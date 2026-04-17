@@ -1,0 +1,16 @@
+services:
+  builder:
+    build:
+      context: .
+    volumes:
+      - ./dist:/src/dist
+    # The command now executes the build into the mounted volume
+    command: >
+      sh -c "pyinstaller --noconfirm --onefile 
+      --collect-all ttkbootstrap
+      --hidden-import PIL._tkinter_finder
+      --add-data 'configs:configs' --add-data 'data:data' 
+      --name app
+      app.py && 
+      chmod +x dist/app dist/LinApp.desktop &&
+      chown -R ${UID:-1000}:${GID:-1000} dist/"

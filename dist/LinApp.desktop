@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=LinApp
+Comment=Semi-Auto Migration
+Exec=sh -c 'd="$(dirname "$(readlink -f "$1")")"; cd "$d"; exec ./app' sh %k
+Terminal=false
+Categories=Utility;

@@ -1,0 +1,27 @@
+windows_name,linux_package,linux_display_name,category,migration_strategy,confidence,notes
+Microsoft Office,libreoffice,LibreOffice,Office,apt,high,Full office suite replacement
+Microsoft 365,libreoffice,LibreOffice,Office,apt,high,Full microsoft 365 suite replacement
+Microsoft Edge,firefox,Firefox,Browser,apt,high,Recommended default browser
+Google Chrome,google-chrome-stable,Google Chrome,Browser,external,high,Requires Google repo
+VLC Media Player,vlc,VLC Media Player,Media,apt,high,Direct equivalent
+Visual Studio Code,code,VS Code,Development,external,high,Microsoft repository
+Notepad++,notepad-plus-plus,Note++,Utility,apt,medium,Feature overlap but different UI
+Paint,gimp,GIMP,Graphics,apt,medium,More powerful but steeper learning curve
+Paint 3D,blender,Blender,Graphics,apt,low,Advanced 3D tool not beginner-friendly
+Adobe Photoshop,gimp,GIMP,Graphics,apt,medium,Feature-rich but different workflows
+Adobe Illustrator,inkscape,Inkscape,Graphics,apt,medium,Vector graphics equivalent
+Adobe Premiere Pro,kdenlive,Kdenlive,Media,apt,medium,Non-linear video editor
+Adobe After Effects,blender,Blender,Media,apt,low,Partial replacement via compositor
+WinRAR,p7zip-full,7-Zip,Utility,apt,high,CLI + GUI archive support
+7-Zip,p7zip-full,7-Zip,Utility,apt,high,Same compression formats
+File Explorer,nautilus,Files,Utility,apt,high,Default GNOME file manager
+PowerShell,powershell,PowerShell,Utility,external,medium,Cross-platform PowerShell Core
+Command Prompt,bash,Bash,Utility,apt,high,Standard Linux shell
+Task Manager,htop,htop,System,apt,medium,Terminal-based process viewer
+TeamViewer,remmina,Remmina,Remote Access,apt,medium,RDP/VNC support
+Zoom,zoom,Zoom,Communication,external,high,Official Linux client
+Skype,skypeforlinux,Skype,Communication,external,high,Official Microsoft package
+Slack,slack-desktop,Slack,Communication,external,high,Official Linux build
+Discord,discord,Discord,Communication,external,high,Official Linux client
+Dropbox,dropbox,Dropbox,Cloud,external,high,Official daemon + tray
+OneDrive,rclone,Rclone,Cloud,apt,medium,CLI-based sync solution

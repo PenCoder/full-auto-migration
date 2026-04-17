@@ -1,0 +1,89 @@
+project:
+  name: "Semi-Automated Migration from Windows 11 to Linux Mint"
+  version: "0.1.0"
+  maintainer: "Kofi"
+
+source_system:
+  windows_user: null  # If null, auto-detects current user
+  inventory_output_dir: "inventory"
+  backup_output_dir: "backup"
+
+  backup_paths:
+    - "~/Documents"
+    - "~/Desktop"
+    # - "Pictures"
+    # - "Downloads"
+
+  excluded_paths:
+    - "AppData/Local/Temp"
+    - "AppData/Local/Cache"
+  
+  file_types:
+    ".pdf": True
+    ".docx": True
+    ".xlsx": True
+    ".pptx": True
+    ".jpg": True
+    ".png": True
+    ".zip": False
+
+backup:
+  compress: true
+  archive_name: "backup.zip"
+
+target_system:
+  distro: "linux-mint"            # linux-mint or ubuntu
+  edition: "cinnamon"             # cinnamon, mate, xfce
+  language: "en_US.UTF-8"
+  timezone: "Europe/Berlin"
+  hostname: "mint-migrated-system"
+  username: "linuxuser"
+  auto_login: false
+
+migration:
+  mode: "full_clean"              # full_clean or dual_boot (future)
+  target_disk: "/dev/sda"
+  layout: "full_disk"             # full_disk or custom
+  swap_size_gb: 4
+  encrypt_root: false
+  backup_location: "/mnt/backup"
+  include_hidden_files: false
+
+  software_profile: "standard"    # standard / developer / custom
+  extra_packages:
+    - "vlc"
+    - "gimp"
+
+automation:
+  dry_run: false
+  logging_level: "INFO"           # DEBUG / INFO / WARNING / ERROR
+  log_file: "logs/migration.log"
+  confirm_destructive_actions: true
+
+validation:
+  check_network: true
+  check_audio: true
+  check_gpu: true
+  check_video_playback: true
+  check_office_suite: true
+
+research:
+  record_metrics: true
+  anonymize_machine_id: true
+  save_run_summary: "logs/run_summary.json"
+
+
+# ---------------------------------------
+
+demo:
+  mode: true
+  include_dirs:
+    - "~/Documents"
+    - "~/Desktop"
+  file_extensions:
+    - ".txt"
+    - ".pdf"
+    - ".docx"
+    - ".jpg"
+    - ".png"
+  max_files: 30

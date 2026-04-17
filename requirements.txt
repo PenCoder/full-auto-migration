@@ -1,0 +1,8 @@
+ttkbootstrap
+PySide6
+PyYAML
+pyinstaller
+requests
+psutil
+rich
+typer
