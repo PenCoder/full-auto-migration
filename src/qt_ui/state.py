@@ -17,6 +17,7 @@ class QtUiState:
             "Pictures": True,
         }
     )
+    custom_paths: list[str] = field(default_factory=list)
     inventory_completed: bool = False
     analysis_completed: bool = False
     backup_completed: bool = False

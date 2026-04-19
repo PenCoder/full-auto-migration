@@ -30,13 +30,14 @@ configuration file (migration.config.yaml) and centralized logging.
 from __future__ import annotations
 
 import getpass
+import json
 import logging
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from src.constants import BASE_DIR, DATA_DIR
+from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
 from src.loggers import get_logger
 from src.config import load_default_config, load_config, MigrationConfigRoot
 from src.inventory.hardware import (
@@ -59,6 +60,11 @@ from src.analysis.software_mapping import (
     write_software_mapping,
     _load_software_inventory,
 )
+from src.orchestration.errors import MigrationError, user_facing_error
+from src.services.validation_service import validate_restore_report
+from src.services.profile_service import ProfileService
+from src.services.report_service import ReportService
+from src.services.pipeline_service import PipelineService
 
 
 # ---------------------------------------------------------------------------
@@ -69,13 +75,26 @@ app = typer.Typer(help="Semi-automated migration framework CLI")
 
 inventory_app = typer.Typer(help="Inventory-related commands (hardware, software)")
 analyze_app = typer.Typer(help="Analysis commands (hardware matrix, software mapping)")
+profile_app = typer.Typer(help="Profile commands for saving custom migration preferences")
 
 app.add_typer(inventory_app, name="inventory")
 app.add_typer(analyze_app, name="analyze")
+app.add_typer(profile_app, name="profile")
 
 # logger = logging.getLogger("semi_migrate")
 # logger.setLevel(logging.INFO)
 logger = get_logger("cli")
+
+
+def _handle_cli_error(exc: Exception, action: str) -> None:
+    if isinstance(exc, MigrationError):
+        logger.exception("%s failed: %s", action, exc)
+        typer.echo(f"ERROR during {action}:\n{user_facing_error(str(exc))}")
+    else:
+        logger.exception("%s failed with unexpected error: %s", action, exc)
+        typer.echo(f"ERROR during {action}: {exc}")
+        typer.echo("Recovery: Review logs, verify inputs, and retry the command.")
+    raise typer.Exit(code=1)
 
 
 
@@ -203,29 +222,73 @@ def backup_command(
     It creates manifest.json containing file paths, sizes, and hashes
     as a basis for later backup and integrity checks.
     """
-    cfg = load_configuration(config)
-
-    if not confirm:
-        proceed = typer.confirm(
-            "This will scan all configured backup paths and compute SHA-256 hashes. "
-            "This may take some time. Continue?"
-        )
-        if not proceed:
-            typer.echo("Aborted by user.")
-            raise typer.Exit(code=1)
-
-    logger.info("Starting backup manifest generation...")
-
     try:
+        cfg = load_configuration(config)
+
+        if not confirm:
+            proceed = typer.confirm(
+                "This will scan all configured backup paths and compute SHA-256 hashes. "
+                "This may take some time. Continue?"
+            )
+            if not proceed:
+                typer.echo("Aborted by user.")
+                raise typer.Exit(code=1)
+
+        logger.info("Starting backup manifest generation...")
+
         manifest = generate_manifest(cfg)
-        
         out_file = write_manifest(cfg, manifest)
         logger.info("Backup manifest written to %s", out_file)
         copy_backup_files(manifest, cfg)
+    except typer.Exit:
+        raise
     except Exception as exc:
-        logger.exception("Backup command failed: %s", exc)
-        typer.echo("ERROR: Backup failed. See logs for details.")
-        raise typer.Exit(code=1)
+        _handle_cli_error(exc, "backup")
+
+
+@app.command("recommended")
+def recommended_command(
+    config: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to migration.config.yaml"
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip confirmations and run full recommended pre-migration pipeline.",
+    ),
+) -> None:
+    """
+    Run one-click recommended Windows-side pipeline:
+    inventory -> analysis -> backup.
+    """
+    try:
+        cfg = load_configuration(config)
+
+        if not yes:
+            proceed = typer.confirm("Run full recommended pipeline (inventory, analysis, backup)?")
+            if not proceed:
+                typer.echo("Aborted by user.")
+                raise typer.Exit(code=1)
+
+        logger.info("Starting recommended migration pipeline")
+        pipeline = PipelineService(cfg)
+        result = pipeline.run_windows_pre_migration()
+        logger.info(
+            "Recommended pipeline complete: inventory=%d software entries, mappings=%d, backup=%s",
+            len(result.inventory.get("software", {}).get("entries", [])),
+            len(result.analysis.get("software", [])),
+            "ok" if result.backup else "failed",
+        )
+        if result.backup is None:
+            typer.echo("ERROR: Recommended pipeline failed during backup stage.")
+            raise typer.Exit(code=1)
+
+        typer.echo("Recommended pipeline completed successfully.")
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        _handle_cli_error(exc, "recommended pipeline")
 
 
 # ---------------------------------------------------------------------------
@@ -321,30 +384,27 @@ def validate_command(
     config: Optional[Path] = typer.Option(
         None, "--config", "-c", help="Path to migration.config.yaml"
     ),
+    report: Optional[Path] = typer.Option(
+        None,
+        "--report",
+        help="Path to restore_report.json. Defaults to data/restore/restore_report.json.",
+    ),
 ) -> None:
     """
-    Validate post-migration system state (stub).
-
-    Future work (Milestone M4 and M5) will implement:
-    - Verification of restored files against manifest.json (hash comparison)
-    - Basic system checks: network, audio, GPU driver readiness
-    - Video playback validation (codec availability)
-    - Office suite readiness (LibreOffice available and functional)
+    Validate post-migration state from restore_report.json and emit
+    a machine-readable validation_report.json summary.
     """
-    cfg = load_configuration(config)
+    try:
+        load_configuration(config)
 
-    logger.info("Validation command invoked (stub mode).")
-    typer.echo(
-        "validate: This feature is not implemented yet.\n"
-        "Planned functionality includes:\n"
-        "1. Compare restored files against manifest.json (SHA-256).\n"
-        "2. Run network connectivity tests.\n"
-        "3. Validate audio output and microphone.\n"
-        "4. Check GPU driver readiness and acceleration.\n"
-        "5. Validate video playback (H.264, MP4).\n"
-        "6. Confirm office suite availability and functionality.\n"
-        "7. Produce a structured validation report.\n"
-    )
+        report_path = report or (RESTORE_DIR / "restore_report.json")
+        summary = validate_restore_report(report_path)
+        typer.echo(json.dumps(summary, indent=2))
+        logger.info("Validation summary generated at %s", summary.get("validation_report_path"))
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        _handle_cli_error(exc, "validation")
 
 # ---------------------------------------------------------------------------
 # RESTORE COMMAND (stub for future extension)
@@ -360,30 +420,99 @@ def restore_command(
         "--source",
         help="Path to the mounted backup location on Linux (e.g. /mnt/backup).",
     ),
+    target: Optional[Path] = typer.Option(
+        None,
+        "--target",
+        help="Target directory for restored files. Defaults to ~/Restored_Migration.",
+    ),
 ) -> None:
     """
-    Restore data from backup location to the Linux home directory (stub).
-
-    Future work (Milestone M4 and M5) will implement:
-    - Reading manifest.json
-    - Restoring files with rsync or a Python copy mechanism
-    - Rebuilding directory structures under /home/<user>
-    - Handling permissions and ownership
-    - Running hash validation to ensure correctness
+    Restore data from backup bundle to the Linux target directory,
+    verify hashes, and emit restore_report.json.
     """
-    cfg = load_configuration(config)
+    try:
+        cfg = load_configuration(config)
 
-    logger.info("Restore command invoked (stub mode).")
-    typer.echo(
-        "restore: This feature is not implemented yet.\n"
-        "Planned functionality:\n"
-        "1. Load manifest.json from backup.\n"
-        "2. Validate backup source path (--source).\n"
-        "3. Reconstruct directory structure in /home/<user>.\n"
-        "4. Copy files from backup to target system.\n"
-        "5. Verify file integrity via SHA-256.\n"
-        "6. Produce a restore report.\n"
-    )
+        source_dir = source or RESTORE_DIR
+        target_home = target or (Path.home() / "Restored_Migration")
+        logger.info("Restore command invoked with source=%s target=%s", source_dir, target_home)
+
+        pipeline = PipelineService(cfg)
+        result = pipeline.run_linux_post_migration(
+            bundle_dir=source_dir,
+            target_home=target_home,
+        )
+        typer.echo(f"Restore completed. Report: {result.restore['report_path']}")
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        _handle_cli_error(exc, "restore")
+
+
+@app.command("report")
+def report_command(
+    config: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to migration.config.yaml"
+    ),
+) -> None:
+    """
+    Generate the final migration report bundle from restore and validation evidence.
+    """
+    try:
+        load_configuration(config)
+
+        result = ReportService().generate_report()
+        report = result.get("report", {})
+        summary = report.get("summary", {})
+
+        typer.echo(json.dumps({
+            "json_path": result.get("json_path"),
+            "markdown_path": result.get("markdown_path"),
+            "html_path": result.get("html_path"),
+            "summary": summary,
+        }, indent=2))
+        logger.info("Final report generated at %s", result.get("markdown_path"))
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        _handle_cli_error(exc, "report generation")
+
+
+@profile_app.command("save")
+def profile_save(
+    mode: str = typer.Option("guided", "--mode", help="Migration mode: guided, balanced, expert"),
+    include_docs: bool = typer.Option(True, "--docs", help="Include Documents folder"),
+    include_desktop: bool = typer.Option(True, "--desktop", help="Include Desktop folder"),
+    include_downloads: bool = typer.Option(True, "--downloads", help="Include Downloads folder"),
+    include_pictures: bool = typer.Option(True, "--pictures", help="Include Pictures folder"),
+) -> None:
+    """
+    Save an active profile for customization-aware flows.
+    """
+    profile = {
+        "mode": mode,
+        "selected_folders": {
+            "Documents": include_docs,
+            "Desktop": include_desktop,
+            "Downloads": include_downloads,
+            "Pictures": include_pictures,
+        },
+        "mapping_overrides": [],
+    }
+    path = ProfileService().save(profile)
+    typer.echo(f"Profile saved: {path}")
+
+
+@profile_app.command("show")
+def profile_show() -> None:
+    """
+    Show the currently active customization profile.
+    """
+    profile = ProfileService().load()
+    if not profile:
+        typer.echo("No active profile found.")
+        return
+    typer.echo(json.dumps(profile, indent=2))
 
 
 # ---------------------------------------------------------------------------

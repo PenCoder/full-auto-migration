@@ -37,18 +37,9 @@ class ExecutionPage(BasePage):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(14)
 
-        title = QLabel("Step 3 of 4: Execute Migration Preparation")
-        title.setStyleSheet("font-size: 20px; font-weight: 600;")
-        root.addWidget(title)
-
         self.status = QLabel("Run each task below, or use Run All for one-click flow.")
         self.status.setWordWrap(True)
         root.addWidget(self.status)
-
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 1)
-        self.progress.setValue(0)
-        root.addWidget(self.progress)
 
         row = QHBoxLayout()
         self.inventory_btn = QPushButton("Run Inventory")

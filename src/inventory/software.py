@@ -162,7 +162,67 @@ def _collect_software_from_registry() -> List[Dict[str, Any]]:
     return []
 
 
-def collect_software_inventory() -> Dict[str, Any]:
+def _collect_packages_from_package_manager() -> List[Dict[str, Any]]:
+    ps_script = r"""
+    try {
+        Get-Package |
+            Select-Object Name,Version,ProviderName,Source |
+            ConvertTo-Json -Depth 4
+    } catch {
+        @() | ConvertTo-Json -Depth 4
+    }
+    """
+    data = _run_powershell_json(ps_script)
+    if data is None:
+        return []
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def _collect_appx_packages() -> List[Dict[str, Any]]:
+    ps_script = r"""
+    try {
+        Get-AppxPackage |
+            Select-Object Name,Publisher,Version,InstallLocation |
+            ConvertTo-Json -Depth 4
+    } catch {
+        @() | ConvertTo-Json -Depth 4
+    }
+    """
+    data = _run_powershell_json(ps_script)
+    if data is None:
+        return []
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def _collect_startup_entries() -> List[Dict[str, Any]]:
+    ps_script = r"""
+    try {
+        Get-CimInstance Win32_StartupCommand |
+            Select-Object Name,Command,Location,User |
+            ConvertTo-Json -Depth 4
+    } catch {
+        @() | ConvertTo-Json -Depth 4
+    }
+    """
+    data = _run_powershell_json(ps_script)
+    if data is None:
+        return []
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def collect_software_inventory(deep_scan: bool = False) -> Dict[str, Any]:
     """
     Collect software inventory from the current Windows system.
 
@@ -180,7 +240,22 @@ def collect_software_inventory() -> Dict[str, Any]:
     inventory: Dict[str, Any] = {
         "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "entries": entries,
+        "scan_depth": "deep" if deep_scan else "quick",
     }
+
+    if deep_scan:
+        pkg_entries = _collect_packages_from_package_manager()
+        appx_entries = _collect_appx_packages()
+        startup_entries = _collect_startup_entries()
+        inventory["package_manager_entries"] = pkg_entries
+        inventory["appx_entries"] = appx_entries
+        inventory["startup_entries"] = startup_entries
+        inventory["deep_scan_summary"] = {
+            "registry_entries": len(entries),
+            "package_manager_entries": len(pkg_entries),
+            "appx_entries": len(appx_entries),
+            "startup_entries": len(startup_entries),
+        }
 
     logger.info("Software inventory collection completed. Total entries: %d", len(entries))
     return inventory

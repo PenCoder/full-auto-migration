@@ -72,6 +72,11 @@ class MigrationConfig:
 class AutomationConfig:
     """Runtime automation behaviour."""
     dry_run: bool = False
+    auto_start_full_flow: bool = False
+    auto_start_delay_ms: int = 250
+    enable_dynamic_rules: bool = True
+    active_profile_path: str = "data/profiles/active_profile.json"
+    checkpoint_dir: str = "data/checkpoints"
     logging_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_file: str = "logs/migration.log"
     confirm_destructive_actions: bool = True

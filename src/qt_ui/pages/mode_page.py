@@ -4,9 +4,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
     QPushButton,
+    QRadioButton,
     QVBoxLayout,
 )
 
@@ -21,55 +21,47 @@ class ModePage(BasePage):
         self.refresh()
 
     def _build_ui(self) -> None:
-        root = QVBoxLayout(self)
-        root.setContentsMargins(10, 10, 10, 10)
-        root.setSpacing(16)
-
-        step = QLabel("Step 1 of 4: Migration Mode")
-        step.setObjectName("StepTitle")
-        step.setAlignment(Qt.AlignCenter)
-        root.addWidget(step)
-
-        summary = QLabel(
-            "Choose a simple mode now. You can open Expert Overrides at any point for advanced control."
-        )
-        summary.setObjectName("BodyText")
-        summary.setWordWrap(True)
-        summary.setAlignment(Qt.AlignCenter)
-        root.addWidget(summary)
+        root = self.create_center_card_layout()
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(16)
         grid.setVerticalSpacing(16)
 
-        self.guided_btn = self._mode_card(
-            "Recommended Migration",
-            "Safe defaults, least effort, best for novice users.",
-            "guided",
-        )
-        self.balanced_btn = self._mode_card(
-            "Custom Migration",
-            "Balanced automation with selective choices.",
-            "balanced",
-        )
-        self.expert_btn = self._mode_card(
-            "System Assessment",
-            "Insight-first flow with advanced controls.",
-            "expert",
-        )
+        self.guided_radio = QRadioButton("Guided Migration")
+        self.guided_radio.setToolTip("You'll be guided through each step with recommended defaults and explanations.")
+        guided_hint_text = ("ⓘ Recommended for most users, especially if you're new to Linux or want a hassle-free experience. " +
+                        "You'll get helpful guidance and sensible defaults while still having the option to customize key choices.")
+        guided_hint = self.hint_label(guided_hint_text)
 
-        grid.addWidget(self.guided_btn, 0, 0)
-        grid.addWidget(self.balanced_btn, 0, 1)
-        grid.addWidget(self.expert_btn, 0, 2)
-        root.addLayout(grid)
+        self.balanced_radio = QRadioButton("Balanced Migration")
+        self.balanced_radio.setToolTip("You'll get recommended defaults but can customize key choices.")
+        balanced_hint_text = ("ⓘ Good if you want a mix of guidance and control. You'll receive recommendations for each step but can choose to customize or skip them as you go.")
+        balanced_hint = self.hint_label(balanced_hint_text)
 
-        action_row = QHBoxLayout()
-        action_row.addStretch(1)
-        continue_btn = QPushButton("Continue")
-        continue_btn.setProperty("role", "cta")
-        continue_btn.clicked.connect(self.request_next.emit)
-        action_row.addWidget(continue_btn)
-        root.addLayout(action_row)
+        self.expert_radio = QRadioButton("Expert Migration")
+        self.expert_radio.setToolTip("You'll have full control and see all options upfront.")
+        expert_hint_text = ("ⓘ Best if you're experienced with migrations or want full control. You'll see all options and settings upfront and can customize everything from the start.")
+        expert_hint = self.hint_label(expert_hint_text)
+
+        question = "1. Choose a migration mode." \
+        
+        info = ("• Each mode offers different levels of guidance and control, yet all modes will produce the same final migration outcome. <br/>" + 
+                "• You can switch modes at any time without affecting your progress."
+                )
+
+        questionnaire = self.create_guided_questionnaire(
+            question=question,
+            info=info,
+            options=[
+                self.guided_radio, 
+                guided_hint,
+                self.balanced_radio,
+                balanced_hint,
+                self.expert_radio,
+                expert_hint
+            ],
+        )
+        root.addWidget(questionnaire)
 
     def _mode_card(self, title: str, detail: str, mode_value: str) -> QFrame:
         card = QFrame()
@@ -101,9 +93,9 @@ class ModePage(BasePage):
 
     def refresh(self) -> None:
         selected = self.ui_state.mode
-        self._set_selected(self.guided_btn, selected == "guided")
-        self._set_selected(self.balanced_btn, selected == "balanced")
-        self._set_selected(self.expert_btn, selected == "expert")
+        # self._set_selected(self.guided_btn, selected == "guided")
+        # self._set_selected(self.balanced_btn, selected == "balanced")
+        # self._set_selected(self.expert_btn, selected == "expert")
 
     @staticmethod
     def _set_selected(card: QFrame, value: bool) -> None:

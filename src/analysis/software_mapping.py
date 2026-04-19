@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional
 from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
 from src.loggers import get_logger
 from src.config import load_default_config, load_config, MigrationConfigRoot, load_software_mapping
+from src.analysis.dynamic_rules import resolve_mapping
+from src.services.profile_service import ProfileService
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +257,10 @@ def generate_software_mapping(
     rows: List[Dict[str, str]] = []
 
     mapping = load_software_mapping(config.migration.software_map_config)
+    profile_path = Path(config.automation.active_profile_path)
+    if not profile_path.is_absolute():
+        profile_path = BASE_DIR / profile_path
+    overrides = ProfileService(profile_path=profile_path).get_mapping_overrides()
     
     for entry in entries:
         display_name = _normalize_str(entry.get("DisplayName"))
@@ -265,20 +271,24 @@ def generate_software_mapping(
 
         category = classify_category(display_name, publisher)
 
-        mapped = [m for m in mapping if m["windows_name"].lower() in display_name.lower()]
-        if mapped:
-            cur_map = mapped[0]
-        else:
+        decision = resolve_mapping(
+            display_name=display_name,
+            base_mappings=mapping,
+            overrides=overrides,
+        )
+        if not decision:
             continue
 
         rows.append({
             "windows_name": display_name,
             "publisher": publisher,
             "category": category,
-            "linux_package": cur_map["linux_package"],
-            "linux_display_name": cur_map.get("linux_display_name"),
-            "migration_strategy": cur_map["migration_strategy"],
-            "notes": cur_map["notes"],
+            "linux_package": decision.linux_package,
+            "linux_display_name": decision.linux_display_name,
+            "migration_strategy": decision.migration_strategy,
+            "notes": decision.notes,
+            "confidence_score": f"{decision.confidence_score:.2f}",
+            "recommendation_source": decision.recommendation_source,
         })
 
     return rows
@@ -319,6 +329,8 @@ def write_software_mapping(
         "migration_strategy",
         "linux_display_name",
         "notes",
+        "confidence_score",
+        "recommendation_source",
     ]
 
     with out_path.open("w", encoding="utf-8", newline="") as f:

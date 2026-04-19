@@ -5,6 +5,7 @@ from typing import Callable
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QVBoxLayout
 
+from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
 from src.qt_ui.workers import FunctionWorker
 
@@ -20,25 +21,15 @@ class BackupBundlePage(BasePage):
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
 
-        step = QLabel("Preparation - Step 4 of 4: Create the Backup")
-        step.setObjectName("StepTitle")
-        step.setAlignment(Qt.AlignCenter)
-        root.addWidget(step)
-
-        self.step_progress = QProgressBar()
-        self.step_progress.setRange(0, 100)
-        self.step_progress.setValue(100)
-        self.step_progress.setTextVisible(False)
-        self.step_progress.setFixedHeight(10)
-        root.addWidget(self.step_progress)
-
-        text = QLabel("Ready to go! We'll create an encrypted bundle on your desktop.")
+        text = QLabel(
+            "Create a migration bundle with manifest metadata and transferable backup payload."
+        )
         text.setObjectName("HeroTitle")
         text.setWordWrap(True)
         text.setAlignment(Qt.AlignCenter)
         root.addWidget(text)
 
-        self.status = QLabel("Press Create Backup Bundle to generate manifest and backup payload.")
+        self.status = QLabel("Press Create Backup Bundle to generate manifest.json and backup artifacts.")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
@@ -51,14 +42,14 @@ class BackupBundlePage(BasePage):
 
         self.backup_btn = QPushButton("Create Backup Bundle")
         self.backup_btn.setProperty("role", "primary")
-        self.backup_btn.setMinimumHeight(58)
-        self.backup_btn.setFixedWidth(280)
+        self.backup_btn.setMinimumHeight(48)
+        self.backup_btn.setFixedWidth(250)
         self.backup_btn.clicked.connect(self._run_backup)
         root.addWidget(self.backup_btn, alignment=Qt.AlignHCenter)
 
         self.next_btn = QPushButton("Continue")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(220)
+        self.next_btn.setFixedWidth(200)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
@@ -74,16 +65,17 @@ class BackupBundlePage(BasePage):
         self.thread_pool.start(worker)
 
     def _on_result(self, result: object) -> None:
-        if result:
+        if isinstance(result, dict):
             self.ui_state.backup_completed = True
-            self.status.setText("Backup bundle created successfully.")
+            total = int(result.get("total_files", 0))
+            self.status.setText(f"Backup bundle created successfully. Manifest entries: {total}.")
         else:
             self.status.setText("Backup finished without manifest output.")
         self.refresh()
 
     def _on_error(self, error: str) -> None:
         self.ui_state.last_error = error
-        self.status.setText(f"Backup failed: {error}")
+        self.status.setText(f"Backup failed.\n{user_facing_error(error)}")
         self.refresh()
 
     def _on_finished(self) -> None:

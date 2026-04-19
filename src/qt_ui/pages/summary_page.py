@@ -16,10 +16,6 @@ class SummaryPage(BasePage):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(14)
 
-        title = QLabel("Step 4 of 4: Review")
-        title.setStyleSheet("font-size: 20px; font-weight: 600;")
-        root.addWidget(title)
-
         self.summary = QLabel()
         self.summary.setWordWrap(True)
         self.summary.setStyleSheet("font-size: 16px;")

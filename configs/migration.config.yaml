@@ -56,6 +56,11 @@ migration:
 
 automation:
   dry_run: false
+  auto_start_full_flow: false
+  auto_start_delay_ms: 250
+  enable_dynamic_rules: true
+  active_profile_path: "data/profiles/active_profile.json"
+  checkpoint_dir: "data/checkpoints"
   logging_level: "INFO"           # DEBUG / INFO / WARNING / ERROR
   log_file: "logs/migration.log"
   confirm_destructive_actions: true

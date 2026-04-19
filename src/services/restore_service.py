@@ -7,6 +7,8 @@ from typing import Callable, Optional
 
 from src.constants import EXTRACTED_BACKUP_DIR, RESTORE_REPORT
 from src.loggers import get_logger
+from src.orchestration.errors import ERR_ARCHIVE_UNSAFE_PATH, ERR_MISSING_BUNDLE, MigrationError
+from src.services.package_manager import detect_package_manager, install_packages
 
 # logger = logging.getLogger("restore")
 
@@ -23,7 +25,13 @@ class RestoreService:
     - Install selected applications using pkexec
     """
 
-    def __init__(self, bundle_dir: Path, target_home: Path, progress_cb: Optional[ProgressCb] = None):
+    def __init__(
+        self,
+        bundle_dir: Path,
+        target_home: Path,
+        progress_cb: Optional[ProgressCb] = None,
+        target_distro: str | None = None,
+    ):
         self.logger = get_logger("restore_service")
         
         self.bundle_dir = bundle_dir
@@ -35,6 +43,7 @@ class RestoreService:
         self.apps_path = bundle_dir / "apps_to_install.json"
 
         self.apps_to_install = []
+        self.target_distro = target_distro
 
         self.restored_files = []
         self.installed_apps = []
@@ -49,6 +58,7 @@ class RestoreService:
     # PUBLIC ENTRY POINT
     # -------------------------
     def run_restore(self):
+        self._validate_bundle()
         self._progress(0, "Loading manifest…")
         manifest = self._load_manifest()
 
@@ -68,6 +78,10 @@ class RestoreService:
         self._write_restore_report()
 
         self._progress(100, "Restore completed.")
+
+    def _validate_bundle(self) -> None:
+        if not self.manifest_path.exists() or not self.archive_path.exists():
+            raise MigrationError(ERR_MISSING_BUNDLE, str(self.bundle_dir))
 
 
     def _write_restore_report(self):
@@ -102,7 +116,7 @@ class RestoreService:
                 # Zip Slip protection
                 target_path = (extract_dir / member.filename).resolve()
                 if not str(target_path).startswith(str(extract_dir.resolve())):
-                    raise RuntimeError(f"Unsafe path in archive: {member.filename}")
+                    raise MigrationError(ERR_ARCHIVE_UNSAFE_PATH, member.filename)
                 if member.is_dir():
                     target_path.mkdir(parents=True, exist_ok=True)
                 else:
@@ -122,12 +136,22 @@ class RestoreService:
             dst = self.target_home / entry["relative_path"]
 
             dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
+
+            verification_status = "restored"
+            if dst.exists() and dst.is_file():
+                current_hash = self._hash_file(dst)
+                if current_hash == entry["sha256"]:
+                    verification_status = "already_present"
+                else:
+                    shutil.copy2(src, dst)
+            else:
+                shutil.copy2(src, dst)
 
             self.restored_files.append({
                 "relative_path": entry["relative_path"],
                 "destination": str(dst),
                 "sha256": entry["sha256"],
+                "verification_status": verification_status,
             })
 
             # map restore phase into 15%..70%
@@ -145,14 +169,26 @@ class RestoreService:
             expected = entry["sha256"]
 
             actual = self._hash_file(path)
+            status = "match"
             if actual != expected:
+                status = "mismatch"
                 self.logger.error("Hash mismatch for %s: expected %s, got %s", path, expected, actual)
+
+            for item in self.restored_files:
+                if item.get("relative_path") == entry["relative_path"]:
+                    item["verification_status"] = status
+                    item["actual_sha256"] = actual
+                    break
                 
             # map verify phase into 75%..89%
             pct = 75 + int((i / total) * 14)
             self._progress(pct, f"Verifying… ({i}/{total})")
 
-        self.logger.info("File integrity verified")
+        mismatches = [f for f in self.restored_files if f.get("verification_status") == "mismatch"]
+        if mismatches:
+            self.logger.warning("File integrity completed with %d mismatch(es)", len(mismatches))
+        else:
+            self.logger.info("File integrity verified")
 
     @staticmethod
     def _hash_file(path: Path) -> str:
@@ -173,40 +209,23 @@ class RestoreService:
         applications = self._load_applications(self.apps_path)
         self.apps_to_install = applications.get("applications", [])
 
-        apt_packages = [
+        packages = [
             app["linux_package"]
             for app in self.apps_to_install
-            if app.get("migration_strategy") == "apt" and app.get("linux_package")
+            if app.get("migration_strategy") in {"apt", "dnf", "pacman", "install linux equivalent"}
+            and app.get("linux_package")
         ]
 
-        if not apt_packages:
+        if not packages:
             self.logger.info("No applications to install")
             self._progress(100, "Restore completed.")
+            return
 
-        self._progress(90, f"Installing {len(apt_packages)} applications…")
-        self._run_pkexec_apt_install(apt_packages)
+        manager = detect_package_manager(self.target_distro)
+        self._progress(90, f"Installing {len(packages)} applications with {manager}…")
+        result = install_packages(packages, manager=manager, use_pkexec=True)
 
         self.logger.info("Applications installed")
         self.installed_apps = self.apps_to_install
-
-    def _run_pkexec_apt_install(self, packages: list):
-        import subprocess
-
-        cmd = ["pkexec", "apt-get", "install", "-y"] + packages
-
-        self.logger.info("Running command: %s", " ".join(cmd))
-
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-
-        stdout, stderr = process.communicate()
-
-        if process.returncode != 0:
-            self.logger.error("Application installation failed: %s", stderr)
-
-        self.logger.info("Application installation output: %s", stdout)
+        self.logger.info("Package manager output: %s", result.stdout)
 

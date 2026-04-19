@@ -6,6 +6,7 @@ from typing import Callable
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
 
+from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
 from src.qt_ui.workers import FunctionWorker
 
@@ -22,19 +23,9 @@ class RestorePage(BasePage):
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
 
-        step = QLabel("Migration - Step 1 of 2: Restore Data on Linux")
-        step.setObjectName("StepTitle")
-        step.setAlignment(Qt.AlignCenter)
-        root.addWidget(step)
-
-        self.step_progress = QProgressBar()
-        self.step_progress.setRange(0, 100)
-        self.step_progress.setValue(50)
-        self.step_progress.setTextVisible(False)
-        self.step_progress.setFixedHeight(10)
-        root.addWidget(self.step_progress)
-
-        text = QLabel("Welcome to Linux! Select your backup bundle to begin the restore.")
+        text = QLabel(
+            "Restore your migration bundle on Linux and rebuild your selected data and application state."
+        )
         text.setObjectName("HeroTitle")
         text.setWordWrap(True)
         text.setAlignment(Qt.AlignCenter)
@@ -51,7 +42,7 @@ class RestorePage(BasePage):
         row.addWidget(browse)
         root.addLayout(row)
 
-        self.status = QLabel("Choose a folder containing manifest.json and backup.zip.")
+        self.status = QLabel("Choose a folder containing manifest.json and backup.zip to begin restoration.")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
@@ -64,14 +55,14 @@ class RestorePage(BasePage):
 
         self.restore_btn = QPushButton("Start Restore")
         self.restore_btn.setProperty("role", "primary")
-        self.restore_btn.setMinimumHeight(58)
-        self.restore_btn.setFixedWidth(260)
+        self.restore_btn.setMinimumHeight(48)
+        self.restore_btn.setFixedWidth(230)
         self.restore_btn.clicked.connect(self._run_restore)
         root.addWidget(self.restore_btn, alignment=Qt.AlignHCenter)
 
         self.next_btn = QPushButton("Continue")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(220)
+        self.next_btn.setFixedWidth(200)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
@@ -98,16 +89,17 @@ class RestorePage(BasePage):
         self.thread_pool.start(worker)
 
     def _on_result(self, result: object) -> None:
-        if result:
+        if isinstance(result, dict):
             self.ui_state.restore_completed = True
-            self.status.setText("Restore completed successfully.")
+            report_path = result.get("report_path", "")
+            self.status.setText(f"Restore completed successfully. Evidence report: {report_path}")
         else:
             self.status.setText("Restore finished without a result.")
         self.refresh()
 
     def _on_error(self, error: str) -> None:
         self.ui_state.last_error = error
-        self.status.setText(f"Restore failed: {error}")
+        self.status.setText(f"Restore failed.\n{user_facing_error(error)}")
         self.refresh()
 
     def _on_finished(self) -> None:

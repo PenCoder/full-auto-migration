@@ -1,8 +1,10 @@
 ttkbootstrap
 PySide6
+pyqtspinner
 PyYAML
 pyinstaller
 requests
 psutil
 rich
 typer
+winapps
