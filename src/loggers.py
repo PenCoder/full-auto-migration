@@ -1,3 +1,5 @@
+"""Logging helpers that keep file-based logging consistent across modules."""
+
 # ---------------------------------------------------------------------------
 # Logging setup
 # ---------------------------------------------------------------------------
@@ -8,10 +10,7 @@ import platform
 from .constants import LOGS_DIR
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    Returns a logger with standardized formatting.
-    Ensures that handlers are only added once.
-    """
+    """Return a named file logger with standardized formatting."""
     system_platform = platform.system().lower()
     if system_platform == "windows":
         action = "migrate"

@@ -1,3 +1,5 @@
+"""Qt application bootstrap helpers."""
+
 from __future__ import annotations
 
 import sys
@@ -10,6 +12,7 @@ from src.qt_ui.main_window import QtMigrationWindow
 
 
 def run_qt_app(config: MigrationConfigRoot, runtime_mode: str) -> int:
+    """Create the Qt application, apply styling, and start the event loop."""
     app = QApplication(sys.argv)
     qss_path = Path(__file__).resolve().parent / "theme.qss"
     if qss_path.exists():

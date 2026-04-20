@@ -1,3 +1,5 @@
+"""Mode selection page for the migration wizard."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -14,6 +16,8 @@ from src.qt_ui.pages.base_page import BasePage
 
 
 class ModePage(BasePage):
+    """Let the user choose guided, balanced, or expert migration mode."""
+
     def __init__(self, ui_state) -> None:
         super().__init__(ui_state)
         self.setObjectName("StepCard")
@@ -29,17 +33,20 @@ class ModePage(BasePage):
 
         self.guided_radio = QRadioButton("Guided Migration")
         self.guided_radio.setToolTip("You'll be guided through each step with recommended defaults and explanations.")
+        self.guided_radio.toggled.connect(lambda: self._set_mode("guided"))
         guided_hint_text = ("ⓘ Recommended for most users, especially if you're new to Linux or want a hassle-free experience. " +
                         "You'll get helpful guidance and sensible defaults while still having the option to customize key choices.")
         guided_hint = self.hint_label(guided_hint_text)
 
         self.balanced_radio = QRadioButton("Balanced Migration")
         self.balanced_radio.setToolTip("You'll get recommended defaults but can customize key choices.")
+        self.balanced_radio.toggled.connect(lambda: self._set_mode("balanced"))
         balanced_hint_text = ("ⓘ Good if you want a mix of guidance and control. You'll receive recommendations for each step but can choose to customize or skip them as you go.")
         balanced_hint = self.hint_label(balanced_hint_text)
 
         self.expert_radio = QRadioButton("Expert Migration")
         self.expert_radio.setToolTip("You'll have full control and see all options upfront.")
+        self.expert_radio.toggled.connect(lambda: self._set_mode("expert"))
         expert_hint_text = ("ⓘ Best if you're experienced with migrations or want full control. You'll see all options and settings upfront and can customize everything from the start.")
         expert_hint = self.hint_label(expert_hint_text)
 
@@ -63,39 +70,15 @@ class ModePage(BasePage):
         )
         root.addWidget(questionnaire)
 
-    def _mode_card(self, title: str, detail: str, mode_value: str) -> QFrame:
-        card = QFrame()
-        card.setFrameShape(QFrame.StyledPanel)
-        card.setProperty("card", True)
-        card.setProperty("selected", False)
-
-        layout = QVBoxLayout(card)
-        layout.setSpacing(10)
-        h = QLabel(title)
-        h.setObjectName("StepTitle")
-        d = QLabel(detail)
-        d.setObjectName("BodyText")
-        d.setWordWrap(True)
-
-        select_btn = QPushButton("Select")
-        select_btn.setProperty("role", "primary")
-        select_btn.clicked.connect(lambda: self._set_mode(mode_value))
-
-        layout.addWidget(h)
-        layout.addWidget(d)
-        layout.addStretch(1)
-        layout.addWidget(select_btn)
-        return card
-
     def _set_mode(self, value: str) -> None:
         self.ui_state.mode = value
         self.refresh()
 
     def refresh(self) -> None:
         selected = self.ui_state.mode
-        # self._set_selected(self.guided_btn, selected == "guided")
-        # self._set_selected(self.balanced_btn, selected == "balanced")
-        # self._set_selected(self.expert_btn, selected == "expert")
+        self._set_selected(self.guided_radio, selected == "guided")
+        self._set_selected(self.balanced_radio, selected == "balanced")
+        self._set_selected(self.expert_radio, selected == "expert")
 
     @staticmethod
     def _set_selected(card: QFrame, value: bool) -> None:

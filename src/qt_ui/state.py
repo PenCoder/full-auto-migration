@@ -9,6 +9,8 @@ class QtUiState:
     expert_panel_visible: bool = False
     target_distro: str = "Linux Mint"
     data_strategy: str = "keep_all"
+    data_choice_mode: str = "all_files"
+    recommendation_strategy: str = "migrate_all"
     selected_folders: dict[str, bool] = field(
         default_factory=lambda: {
             "Documents": True,

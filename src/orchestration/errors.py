@@ -1,3 +1,5 @@
+"""Structured error codes and user-facing recovery hints."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +8,7 @@ import re
 
 @dataclass(frozen=True)
 class ErrorCode:
+    """Immutable error metadata used by orchestration and services."""
     code: str
     message: str
 
@@ -35,6 +38,7 @@ ERROR_HINTS = {
 
 
 def extract_error_code(message: str) -> str | None:
+    """Extract an application error code from a free-form message."""
     match = re.search(r"\b(E_[A-Z]{3}_[0-9]{3})\b", message or "")
     if not match:
         return None
@@ -42,6 +46,7 @@ def extract_error_code(message: str) -> str | None:
 
 
 def recovery_hint(message: str) -> str:
+    """Return a recovery hint for a message or error code."""
     code = extract_error_code(message)
     if not code:
         return "Review logs, verify inputs, and retry the operation."
@@ -49,6 +54,7 @@ def recovery_hint(message: str) -> str:
 
 
 def user_facing_error(message: str) -> str:
+    """Format an error message with a recovery suggestion."""
     code = extract_error_code(message)
     hint = recovery_hint(message)
     if code:
@@ -57,7 +63,10 @@ def user_facing_error(message: str) -> str:
 
 
 class MigrationError(RuntimeError):
+    """Exception raised when a migration step fails with a known error code."""
+
     def __init__(self, error: ErrorCode, details: str = "") -> None:
+        """Build a readable exception message from a structured error code."""
         self.error = error
         self.details = details
         message = f"{error.code}: {error.message}"

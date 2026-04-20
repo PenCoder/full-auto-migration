@@ -1,3 +1,5 @@
+"""Final report page for exporting migration evidence artifacts."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,6 +16,8 @@ from src.services.report_service import ReportService
 
 
 class ReportPage(BasePage):
+    """Generate and open the final migration report outputs."""
+
     def __init__(self, ui_state, generate_report_cb: Callable[[], dict] | None = None) -> None:
         super().__init__(ui_state)
         self.generate_report_cb = generate_report_cb

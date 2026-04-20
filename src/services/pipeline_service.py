@@ -1,3 +1,5 @@
+"""Orchestration service for the end-to-end migration pipelines."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,6 +15,7 @@ from src.services.validation_service import validate_restore_report
 
 @dataclass
 class WindowsPipelineResult:
+    """Result bundle for the Windows-side inventory, analysis, and backup flow."""
     inventory: dict[str, Any]
     analysis: dict[str, Any]
     backup: dict[str, Any] | None
@@ -20,12 +23,14 @@ class WindowsPipelineResult:
 
 @dataclass
 class LinuxPipelineResult:
+    """Result bundle for the Linux-side restore and validation flow."""
     restore: dict[str, Any]
     validation: dict[str, Any]
 
 
 @dataclass
 class ReportPipelineResult:
+    """Result bundle for the final report generation flow."""
     report: dict[str, Any]
 
 
@@ -33,6 +38,7 @@ class PipelineService:
     """Backend orchestrator for full migration pipelines."""
 
     def __init__(self, config: MigrationConfigRoot) -> None:
+        """Create a pipeline service bound to a specific configuration."""
         self.config = config
         self.migration = MigrationService(config=config, context={})
 
@@ -41,6 +47,7 @@ class PipelineService:
         selected_folders: list[str] | None = None,
         selected_file_types: dict[str, bool] | None = None,
     ) -> WindowsPipelineResult:
+        """Run the Windows-side inventory, analysis, and backup flow."""
         inventory = self.migration.run_inventory()
         analysis = self.migration.run_analysis(
             sw_inventory=inventory.get("software", {}),
@@ -62,6 +69,7 @@ class PipelineService:
         bundle_dir: Path,
         target_home: Path,
     ) -> LinuxPipelineResult:
+        """Run the Linux-side restore and validation flow."""
         service = RestoreService(
             bundle_dir=bundle_dir,
             target_home=target_home,
@@ -81,6 +89,7 @@ class PipelineService:
         )
 
     def generate_final_report(self) -> ReportPipelineResult:
+        """Generate the final migration report bundle."""
         service = ReportService()
         report = service.generate_report()
         return ReportPipelineResult(report=report)

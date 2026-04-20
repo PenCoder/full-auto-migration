@@ -1,3 +1,5 @@
+"""Summary page for displaying the current migration configuration."""
+
 from __future__ import annotations
 
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout
@@ -6,6 +8,8 @@ from src.qt_ui.pages.base_page import BasePage
 
 
 class SummaryPage(BasePage):
+    """Show a compact snapshot of the current migration choices."""
+
     def __init__(self, ui_state) -> None:
         super().__init__(ui_state)
         self._build_ui()

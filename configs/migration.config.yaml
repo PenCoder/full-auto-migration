@@ -77,6 +77,14 @@ research:
   anonymize_machine_id: true
   save_run_summary: "logs/run_summary.json"
 
+ai:
+  enabled: false
+  endpoint: ""
+  model: ""
+  api_key: ""
+  temperature: 0.2
+  timeout_seconds: 10
+
 
 # ---------------------------------------
 

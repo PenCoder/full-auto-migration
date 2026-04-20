@@ -1,3 +1,5 @@
+"""Expert override panel for mappings, paths, and advanced options."""
+
 from __future__ import annotations
 
 import json
@@ -32,7 +34,10 @@ from src.services.profile_service import ProfileService
 
 
 class ExpertPanel(QWidget):
+    """Expose advanced mapping and migration overrides to expert users."""
+
     def __init__(self, ui_state: QtUiState, profile_path: Path | None = None) -> None:
+        """Create the expert panel and bind it to the active UI state."""
         super().__init__()
         self.ui_state = ui_state
         self.profile_service = ProfileService(profile_path=profile_path)

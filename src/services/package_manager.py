@@ -1,3 +1,5 @@
+"""Package-manager abstraction used by restore and recommendation workflows."""
+
 from __future__ import annotations
 
 import shutil
@@ -9,6 +11,7 @@ from src.orchestration.errors import ERR_PACKAGE_INSTALL, ERR_UNSUPPORTED_PM, Mi
 
 @dataclass
 class PackageInstallResult:
+    """Summary of a package installation run."""
     manager: str
     installed: list[str]
     failed: list[str]
@@ -17,6 +20,7 @@ class PackageInstallResult:
 
 
 def detect_package_manager(preferred_distro: str | None = None) -> str:
+    """Detect the best supported package manager for the current environment."""
     distro = (preferred_distro or "").lower()
     if "ubuntu" in distro or "mint" in distro or "debian" in distro:
         return "apt"
@@ -36,6 +40,7 @@ def detect_package_manager(preferred_distro: str | None = None) -> str:
 
 
 def install_packages(packages: list[str], manager: str, use_pkexec: bool = True) -> PackageInstallResult:
+    """Install packages through the selected package manager."""
     if not packages:
         return PackageInstallResult(manager=manager, installed=[], failed=[], stdout="", stderr="")
 

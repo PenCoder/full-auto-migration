@@ -1,3 +1,5 @@
+"""Application mapping page for compatibility review and analysis."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -12,6 +14,8 @@ from src.qt_ui.widgets.horizontal_stepper import HorizontalStepper
 
 
 class ApplicationMappingPage(BasePage):
+    """Generate Linux application mapping guidance from the scan results."""
+
     def __init__(self, ui_state, run_analysis_cb: Callable[[], dict], current_step: int = 2, step_names: list[str] | None = None) -> None:
         super().__init__(ui_state)
         self.run_analysis_cb = run_analysis_cb

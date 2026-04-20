@@ -1,22 +1,25 @@
+"""Scan page for inventory collection and recommendation generation."""
+
 from __future__ import annotations
 
 from typing import Callable
 
 from PySide6.QtCore import QThreadPool, Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QRadioButton, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QRadioButton
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
-from src.qt_ui.widgets.horizontal_stepper import HorizontalStepper
 from src.qt_ui.workers import FunctionWorker
 
 
 class ScanPage(BasePage):
+    """Collect inventory and generate app-level recommendation previews."""
+
     def __init__(
         self,
         ui_state,
         run_inventory_cb: Callable[[bool], dict],
-        run_recommendations_cb: Callable[[str], dict],
+        run_recommendations_cb: Callable[[str, str], dict],
         current_step: int = 0,
         step_names: list[str] | None = None,
     ) -> None:
@@ -32,21 +35,33 @@ class ScanPage(BasePage):
 
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
-       
-        question = "Would you want to migrate all supported applications or prioritize customizing which applications to migrate?"
-        info = ("• You can choose to move all supported applications or customize which ones to prioritize. <br>" +
-                "• We recommend prioritizing applications you use daily or that are critical for work to ensure a smooth transition.")
-        
-        migrate_all_radio = QRadioButton("Migrate All Supported Applications")
-        prioritize_radio = QRadioButton("Prioritize Custom Selection")
-        prioritize_radio.toggled.connect
 
+        question = "Would you want to migrate all supported applications or prioritize customizing which applications to migrate?"
+        info = (
+            "• You can choose to move all supported applications or customize which ones to prioritize. <br>"
+            + "• We recommend prioritizing applications you use daily or that are critical for work to ensure a smooth transition."
+        )
+
+        self.migrate_all_radio = QRadioButton("Migrate All Supported Applications")
+        self.prioritize_radio = QRadioButton("Prioritize Custom Selection")
+        
         guided_panel = self.create_guided_questionnaire(
             question,
             info,
-            options=[migrate_all_radio, prioritize_radio]
+            options=[self.migrate_all_radio, self.prioritize_radio],
         )
         root.addWidget(guided_panel)
+
+        if self.ui_state.recommendation_strategy == "prioritize":
+            self.prioritize_radio.setChecked(True)
+        else:
+            self.migrate_all_radio.setChecked(True)
+
+        self.recommendation_profile = QLabel("")
+        self.recommendation_profile.setObjectName("BodyText")
+        self.recommendation_profile.setWordWrap(True)
+        self.recommendation_profile.setAlignment(Qt.AlignCenter)
+        root.addWidget(self.recommendation_profile)
 
         self.status = QLabel("Run Quick Scan to collect hardware_inventory.json and software_inventory.json.")
         self.status.setObjectName("BodyText")
@@ -101,11 +116,19 @@ class ScanPage(BasePage):
         # self.next_btn.clicked.connect(self.request_next.emit)
         # root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
+        self.prioritize_radio.toggled.connect(self._on_priority_toggled)
+        self.migrate_all_radio.toggled.connect(self._on_migrate_all_toggled)
+
     def _on_priority_toggled(self, checked: bool) -> None:
         if checked:
             self.ui_state.recommendation_strategy = "prioritize"
-        else:
+            self.refresh()
+
+    def _on_migrate_all_toggled(self, checked: bool) -> None:
+        if checked:
             self.ui_state.recommendation_strategy = "migrate_all"
+        else:
+            return
         self.refresh()
 
     def _set_running_state(self, running: bool) -> None:
@@ -137,7 +160,8 @@ class ScanPage(BasePage):
             self.status.setText("Agent recommendation mode: scoring Linux package alternatives...")
         else:
             self.status.setText("Online recommendation mode: validating package signals...")
-        worker = FunctionWorker(lambda: self.run_recommendations_cb(strategy))
+        preference = self.ui_state.recommendation_strategy
+        worker = FunctionWorker(lambda: self.run_recommendations_cb(strategy, preference))
         worker.signals.result.connect(self._on_recommendation_result)
         worker.signals.error.connect(self._on_error)
         worker.signals.finished.connect(self._on_finished)
@@ -170,8 +194,9 @@ class ScanPage(BasePage):
             count = int(result.get("recommended_count", 0))
             total = int(result.get("input_count", 0))
             strategy = str(result.get("strategy", "local"))
+            preference = str(result.get("selection_profile", self.ui_state.recommendation_strategy))
             self.status.setText(
-                f"{strategy.capitalize()} recommendations generated: {count}/{total} matched. "
+                f"{strategy.capitalize()} recommendations generated ({preference}): {count}/{total} matched. "
                 f"Report: {result.get('markdown_path', '')}"
             )
         else:
@@ -190,10 +215,24 @@ class ScanPage(BasePage):
 
     def refresh(self) -> None:
         mode = self.ui_state.mode
+        if self.ui_state.recommendation_strategy == "prioritize":
+            self.recommendation_profile.setText(
+                "Recommendation profile: Prioritized shortlist. Focuses high-confidence and high-value applications first."
+            )
+        else:
+            self.recommendation_profile.setText(
+                "Recommendation profile: Migrate all. Keeps all supported applications in the recommendation set."
+            )
+
         if mode == "guided":
+            if self.ui_state.recommendation_strategy != "migrate_all":
+                self.ui_state.recommendation_strategy = "migrate_all"
+                self.migrate_all_radio.setChecked(True)
             self.deep_scan_btn.setVisible(False)
             self.online_rec_btn.setVisible(False)
             self.agent_rec_btn.setVisible(False)
+            self.prioritize_radio.setEnabled(False)
+            self.migrate_all_radio.setEnabled(False)
             if not self.is_running:
                 self.quick_scan_btn.setEnabled(True)
             self.status.setText(
@@ -205,6 +244,8 @@ class ScanPage(BasePage):
             self.deep_scan_btn.setVisible(False)
             self.online_rec_btn.setVisible(False)
             self.agent_rec_btn.setVisible(False)
+            self.prioritize_radio.setEnabled(True)
+            self.migrate_all_radio.setEnabled(True)
             if not self.is_running:
                 self.quick_scan_btn.setEnabled(True)
             if not self.ui_state.inventory_completed:
@@ -215,6 +256,8 @@ class ScanPage(BasePage):
             self.deep_scan_btn.setVisible(True)
             self.online_rec_btn.setVisible(True)
             self.agent_rec_btn.setVisible(True)
+            self.prioritize_radio.setEnabled(True)
+            self.migrate_all_radio.setEnabled(True)
             if not self.is_running:
                 self.quick_scan_btn.setEnabled(True)
                 self.deep_scan_btn.setEnabled(True)

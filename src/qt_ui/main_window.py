@@ -1,3 +1,5 @@
+"""Main Qt window that orchestrates the migration workflow."""
+
 from __future__ import annotations
 
 import json
@@ -36,6 +38,7 @@ from src.qt_ui.pages.report_page import ReportPage
 from src.qt_ui.pages.restore_page import RestorePage
 from src.qt_ui.pages.scan_page import ScanPage
 from src.qt_ui.pages.mode_page import ModePage
+from src.qt_ui.pages.review_recommendations_page import ReviewRecommendationsPage
 from src.qt_ui.pages.verification_page import VerificationPage
 from src.qt_ui.state import QtUiState
 from src.qt_ui.workers import FunctionWorker
@@ -47,15 +50,19 @@ from src.orchestration.errors import user_facing_error
 from src.services.migration_service import MigrationService
 from src.services.pipeline_service import PipelineService
 from src.services.recommendation_service import RecommendationService
+from src.services.file_recommendation_service import FileRecommendationService
 from src.services.report_service import ReportService
 from src.services.restore_service import RestoreService
 from src.services.validation_service import validate_restore_report
 
 
 class QtMigrationWindow(QMainWindow):
+    """Coordinate page navigation, background tasks, and migration state."""
+
     activity_event = Signal(str, str, str)
 
     def __init__(self, config: MigrationConfigRoot, runtime_mode: str) -> None:
+        """Build the main window and wire the runtime services."""
         super().__init__()
         self.config = config
         self.runtime_mode = runtime_mode
@@ -64,7 +71,7 @@ class QtMigrationWindow(QMainWindow):
         self.auto_running = False
         self.thread_pool = QThreadPool.globalInstance()
         self.completed_actions: set[str] = set()
-        self.total_actions = 4 if runtime_mode == "windows" else 3
+        self.total_actions = 5 if runtime_mode == "windows" else 3
         self.activity_entries: list[dict[str, str]] = []
         self.activity_filters: dict[str, bool] = {
             "info": True,
@@ -77,6 +84,7 @@ class QtMigrationWindow(QMainWindow):
         self.pipeline_service = PipelineService(config=self.config)
         self.report_service = ReportService()
         self.recommendation_service = RecommendationService()
+        self.file_recommendation_service = FileRecommendationService()
         self.activity_event.connect(self._on_activity_event)
 
         self.setWindowTitle("Sovereignty Migration Platform (Qt)")
@@ -89,6 +97,7 @@ class QtMigrationWindow(QMainWindow):
         self._schedule_auto_start_if_enabled()
 
     def _schedule_auto_start_if_enabled(self) -> None:
+        """Start the full automation flow automatically when enabled."""
         if not self.config.automation.auto_start_full_flow:
             return
 
@@ -96,6 +105,7 @@ class QtMigrationWindow(QMainWindow):
         QTimer.singleShot(delay, self._run_full_automation)
 
     def _build_ui(self) -> None:
+        """Construct the window layout, page stack, and activity console."""
         root = QWidget(self)
         root.setObjectName("RootSurface")
         root_layout = QVBoxLayout(root)
@@ -163,12 +173,13 @@ class QtMigrationWindow(QMainWindow):
         if self.runtime_mode == "windows":
             self.stepper = StepperSidebar(
                 title="Windows Migration Preparation",
-                subtitle="Collect inventory, resolve mapping, and produce a transferable migration bundle.",
+                subtitle="Collect inventory, resolve mapping, review recommendations, and produce a migration bundle.",
                 steps=[
                     "Mode Selection\nChoose your interaction mode",
                     "Windows Scan\nBrowse and scan",
                     "Data Selection\nSelect your data scope",
                     "Application Mapping\nChoose migration mapping",
+                    "Review & Customize\nAcknowledge recommendations",
                     "Create Backup\nReview and confirm",
                 ],
             )
@@ -181,17 +192,33 @@ class QtMigrationWindow(QMainWindow):
             )
             self.data_page = DataSelectionPage(self.ui_state)
             self.mapping_page = ApplicationMappingPage(self.ui_state, run_analysis_cb=self._run_analysis)
+            self.review_page = ReviewRecommendationsPage(
+                self.ui_state,
+                run_app_recommendations_cb=self._run_app_recommendations,
+                run_file_recommendations_cb=self._run_file_recommendations,
+            )
             self.backup_page = BackupBundlePage(self.ui_state, run_backup_cb=self._run_backup)
 
+            self.mode_page.request_next.connect(self.next_page)
             self.scan_page.request_next.connect(self.next_page)
             self.data_page.request_next.connect(self.next_page)
             self.mapping_page.request_next.connect(self.next_page)
+            self.review_page.request_next.connect(self.next_page)
             self.backup_page.request_next.connect(self.next_page)
 
+            self.guided_radio.toggled.connect(self.mode_page.guided_radio.setChecked)
+            self.balanced_radio.toggled.connect(self.mode_page.balanced_radio.setChecked)
+            self.expert_radio.toggled.connect(self.mode_page.expert_radio.setChecked)
+
+            self.mode_page.guided_radio.toggled.connect(lambda checked: self.guided_radio.setChecked(checked))
+            self.mode_page.balanced_radio.toggled.connect(lambda checked: self.balanced_radio.setChecked(checked))
+            self.mode_page.expert_radio.toggled.connect(lambda checked: self.expert_radio.setChecked(checked))
+            
             self.stack.addWidget(self.mode_page)
             self.stack.addWidget(self.scan_page)
             self.stack.addWidget(self.data_page)
             self.stack.addWidget(self.mapping_page)
+            self.stack.addWidget(self.review_page)
             self.stack.addWidget(self.backup_page)
         else:
             self.stepper = StepperSidebar(
@@ -395,8 +422,8 @@ class QtMigrationWindow(QMainWindow):
             self.expert_toggle_btn.setText("Hide Expert Overrides")
             self.expert_toggle_btn.setEnabled(True)
             self.complete_all_btn.setEnabled(True)
-            self.toggle_filters_btn.setEnabled(True)
-            self.export_log_btn.setEnabled(True)
+            # self.toggle_filters_btn.setEnabled(True)
+            # self.export_log_btn.setEnabled(True)
             return
 
         # balanced mode keeps manual control, defaulting to hidden expert panel
@@ -404,8 +431,8 @@ class QtMigrationWindow(QMainWindow):
             self.expert_dock.hide()
         self.expert_toggle_btn.setEnabled(True)
         self.complete_all_btn.setEnabled(True)
-        self.toggle_filters_btn.setEnabled(True)
-        self.export_log_btn.setEnabled(True)
+        # self.toggle_filters_btn.setEnabled(True)
+        # self.export_log_btn.setEnabled(True)
         self.expert_toggle_btn.setText("Hide Expert Overrides" if self.expert_dock.isVisible() else "Show Expert Overrides")
 
     def _toggle_expert_panel(self) -> None:
@@ -450,6 +477,9 @@ class QtMigrationWindow(QMainWindow):
             analysis = self._run_analysis()
             self.ui_state.analysis_completed = True
 
+            app_recs = self._run_app_recommendations()
+            file_recs = self._run_file_recommendations()
+
             backup = self._run_backup()
             self.ui_state.backup_completed = backup is not None
 
@@ -457,6 +487,8 @@ class QtMigrationWindow(QMainWindow):
                 "mode": "windows",
                 "inventory": inventory,
                 "analysis": analysis,
+                "app_recommendations": app_recs,
+                "file_recommendations": file_recs,
                 "backup": backup,
             }
 
@@ -672,8 +704,20 @@ class QtMigrationWindow(QMainWindow):
                 "message": message,
             }
         )
-        self._refresh_activity_log()
-        self.activity_status.setText(message)
+        # Late events can arrive while the window is being destroyed.
+        try:
+            self._refresh_activity_log()
+            self.activity_status.setText(message)
+        except RuntimeError:
+            return
+
+    def closeEvent(self, event) -> None:
+        """Disconnect transient signals before Qt destroys child widgets."""
+        try:
+            self.activity_event.disconnect(self._on_activity_event)
+        except Exception:
+            pass
+        super().closeEvent(event)
 
     def _mark_action_done(self, action_key: str) -> None:
         self.completed_actions.add(action_key)
@@ -709,7 +753,7 @@ class QtMigrationWindow(QMainWindow):
         self._mark_action_done("inventory")
         return result
 
-    def _generate_software_recommendations(self, strategy: str = "local") -> dict:
+    def _generate_software_recommendations(self, strategy: str = "local", selection_profile: str = "migrate_all") -> dict:
         if self.runtime_mode != "windows":
             raise RuntimeError("Software recommendations are available in Windows pre-migration mode only.")
         if self.ui_state.mode != "expert":
@@ -720,18 +764,82 @@ class QtMigrationWindow(QMainWindow):
             inventory = self._run_inventory(deep_scan=False)
 
         software_inventory = inventory.get("software", {}) if isinstance(inventory, dict) else {}
-        self._log_activity("analysis", f"Generating {strategy} software recommendations...")
+        effective_profile = selection_profile or self.ui_state.recommendation_strategy
+        self._log_activity("analysis", f"Generating {strategy} software recommendations ({effective_profile})...")
         result = self.recommendation_service.generate_recommendations(
             software_inventory=software_inventory,
             strategy=strategy,
+            selection_profile=effective_profile,
         )
-        self.runtime_data[f"recommendations_{strategy}"] = result
+        self.runtime_data[f"recommendations_{strategy}_{effective_profile}"] = result
         self._log_activity(
             "analysis",
-            f"{strategy.capitalize()} recommendation report created: {result.get('markdown_path', '')}",
+            f"{strategy.capitalize()} ({effective_profile}) recommendation report created: {result.get('markdown_path', '')}",
             level="success",
         )
         return result
+
+    def _run_app_recommendations(self) -> dict:
+        """Generate app-level recommendations for review page."""
+        if self.runtime_mode != "windows":
+            raise RuntimeError("App recommendations are only available in Windows pre-migration mode.")
+
+        inventory = self.runtime_data.get("inventory")
+        if not inventory:
+            inventory = self._run_inventory(deep_scan=False)
+
+        software_inventory = inventory.get("software", {}) if isinstance(inventory, dict) else {}
+        strategy = "agent" if self.ui_state.mode == "expert" else "local"
+        selection_profile = self.ui_state.recommendation_strategy
+
+        self._log_activity("recommendations", f"Generating {strategy} app recommendations ({selection_profile})...")
+        result = self.recommendation_service.generate_recommendations(
+            software_inventory=software_inventory,
+            strategy=strategy,
+            selection_profile=selection_profile,
+        )
+        self.runtime_data["review_app_recommendations"] = result
+        self._log_activity(
+            "recommendations",
+            f"App recommendations ready: {result.get('recommended_count', 0)} apps",
+            level="success",
+        )
+        return result
+
+    def _run_file_recommendations(self) -> dict:
+        """Generate file-level recommendations for review page."""
+        if self.runtime_mode != "windows":
+            raise RuntimeError("File recommendations are only available in Windows pre-migration mode.")
+
+        # For now, return placeholder; file inventory integration would be added when file scanning is available
+        choice_mode = self.ui_state.data_choice_mode
+        self._log_activity("recommendations", f"Generating file recommendations ({choice_mode})...")
+
+        result = self.file_recommendation_service.generate_recommendations(
+            file_inventory={"files": []},  # Placeholder; would use actual file scan from inventory
+            choice_mode=choice_mode,
+            use_ai=self.ui_state.mode == "expert",
+            ai_config=self._get_ai_config(),
+        )
+        self.runtime_data["review_file_recommendations"] = result
+        self._log_activity(
+            "recommendations",
+            f"File recommendations ready: {result.get('recommended_count', 0)} files",
+            level="success",
+        )
+        return result
+
+    def _get_ai_config(self) -> dict:
+        """Retrieve AI configuration from config or environment."""
+        ai_cfg = self.config.ai
+        return {
+            "enabled": ai_cfg.enabled,
+            "endpoint": ai_cfg.endpoint or "",
+            "model": ai_cfg.model or "",
+            "api_key": ai_cfg.api_key or "",
+            "temperature": ai_cfg.temperature,
+            "timeout_seconds": ai_cfg.timeout_seconds,
+        }
 
     def _run_analysis(self) -> dict:
         if self.runtime_mode != "windows":

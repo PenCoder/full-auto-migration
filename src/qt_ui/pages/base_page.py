@@ -1,3 +1,5 @@
+"""Shared base helpers for Qt wizard pages."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
@@ -7,15 +9,20 @@ from src.qt_ui.state import QtUiState
 
 
 class BasePage(QWidget):
+    """Common scaffolding for the migration wizard pages."""
+
     request_next = Signal()
     request_back = Signal()
     loading_progress = Signal(int)
+    mode_changed = Signal(str)
 
     def __init__(self, ui_state: QtUiState) -> None:
+        """Store the shared UI state for a page."""
         super().__init__()
         self.ui_state = ui_state
 
     def create_center_card_layout(self, max_width: int = 920) -> QVBoxLayout:
+        """Create a centered card layout used by the wizard pages."""
         page_layout = QVBoxLayout(self)
         page_layout.setContentsMargins(0, 0, 0, 0)
         page_layout.addStretch(1)
@@ -34,6 +41,7 @@ class BasePage(QWidget):
         return card_layout
 
     def create_trust_banner(self, text: str) -> QWidget:
+        """Create a centered informational trust banner."""
         banner = QLabel(text)
         banner.setObjectName("TrustBanner")
         banner.setWordWrap(True)
@@ -41,6 +49,7 @@ class BasePage(QWidget):
         return banner
     
     def create_guided_panel(self, title: str, description: str | list[str]) -> QFrame:
+        """Create a styled guidance card with a title and bullet content."""
         panel = QFrame()
         panel.setProperty("card", "true")
         panel.setProperty("guided", "true")
@@ -63,6 +72,7 @@ class BasePage(QWidget):
         return panel
     
     def create_guided_questionnaire(self, question: str, info: str = None, options: list[QWidget]=None) -> QFrame:
+        """Create a question card with supporting info and custom options."""
         questionnaire = QFrame()
         questionnaire.setProperty("card", "true")
         questionnaire.setProperty("guided", "true")
@@ -89,6 +99,7 @@ class BasePage(QWidget):
         return questionnaire
     
     def create_stat_chip_row(self, chips: list[str]) -> QWidget:
+        """Create a centered row of compact status chips."""
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -104,6 +115,7 @@ class BasePage(QWidget):
         return row
     
     def radio_with_hint(self, text: str, hint: str) -> QFrame:
+        """Create a radio button with a short explanatory hint."""
         radio = QRadioButton(text)
 
         hint_label = QLabel(hint)
@@ -119,6 +131,7 @@ class BasePage(QWidget):
         return container
     
     def hint_label(self, text: str) -> QLabel:
+        """Create a small muted hint label."""
         hint_label = QLabel(text)
         hint_label.setWordWrap(True)
         hint_label.setStyleSheet("font-size: 12px; margin-left: 20px;")

@@ -1,3 +1,5 @@
+"""Reusable sidebar stepper widget for wizard navigation."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -5,7 +7,10 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 
 class StepperSidebar(QWidget):
+    """Render a vertical step list with state-aware labels."""
+
     def __init__(self, title: str, subtitle: str, steps: list[str]) -> None:
+        """Create the sidebar and populate it with the provided steps."""
         super().__init__()
         self.steps = steps
         self.dot_labels: list[QLabel] = []

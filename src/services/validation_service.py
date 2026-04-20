@@ -1,3 +1,5 @@
+"""Validation helpers for restore outputs and migration evidence."""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +11,7 @@ from src.orchestration.errors import ERR_VALIDATION_INPUT, MigrationError
 
 
 def _format_size(num_bytes: int) -> str:
+    """Format a byte count using human-friendly units."""
     units = ["B", "KB", "MB", "GB", "TB"]
     size = float(num_bytes)
     for unit in units:
@@ -19,6 +22,7 @@ def _format_size(num_bytes: int) -> str:
 
 
 def validate_restore_report(report_path: Path = RESTORE_REPORT) -> dict[str, Any]:
+    """Validate a restore report and produce a compact validation summary."""
     if not report_path.exists():
         raise MigrationError(ERR_VALIDATION_INPUT, f"Missing restore report: {report_path}")
 

@@ -1,3 +1,5 @@
+"""Backup bundle page for packaging migration artifacts."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -11,6 +13,8 @@ from src.qt_ui.workers import FunctionWorker
 
 
 class BackupBundlePage(BasePage):
+    """Create the migration backup bundle and its manifest."""
+
     def __init__(self, ui_state, run_backup_cb: Callable[[], dict | None]) -> None:
         super().__init__(ui_state)
         self.run_backup_cb = run_backup_cb

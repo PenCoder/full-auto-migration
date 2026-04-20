@@ -1,3 +1,5 @@
+"""Dynamic mapping helpers for Windows-to-Linux application selection."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +8,7 @@ from difflib import SequenceMatcher
 
 @dataclass
 class MappingDecision:
+    """Resolved Linux mapping choice for a single Windows application."""
     linux_package: str
     linux_display_name: str
     migration_strategy: str
@@ -15,10 +18,12 @@ class MappingDecision:
 
 
 def _norm(value: str) -> str:
+    """Normalize text for simple matching operations."""
     return (value or "").strip().lower()
 
 
 def _similarity(a: str, b: str) -> float:
+    """Compute a lightweight similarity score between two names."""
     if not a or not b:
         return 0.0
     return SequenceMatcher(None, a, b).ratio()
@@ -29,6 +34,7 @@ def resolve_mapping(
     base_mappings: list[dict[str, str]],
     overrides: list[dict[str, str]] | None = None,
 ) -> MappingDecision | None:
+    """Resolve a Linux mapping using overrides and the base mapping set."""
     name = _norm(display_name)
     overrides = overrides or []
 

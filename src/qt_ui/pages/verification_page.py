@@ -1,3 +1,5 @@
+"""Verification page for restore integrity and sovereignty scoring."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -11,6 +13,8 @@ from src.qt_ui.workers import FunctionWorker
 
 
 class VerificationPage(BasePage):
+    """Run validation checks and present the resulting sovereignty score."""
+
     def __init__(self, ui_state, run_validation_cb: Callable[[], dict]) -> None:
         super().__init__(ui_state)
         self.run_validation_cb = run_validation_cb

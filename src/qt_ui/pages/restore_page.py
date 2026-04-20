@@ -1,3 +1,5 @@
+"""Restore page for replaying a migration bundle on Linux."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +14,8 @@ from src.qt_ui.workers import FunctionWorker
 
 
 class RestorePage(BasePage):
+    """Restore a selected bundle and report progress back to the user."""
+
     def __init__(self, ui_state, run_restore_cb: Callable[[Path], dict]) -> None:
         super().__init__(ui_state)
         self.run_restore_cb = run_restore_cb

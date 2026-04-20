@@ -1,3 +1,5 @@
+"""Execution page for running inventory, analysis, and backup tasks."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -17,6 +19,8 @@ from src.qt_ui.workers import FunctionWorker
 
 
 class ExecutionPage(BasePage):
+    """Run the core migration tasks and stream their progress."""
+
     def __init__(
         self,
         ui_state,

@@ -1,3 +1,5 @@
+"""Core migration service that executes inventory, analysis, and backup steps."""
+
 from __future__ import annotations
 
 import threading
@@ -17,7 +19,10 @@ from src.orchestration.errors import ERR_BACKUP_FAILED, MigrationError
 
 
 class MigrationService:
+    """Coordinate inventory, analysis, and backup operations for the app."""
+
     def __init__(self, config, context):
+        """Bind the service to a configuration object and shared context."""
         self.config = config
         self.context = context
         self.logger = get_logger("migration_service")
@@ -28,6 +33,7 @@ class MigrationService:
         self.checkpoints = CheckpointManager(run_id=run_id, checkpoint_dir=checkpoint_dir)
 
     def run_inventory(self, logger=None, deep_scan: bool = False):
+        """Collect hardware and software inventory and persist the outputs."""
         if logger is not None:
             self.logger = logger
         self.checkpoints.mark_phase("inventory_started")
@@ -62,6 +68,7 @@ class MigrationService:
             raise
 
     def run_analysis(self, sw_inventory, hw_inventory, logger=None):
+        """Generate hardware and software analysis outputs."""
         if logger is not None:
             self.logger = logger
         self.checkpoints.mark_phase("analysis_started")
@@ -93,6 +100,7 @@ class MigrationService:
             raise
 
     def run_backup(self, selected_folders, selected_file_types, logger=None):
+        """Create the backup manifest and copy the selected files."""
         if logger is not None:  
             self.logger = logger
 
@@ -122,6 +130,7 @@ class MigrationService:
             raise MigrationError(ERR_BACKUP_FAILED, str(exc)) from exc
 
     def run_task(self, worker_fn: Callable[[], Any], on_done: Callable[[Any], None]) -> None:
+        """Run a worker function asynchronously and hand the result back on completion."""
         def _wrap():
             result = worker_fn()
             on_done(result)

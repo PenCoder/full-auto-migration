@@ -1,3 +1,5 @@
+"""Final report generation for restore and validation outcomes."""
+
 from __future__ import annotations
 
 import json
@@ -10,18 +12,23 @@ from src.loggers import get_logger
 
 
 class ReportService:
+    """Build JSON, Markdown, and HTML report artifacts for the migration run."""
+
     def __init__(self, report_dir: Path | None = None) -> None:
+        """Create the report service and ensure the output directory exists."""
         self.logger = get_logger("report_service")
         self.report_dir = report_dir or (BASE_DIR / "docs" / "reports")
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
     def load_validation_summary(self) -> dict[str, Any]:
+        """Load the validation summary produced by the restore workflow."""
         summary_path = RESTORE_DIR / "validation_report.json"
         if not summary_path.exists():
             raise FileNotFoundError(f"Validation summary not found: {summary_path}")
         return json.loads(summary_path.read_text(encoding="utf-8"))
 
     def generate_report(self) -> dict[str, Any]:
+        """Generate the final report bundle and return the artifact paths."""
         validation = self.load_validation_summary()
         restore_report_path = RESTORE_DIR / "restore_report.json"
         restore_report = {}
@@ -54,6 +61,7 @@ class ReportService:
         }
 
     def _build_summary(self, validation: dict[str, Any]) -> dict[str, Any]:
+        """Derive the human-readable summary metrics for the report."""
         score = int(validation.get("total_sovereignty_score", 0))
         integrity = int(validation.get("hash_verified_files", 0))
         failed = int(validation.get("hash_failed_files", 0))
@@ -68,6 +76,7 @@ class ReportService:
         }
 
     def _build_markdown(self, report: dict[str, Any], restore_report: dict[str, Any]) -> str:
+        """Render the final report as Markdown."""
         validation = report["validation"]
         summary = report["summary"]
         lines = [
@@ -111,6 +120,7 @@ class ReportService:
         return "\n".join(lines)
 
     def _build_html(self, report: dict[str, Any], restore_report: dict[str, Any]) -> str:
+        """Render the final report as a standalone HTML page."""
         validation = report["validation"]
         summary = report["summary"]
         items = []

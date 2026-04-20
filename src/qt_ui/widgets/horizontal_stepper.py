@@ -1,3 +1,5 @@
+"""Reusable horizontal progress stepper widget."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
@@ -60,8 +62,7 @@ class HorizontalStepper(QWidget):
 
 
 class _StepperCanvas(QWidget):
-    """Renders the progress nodes and connecting lines."""
-
+    """Paint the stepper's nodes and connecting lines."""
     def __init__(self, steps: list[str], parent: HorizontalStepper) -> None:
         super().__init__(parent)
         self.steps = steps
