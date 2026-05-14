@@ -12,16 +12,23 @@ from typing import Any
 
 import requests
 
+from src.analysis.dynamic_rules import resolve_mapping
 from src.constants import BASE_DIR, CONFIG_DIR
 
 
 class RecommendationService:
     """Generate Windows application migration recommendations."""
 
+    # Repositories considered relevant for Linux Mint / Ubuntu-based systems.
+    # Repositories that confirm a package is available for the target system (Linux Mint).
+    # Linux Mint is Ubuntu/Debian-based; linuxmint_21/22 are the primary targets.
+    _TARGET_REPOS = {"linuxmint_21", "linuxmint_22", "ubuntu_22_04", "ubuntu_24_04", "flathub"}
+
     def __init__(self, reports_dir: Path | None = None) -> None:
         """Create a recommendation service and choose the reports directory."""
         self.map_file = CONFIG_DIR / "linux_ms_map.csv"
         self.reports_dir = reports_dir or (BASE_DIR / "docs" / "reports")
+        self._repology_cache: dict[str, dict[str, Any]] = {}
 
     @staticmethod
     def _normalize_name(value: str) -> str:
@@ -48,19 +55,48 @@ class RecommendationService:
                 return row
         return None
 
-    def _query_online_package_signal(self, package_name: str) -> str:
-        """Check whether a package name appears to be available online."""
+    def _query_online_package_signal(self, package_name: str, provider: str = "repology") -> str:
+        """Check package availability via Repology, with target-repo parsing and session caching."""
         if not package_name:
             return "unknown"
+        if provider != "repology":
+            return "not_supported"
+
+        if package_name in self._repology_cache:
+            return self._repology_cache[package_name].get("signal", "cached")
+
         url = f"https://repology.org/api/v1/project/{package_name}"
         try:
-            response = requests.get(url, timeout=4)
+            response = requests.get(
+                url,
+                timeout=6,
+                headers={"User-Agent": "semi-automigration/1.0 (migration tool; metadata only)"},
+            )
+            if response.status_code == 404:
+                result = {"signal": "not_found", "repos": []}
+                self._repology_cache[package_name] = result
+                return "not_found"
             if response.status_code != 200:
                 return "not_verified"
-            payload = response.json()
-            if isinstance(payload, dict) and payload:
-                return "verified"
-            return "not_verified"
+
+            packages = response.json()
+            if not isinstance(packages, list):
+                return "not_verified"
+
+            # Extract which repositories carry this package.
+            repos_found = {
+                str(pkg.get("repo", "")).lower()
+                for pkg in packages
+                if isinstance(pkg, dict) and pkg.get("repo")
+            }
+            target_hits = repos_found & self._TARGET_REPOS
+            signal = "verified" if target_hits else ("available" if repos_found else "not_verified")
+            self._repology_cache[package_name] = {
+                "signal": signal,
+                "repos": sorted(repos_found),
+                "target_repos": sorted(target_hits),
+            }
+            return signal
         except Exception:
             return "unreachable"
 
@@ -107,11 +143,13 @@ class RecommendationService:
         self,
         recommendations: list[dict[str, Any]],
         selection_profile: str,
+        ai_config: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], str]:
         """Ask an AI endpoint to reorder recommendation candidates."""
-        endpoint = os.getenv("AI_RECOMMENDER_ENDPOINT", "").strip()
-        model = os.getenv("AI_RECOMMENDER_MODEL", "").strip()
-        api_key = os.getenv("AI_RECOMMENDER_API_KEY", "").strip()
+        cfg = ai_config or {}
+        endpoint = str(cfg.get("endpoint") or os.getenv("AI_RECOMMENDER_ENDPOINT", "")).strip()
+        model = str(cfg.get("model") or os.getenv("AI_RECOMMENDER_MODEL", "")).strip()
+        api_key = str(cfg.get("api_key") or os.getenv("AI_RECOMMENDER_API_KEY", "")).strip()
         if not endpoint or not model:
             return recommendations, "deterministic"
 
@@ -190,10 +228,22 @@ class RecommendationService:
         software_inventory: dict[str, Any],
         strategy: str = "local",
         selection_profile: str = "migrate_all",
+        ai_config: dict[str, Any] | None = None,
+        mapping_overrides: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Generate app migration recommendations and write report artifacts."""
+        cfg = ai_config or {}
+        software_online_enabled = bool(cfg.get("software_online_lookup_enabled", True))
+        provider = str(cfg.get("software_online_provider", "repology")).strip() or "repology"
+        allowed_fields = {
+            str(field).strip().lower()
+            for field in cfg.get("software_online_send_fields", ["name", "version", "publisher"])
+            if str(field).strip()
+        }
+
         rows = self._load_mapping_rows()
         entries = software_inventory.get("entries", []) if isinstance(software_inventory, dict) else []
+        overrides = mapping_overrides or []
 
         recommendations: list[dict[str, Any]] = []
         for item in entries:
@@ -201,23 +251,41 @@ class RecommendationService:
             if not app_name:
                 continue
 
-            mapped = self._find_mapping(app_name, rows)
-            if not mapped:
+            # resolve_mapping applies user overrides first, then fuzzy base-mapping lookup.
+            decision = resolve_mapping(app_name, rows, overrides=overrides)
+            if not decision:
                 continue
 
-            package_name = mapped.get("linux_package", "")
+            package_name = decision.linux_package
+
+            # Derive a textual confidence label from the numeric score.
+            score = decision.confidence_score
+            if score >= 0.9:
+                confidence_label = "high"
+            elif score >= 0.7:
+                confidence_label = "medium"
+            else:
+                confidence_label = "low"
+
             online_signal = "not_checked"
-            if strategy in {"online", "agent"}:
-                online_signal = self._query_online_package_signal(package_name)
+            if strategy in {"online", "agent"} and software_online_enabled:
+                # Keep online checks software-metadata-only; never send file or path data.
+                if "name" in allowed_fields:
+                    online_signal = self._query_online_package_signal(package_name, provider=provider)
+                else:
+                    online_signal = "policy_blocked"
+            elif strategy in {"online", "agent"} and not software_online_enabled:
+                online_signal = "policy_blocked"
 
             recommendation: dict[str, Any] = {
                 "windows_app": app_name,
                 "linux_package": package_name,
-                "linux_display_name": mapped.get("linux_display_name", ""),
-                "category": mapped.get("category", ""),
-                "migration_strategy": mapped.get("migration_strategy", ""),
-                "mapping_confidence": mapped.get("confidence", ""),
-                "notes": mapped.get("notes", ""),
+                "linux_display_name": decision.linux_display_name,
+                "category": decision.category,
+                "migration_strategy": decision.migration_strategy,
+                "mapping_confidence": confidence_label,
+                "mapping_source": decision.recommendation_source,
+                "notes": decision.notes,
                 "online_signal": online_signal,
                 "source": strategy,
             }
@@ -241,6 +309,7 @@ class RecommendationService:
             recommendations, ranking_method = self._ai_rank_recommendations(
                 recommendations=recommendations,
                 selection_profile=selection_profile,
+                ai_config=cfg,
             )
 
         generated_at = datetime.now().isoformat()
@@ -269,12 +338,12 @@ class RecommendationService:
             f"Ranking method: {ranking_method}",
             f"Matched applications: {len(recommendations)} / {len(entries)}",
             "",
-            "| Windows App | Linux Package | Confidence | Online |",
-            "|---|---|---|---|",
+            "| Windows App | Linux Package | Category | Confidence | Online |",
+            "|---|---|---|---|---|",
         ]
         for rec in recommendations:
             lines.append(
-                f"| {rec.get('windows_app', '')} | {rec.get('linux_package', '')} | {rec.get('mapping_confidence', '')} | {rec.get('online_signal', '')} |"
+                f"| {rec.get('windows_app', '')} | {rec.get('linux_package', '')} | {rec.get('category', '')} | {rec.get('mapping_confidence', '')} | {rec.get('online_signal', '')} |"
             )
         md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

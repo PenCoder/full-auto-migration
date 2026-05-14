@@ -23,6 +23,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+try:
+    import winapps as _winapps
+except ImportError:
+    _winapps = None  # type: ignore[assignment]
+
 from src.constants import BASE_DIR, DATA_DIR
 from src.loggers import get_logger
 from src.config import load_default_config, load_config, MigrationConfigRoot
@@ -107,59 +112,20 @@ def _run_powershell_json(command: str) -> Any:
 # ---------------------------------------------------------------------------
 
 def _collect_software_from_registry() -> List[Dict[str, Any]]:
-    """
-    Collect installed software information from standard Windows registry keys.
-
-    Registry locations checked:
-    - HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*
-    - HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*
-    - HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*
-
-    Only entries with a non-empty DisplayName are included.
-
-    Returns
-    -------
-    List[Dict[str, Any]]
-        List of installed software entries with fields:
-        DisplayName, DisplayVersion, Publisher, InstallDate.
-    """
-    # PowerShell script:
-    #  - define an array of registry paths
-    #  - iterate through them with Get-ItemProperty
-    #  - filter entries with DisplayName
-    #  - select relevant fields
-    #  - convert to JSON
-    ps_script = r"""
-    $paths = @(
-      'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
-      'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
-      'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
-    )
-
-    $apps = foreach ($p in $paths) {
-        try {
-            Get-ItemProperty -Path $p -ErrorAction Stop |
-                Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne '' } |
-                Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
-        } catch {
-            # Ignore errors from inaccessible registry paths
-        }
-    }
-
-    $apps | Sort-Object DisplayName -Unique | ConvertTo-Json -Depth 4
-    """
-
-    data = _run_powershell_json(ps_script)
-    # Ensure we always return a list
-    if data is None:
+    """Return installed Windows applications via winapps, or an empty list on non-Windows."""
+    if _winapps is None:
+        logger.warning("winapps is not available on this platform — returning empty software list.")
         return []
-    if isinstance(data, dict):
-        return [data]
-    if isinstance(data, list):
-        return data
-    # Fallback: unknown structure
-    logger.warning("Unexpected software inventory structure returned from PowerShell.")
-    return []
+
+    data: list[dict[str, Any]] = []
+    for app in _winapps.list_installed():
+        data.append({
+            "DisplayName": app.name,
+            "DisplayVersion": app.version,
+            "Publisher": app.publisher,
+            "InstallDate": None,
+        })
+    return data
 
 
 def _collect_packages_from_package_manager() -> List[Dict[str, Any]]:

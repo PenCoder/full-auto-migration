@@ -116,7 +116,7 @@ class ScanPresenter(BasePresenter):
             self.set_loading(True)
 
             # Call the service callback
-            result = self.run_inventory_cb(deep_scan)
+            self.run_inventory_cb(deep_scan)
 
             # Update state
             self.ui_state.inventory_completed = True
@@ -157,7 +157,7 @@ class ScanPresenter(BasePresenter):
             self.set_loading(True)
 
             # Call the service callback with strategy
-            result = self.run_recommendations_cb(rec_type, self.ui_state.recommendation_strategy)
+            self.run_recommendations_cb(rec_type, self.ui_state.recommendation_strategy)
 
             # Update state
             self.ui_state.analysis_completed = True

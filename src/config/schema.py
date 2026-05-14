@@ -41,6 +41,7 @@ class SourceSystemConfig:
     backup_paths: List[str]
     excluded_paths: List[str] = field(default_factory=list)
     file_types: Dict[str, bool] = field(default_factory=dict)
+    file_type_labels: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -166,6 +167,13 @@ class AIConfig:
     api_key: str = ""
     temperature: float = 0.2
     timeout_seconds: int = 10
+    file_recommendation_online_enabled: bool = False
+    software_online_lookup_enabled: bool = True
+    software_online_provider: str = "repology"
+    software_online_send_fields: List[str] = field(
+        default_factory=lambda: ["name", "version", "publisher"]
+    )
+    redact_user_paths: bool = True
 
 
 @dataclass

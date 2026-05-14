@@ -21,8 +21,8 @@ class StepperSidebar(QWidget):
     def _build_ui(self, title: str, subtitle: str) -> None:
         self.setObjectName("StepperPanel")
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 16, 14, 16)
-        root.setSpacing(10)
+        root.setContentsMargins(16, 18, 16, 16)
+        root.setSpacing(8)
 
         title_lbl = QLabel(title)
         title_lbl.setObjectName("StepperTitle")
@@ -41,15 +41,16 @@ class StepperSidebar(QWidget):
 
         for idx, step in enumerate(self.steps, start=1):
             row = QWidget()
+            row.setMinimumHeight(52)
             row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(0, 4, 0, 4)
-            row_layout.setSpacing(8)
+            row_layout.setContentsMargins(0, 6, 0, 6)
+            row_layout.setSpacing(10)
             row_layout.setAlignment(Qt.AlignTop)
 
             dot = QLabel(str(idx))
             dot.setAlignment(Qt.AlignCenter)
             dot.setObjectName("StepDot")
-            dot.setFixedSize(24, 24)
+            dot.setFixedSize(26, 26)
 
             text_col = QWidget()
             text_col_layout = QVBoxLayout(text_col)

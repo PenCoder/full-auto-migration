@@ -4,27 +4,20 @@ cli.py
 Top-level command-line interface for the
 "Semi-Automated Migration from Windows 11 to Linux Mint" project.
 
-This CLI integrates the components developed in M2 into a single,
-coherent interface and prepares the ground for further automation
-in M3 and later milestones.
+Commands:
 
-Provided commands (current stage):
+- scan           Run inventory, analysis, and recommendations (--mode guided|balanced|expert)
+- inventory      hardware | software | all
+- analyze        hardware | software | all
+- backup         Bundle selected files and settings for migration
+- restore        Extract backup bundle on the Linux target
+- validate       Check restore report integrity and produce a validation summary
+- report         Generate the final migration report (JSON, Markdown, HTML)
+- recommended    Generate software migration recommendations
+- profile        Show active configuration profile
+- usb            (Live USB integration placeholder)
 
-- inventory
-    - hardware
-    - software
-    - all
-- analyze
-    - hardware
-    - software
-    - all
-- backup
-- validate      (stub for future implementation)
-- restore       (stub for future implementation)
-- usb           (stub for future Live USB integration)
-
-The CLI uses Typer for structured subcommands and integrates the
-configuration file (migration.config.yaml) and centralized logging.
+The CLI uses Typer and integrates migration.config.yaml with centralized logging.
 """
 
 from __future__ import annotations
@@ -44,11 +37,14 @@ from src.inventory.hardware import (
     collect_hardware_inventory,
     write_hardware_inventory,
 )
+from src.inventory.settings import (
+    collect_settings_inventory,
+    write_settings_inventory,
+)
 from src.inventory.software import (
     collect_software_inventory,
     write_software_inventory,
 )
-# from src.backup.manifest import generate_manifest, write_manifest
 from src.backup.manifest import copy_backup_files, generate_manifest, write_manifest
 from src.analysis.hw_matrix import (
     generate_hardware_matrix,
@@ -64,7 +60,9 @@ from src.orchestration.errors import MigrationError, user_facing_error
 from src.services.validation_service import validate_restore_report
 from src.services.profile_service import ProfileService
 from src.services.report_service import ReportService
+from src.services.file_recommendation_service import FileRecommendationService
 from src.services.pipeline_service import PipelineService
+from src.services.recommendation_service import RecommendationService
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +125,48 @@ def setup_logging(config: MigrationConfigRoot) -> None:
     logger.addHandler(handler)
 
 
+def _build_file_inventory(cfg: MigrationConfigRoot, max_files: int = 8000) -> dict:
+    """Scan configured backup paths and return a lightweight file inventory dict."""
+    import os as _os
+    import time as _time
+
+    enabled_exts = {ext.lower() for ext, on in cfg.source_system.file_types.items() if on}
+    excluded = {p.lower() for p in cfg.source_system.excluded_paths}
+    now_ts = _time.time()
+    files: list[dict] = []
+    scanned = 0
+
+    for raw_path in cfg.source_system.backup_paths:
+        expanded = Path(raw_path.replace("~", str(Path.home()))).expanduser()
+        if not expanded.exists() or not expanded.is_dir():
+            continue
+        for root, _, filenames in _os.walk(expanded):
+            if scanned >= max_files:
+                break
+            if any(excl in root.lower() for excl in excluded):
+                continue
+            for name in filenames:
+                if scanned >= max_files:
+                    break
+                ext = Path(name).suffix.lower()
+                if enabled_exts and ext not in enabled_exts:
+                    continue
+                full_path = Path(root) / name
+                try:
+                    st = full_path.stat()
+                except OSError:
+                    continue
+                days_ago = int((now_ts - st.st_atime) / 86400)
+                files.append({
+                    "path": str(full_path),
+                    "size": st.st_size,
+                    "last_accessed_days_ago": days_ago,
+                })
+                scanned += 1
+
+    return {"files": files, "total_scanned": scanned}
+
+
 def load_configuration(config_path: Optional[Path]) -> MigrationConfigRoot:
     """
     Load configuration from given path or use default.
@@ -145,6 +185,178 @@ def load_configuration(config_path: Optional[Path]) -> MigrationConfigRoot:
 # ---------------------------------------------------------------------------
 # INVENTORY COMMANDS
 # ---------------------------------------------------------------------------
+
+
+@app.command("scan")
+def scan_command(
+    config: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to migration.config.yaml"
+    ),
+    mode: str = typer.Option(
+        "balanced",
+        "--mode",
+        "-m",
+        help="Automation policy: guided (inventory + local recs + backup), "
+             "balanced (+ analysis + file recs), expert (+ agent ranking).",
+    ),
+    deep: bool = typer.Option(
+        False,
+        "--deep",
+        help="Run deep software scan (package managers + appx where available).",
+    ),
+    include_analysis: bool = typer.Option(
+        None,
+        "--analysis/--no-analysis",
+        help="Run hardware/software analysis. Defaults to True for balanced/expert, False for guided.",
+    ),
+    recommendations: str = typer.Option(
+        None,
+        "--recommendations",
+        help="Recommendation strategy override: none, local, online, agent. "
+             "Defaults to mode-appropriate strategy when omitted.",
+    ),
+    selection_profile: str = typer.Option(
+        "migrate_all",
+        "--selection-profile",
+        help="Recommendation profile: migrate_all or prioritize.",
+    ),
+) -> None:
+    """
+    Run scan workflow from the CLI applying the chosen mode policy.
+
+    Modes
+    -----
+    guided   – inventory + local recommendations only (fast, minimal decisions)
+    balanced – inventory + analysis + app/file recommendations  [default]
+    expert   – balanced + agent-ranked recommendations via AI endpoint
+    """
+    try:
+        valid_modes = {"guided", "balanced", "expert"}
+        valid_recommendations = {"none", "local", "online", "agent"}
+        valid_profiles = {"migrate_all", "prioritize"}
+
+        if mode not in valid_modes:
+            raise typer.BadParameter(
+                f"Invalid mode '{mode}'. Use one of: {sorted(valid_modes)}"
+            )
+
+        # Apply mode-default strategy when not explicitly overridden.
+        if recommendations is None:
+            recommendations = {"guided": "local", "balanced": "local", "expert": "agent"}[mode]
+
+        # Analysis runs by default in balanced/expert; skip in guided unless forced.
+        if include_analysis is None:
+            include_analysis = mode in {"balanced", "expert"}
+
+        if recommendations not in valid_recommendations:
+            raise typer.BadParameter(
+                f"Invalid recommendations mode '{recommendations}'. Use one of: {sorted(valid_recommendations)}"
+            )
+        if selection_profile not in valid_profiles:
+            raise typer.BadParameter(
+                f"Invalid selection profile '{selection_profile}'. Use one of: {sorted(valid_profiles)}"
+            )
+
+        cfg = load_configuration(config)
+
+        logger.info("Starting CLI scan workflow (mode=%s, deep=%s)", mode, deep)
+        hw_inventory = collect_hardware_inventory()
+        sw_inventory = collect_software_inventory(deep_scan=deep)
+        settings_inventory = collect_settings_inventory(export_assets=True)
+
+        hw_output = write_hardware_inventory(cfg, hw_inventory)
+        sw_output = write_software_inventory(cfg, sw_inventory)
+        settings_output = write_settings_inventory(cfg, settings_inventory)
+
+        result: dict[str, object] = {
+            "scan": {
+                "mode": mode,
+                "depth": "deep" if deep else "quick",
+                "hardware_output": str(hw_output),
+                "software_output": str(sw_output),
+                "settings_output": str(settings_output),
+                "hardware_categories": len(hw_inventory.keys()),
+                "software_entries": len(sw_inventory.get("entries", [])),
+                "settings_summary": settings_inventory.get("summary", {}),
+            }
+        }
+
+        if include_analysis:
+            hw_rows = generate_hardware_matrix(cfg, hw_inventory)
+            sw_rows = generate_software_mapping(cfg, sw_inventory.get("entries", []))
+
+            hw_matrix_path = write_hardware_matrix(cfg, hw_rows)
+            sw_mapping_path = write_software_mapping(sw_rows)
+
+            result["analysis"] = {
+                "hardware_rows": len(hw_rows),
+                "software_rows": len(sw_rows),
+                "hardware_matrix_output": str(hw_matrix_path),
+                "software_mapping_output": str(sw_mapping_path),
+            }
+
+        if recommendations != "none":
+            ai_cfg = {
+                "software_online_lookup_enabled": getattr(cfg.ai, "software_online_lookup_enabled", False),
+                "software_online_provider": getattr(cfg.ai, "software_online_provider", "repology"),
+                "software_online_send_fields": getattr(cfg.ai, "software_online_send_fields", ["name"]),
+            }
+            rec_result = RecommendationService().generate_recommendations(
+                software_inventory=sw_inventory,
+                strategy=recommendations,
+                selection_profile=selection_profile,
+                ai_config=ai_cfg,
+            )
+            result["recommendations"] = {
+                "strategy": recommendations,
+                "selection_profile": selection_profile,
+                "recommended_count": rec_result.get("recommended_count", 0),
+                "json_path": rec_result.get("json_path", ""),
+                "markdown_path": rec_result.get("markdown_path", ""),
+            }
+
+        # File recommendations run in balanced and expert modes (mirrors Qt AutomationCoordinator).
+        if mode in {"balanced", "expert"} and recommendations != "none":
+            file_inventory = _build_file_inventory(cfg)
+            choice_mode = "ai_recommended" if mode == "expert" else "all_files"
+            use_ai = mode == "expert"
+            ai_file_cfg = {
+                "file_recommendation_online_enabled": getattr(cfg.ai, "file_recommendation_online_enabled", False),
+                "endpoint": getattr(cfg.ai, "endpoint", ""),
+                "model": getattr(cfg.ai, "model", ""),
+                "api_key": getattr(cfg.ai, "api_key", ""),
+            }
+            file_rec_result = FileRecommendationService().generate_recommendations(
+                file_inventory=file_inventory,
+                choice_mode=choice_mode,
+                use_ai=use_ai,
+                ai_config=ai_file_cfg,
+                selected_file_types=cfg.source_system.file_types,
+            )
+            result["file_recommendations"] = {
+                "choice_mode": choice_mode,
+                "ranking_method": file_rec_result.get("ranking_method", ""),
+                "recommended_count": file_rec_result.get("recommended_count", 0),
+                "input_count": file_rec_result.get("input_count", 0),
+                "json_path": file_rec_result.get("json_path", ""),
+                "markdown_path": file_rec_result.get("markdown_path", ""),
+            }
+            logger.info(
+                "File recommendations: %d / %d files selected (%s)",
+                file_rec_result.get("recommended_count", 0),
+                file_rec_result.get("input_count", 0),
+                file_rec_result.get("ranking_method", ""),
+            )
+
+        typer.echo(json.dumps(result, indent=2))
+        logger.info("CLI scan workflow completed successfully")
+    except typer.Exit:
+        raise
+    except typer.BadParameter as exc:
+        typer.echo(f"ERROR: {exc}")
+        raise typer.Exit(code=2)
+    except Exception as exc:
+        _handle_cli_error(exc, "scan")
 
 @inventory_app.command("hardware")
 def inventory_hardware(

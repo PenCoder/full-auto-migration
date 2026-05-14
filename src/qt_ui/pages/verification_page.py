@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import QThreadPool, Qt
-from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QVBoxLayout
+from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
@@ -26,13 +26,14 @@ class VerificationPage(BasePage):
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
 
-        text = QLabel("Validate restored files, integrity hashes, and migration sovereignty readiness.")
-        text.setObjectName("HeroTitle")
-        text.setWordWrap(True)
-        text.setAlignment(Qt.AlignCenter)
-        root.addWidget(text)
+        root.addWidget(self.create_page_header(
+            "✅",
+            "Let's make sure everything arrived safely",
+            "We'll check every file that was restored and give you a Migration Score "
+            "showing how complete and successful your move to Linux has been.",
+        ))
 
-        self.status = QLabel("Run verification to compute restore integrity and readiness score.")
+        self.status = QLabel("Click the button below to verify your restored files.")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
@@ -40,19 +41,19 @@ class VerificationPage(BasePage):
 
         root.addWidget(
             self.create_trust_banner(
-                "Trust indicator: verification compares restored files and records machine-readable evidence reports."
+                "🔒  Verification only reads files — it never modifies, moves, or deletes anything on your computer."
             )
         )
 
         self.score_progress = QProgressBar()
         self.score_progress.setRange(0, 100)
         self.score_progress.setValue(0)
-        self.score_progress.setFormat("Sovereignty Score: %p%")
+        self.score_progress.setFormat("Migration Score: %p%")
         self.score_progress.setTextVisible(True)
         root.addWidget(self.score_progress)
 
         self.evidence_chips = self.create_stat_chip_row(
-            ["Files: 0", "Hash Verified: 0", "Apps: 0"]
+            ["Files checked: 0", "Verified intact: 0", "Apps matched: 0"]
         )
         root.addWidget(self.evidence_chips)
 
@@ -61,14 +62,14 @@ class VerificationPage(BasePage):
         self.loading.setVisible(False)
         root.addWidget(self.loading)
 
-        self.verify_btn = QPushButton("Run Verification")
+        self.verify_btn = QPushButton("Check Everything Arrived Safely")
         self.verify_btn.setProperty("role", "primary")
         self.verify_btn.setMinimumHeight(48)
-        self.verify_btn.setFixedWidth(230)
+        self.verify_btn.setFixedWidth(260)
         self.verify_btn.clicked.connect(self._run_verification)
         root.addWidget(self.verify_btn, alignment=Qt.AlignHCenter)
 
-        self.report_btn = QPushButton("Final Sovereignty Report")
+        self.report_btn = QPushButton("View Migration Report")
         self.report_btn.setProperty("role", "cta")
         self.report_btn.setFixedWidth(250)
         self.report_btn.clicked.connect(self._show_report_path)
@@ -78,7 +79,7 @@ class VerificationPage(BasePage):
         self.verify_btn.setEnabled(False)
         self.report_btn.setEnabled(False)
         self.loading.setVisible(True)
-        self.status.setText("Validating restored files and application status...")
+        self.status.setText("Checking your files now — comparing what was backed up with what arrived on Linux...")
         worker = FunctionWorker(self.run_validation_cb)
         worker.signals.result.connect(self._on_result)
         worker.signals.error.connect(self._on_error)
@@ -100,12 +101,16 @@ class VerificationPage(BasePage):
             chips_layout.itemAt(1).widget().setText(f"Files: {total_files}")
             chips_layout.itemAt(2).widget().setText(f"Hash Verified: {hash_verified}")
             chips_layout.itemAt(3).widget().setText(f"Apps: {apps}")
-            self.status.setText(
-                "Verification complete. "
-                f"Total Sovereignty Score: {self.ui_state.total_sovereignty_score}%"
-            )
+            score = self.ui_state.total_sovereignty_score
+            if score >= 90:
+                summary = f"🎉  Excellent! Your Migration Score is {score}% — your move to Linux is a great success!"
+            elif score >= 70:
+                summary = f"✅  Good result! Your Migration Score is {score}% — almost everything made it across."
+            else:
+                summary = f"⚠️  Migration Score: {score}%. Some files may need attention — check the report for details."
+            self.status.setText(summary)
         else:
-            self.status.setText("Verification returned no summary.")
+            self.status.setText("Verification complete — click View Migration Report for full details.")
         self.refresh()
 
     def _on_error(self, error: str) -> None:

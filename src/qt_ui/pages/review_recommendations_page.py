@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QProgressBar,
     QPushButton,
-    QVBoxLayout,
     QTextEdit,
 )
 
@@ -27,14 +26,10 @@ class ReviewRecommendationsPage(BasePage):
         ui_state,
         run_app_recommendations_cb: Callable[[], dict],
         run_file_recommendations_cb: Callable[[], dict],
-        current_step: int = 3,
-        step_names: list[str] | None = None,
     ) -> None:
         super().__init__(ui_state)
         self.run_app_recommendations_cb = run_app_recommendations_cb
         self.run_file_recommendations_cb = run_file_recommendations_cb
-        self.current_step = current_step
-        self.step_names = step_names or ["Scan", "Data Selection", "Application Mapping", "Review & Backup"]
         self.thread_pool = QThreadPool.globalInstance()
         self.app_recommendations: dict[str, Any] = {}
         self.file_recommendations: dict[str, Any] = {}
@@ -45,28 +40,26 @@ class ReviewRecommendationsPage(BasePage):
     def _build_ui(self) -> None:
         root = self.create_center_card_layout(max_width=1000)
 
-        step = QLabel("Preparation - Step 4 of 5: Review Migration Recommendations")
-        step.setObjectName("StepTitle")
-        step.setAlignment(Qt.AlignCenter)
-        root.addWidget(step)
+        root.addWidget(self.create_page_header(
+            "🔍",
+            "Review & Confirm Your Migration Plan",
+            "Here's what we're planning to move for you — your apps and your files. "
+            "Look through the lists and click 'Continue' when you're happy.",
+        ))
 
-        question = "Review proposed app and file migrations before creating the backup bundle."
-        info = (
-            "• Your migration recommendations are based on scanned inventory and your chosen strategy. <br>"
-            + "• Review each section and customize selections if needed using Expert Overrides. <br>"
-            + "• Green (checked) items will be migrated; unchecked items will be excluded."
+        root.addWidget(
+            self.create_trust_banner(
+                "💡  Nothing is moved yet. This is just a preview. "
+                "You can adjust everything before we create your migration bundle."
+            )
         )
 
-        guided_panel = self.create_guided_questionnaire(question, info, options=[])
-        root.addWidget(guided_panel)
-
-        # App recommendations section
-        app_title = QLabel("Application Recommendations")
-        app_title.setObjectName("StepTitle")
+        app_title = QLabel("Apps: What we'll find for you on Linux")
+        app_title.setObjectName("SectionTitle")
         root.addWidget(app_title)
 
         self.app_summary = QLabel(
-            "Click 'Refresh Recommendations' to generate app-level migration suggestions based on your scan."
+            "Hit 'Refresh Plan' below to see which of your Windows apps have Linux alternatives ready."
         )
         self.app_summary.setObjectName("BodyText")
         self.app_summary.setWordWrap(True)
@@ -78,13 +71,12 @@ class ReviewRecommendationsPage(BasePage):
         self.app_details.setMaximumHeight(180)
         root.addWidget(self.app_details)
 
-        # File recommendations section
-        file_title = QLabel("File Migration Recommendations")
-        file_title.setObjectName("StepTitle")
+        file_title = QLabel("Files: What we'll bring across for you")
+        file_title.setObjectName("SectionTitle")
         root.addWidget(file_title)
 
         self.file_summary = QLabel(
-            "Click 'Refresh Recommendations' to generate file-level migration suggestions based on your data selection."
+            "Hit 'Refresh Plan' below to see which of your personal files are selected for migration."
         )
         self.file_summary.setObjectName("BodyText")
         self.file_summary.setWordWrap(True)
@@ -96,8 +88,7 @@ class ReviewRecommendationsPage(BasePage):
         self.file_details.setMaximumHeight(180)
         root.addWidget(self.file_details)
 
-        # Status and action buttons
-        self.status = QLabel("Ready to generate recommendations.")
+        self.status = QLabel("Ready — hit 'Refresh Plan' to load your migration preview.")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
@@ -108,18 +99,17 @@ class ReviewRecommendationsPage(BasePage):
         self.loading.setVisible(False)
         root.addWidget(self.loading)
 
-        # Button row
         button_row = QHBoxLayout()
         button_row.setSpacing(10)
 
-        self.refresh_btn = QPushButton("Refresh Recommendations")
+        self.refresh_btn = QPushButton("Refresh Plan")
         self.refresh_btn.setProperty("role", "primary")
         self.refresh_btn.setMinimumHeight(48)
-        self.refresh_btn.setFixedWidth(240)
+        self.refresh_btn.setFixedWidth(200)
         self.refresh_btn.clicked.connect(self._run_recommendations)
         button_row.addWidget(self.refresh_btn)
 
-        self.customize_btn = QPushButton("Customize (Expert)")
+        self.customize_btn = QPushButton("Fine-tune (Expert)")
         self.customize_btn.setProperty("role", "badge")
         self.customize_btn.setMinimumHeight(48)
         self.customize_btn.setFixedWidth(180)
@@ -128,18 +118,17 @@ class ReviewRecommendationsPage(BasePage):
 
         root.addLayout(button_row)
 
-        self.next_btn = QPushButton("Continue to Backup")
+        self.next_btn = QPushButton("Looks good — Continue to Backup")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(220)
+        self.next_btn.setFixedWidth(280)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
     def _run_recommendations(self) -> None:
         self._set_running_state(True)
         self.loading.setVisible(True)
-        self.status.setText("Generating app and file migration recommendations...")
+        self.status.setText("Working out the best migration plan for you...")
 
-        # Run both in parallel conceptually by using a worker function that calls both
         def _generate_both() -> tuple[dict, dict]:
             try:
                 apps = self.run_app_recommendations_cb()
@@ -168,7 +157,7 @@ class ReviewRecommendationsPage(BasePage):
                 app_count = int(app_recs.get("recommended_count", 0))
                 app_total = int(app_recs.get("input_count", 0))
                 self.app_summary.setText(
-                    f"Application recommendations: {app_count}/{app_total} matched apps ready for migration."
+                    f"We found Linux alternatives for {app_count} of your {app_total} Windows apps."
                 )
                 recs = app_recs.get("recommendations", [])
                 apps_text = "\n".join(
@@ -178,7 +167,7 @@ class ReviewRecommendationsPage(BasePage):
                     apps_text += f"\n... and {len(recs) - 10} more"
                 self.app_details.setPlainText(apps_text or "No app recommendations available.")
             else:
-                self.app_summary.setText("Failed to generate app recommendations.")
+                self.app_summary.setText("We couldn't generate app recommendations right now — you can continue anyway.")
                 self.app_details.setPlainText("")
 
             if isinstance(file_recs, dict) and "error" not in file_recs:
@@ -186,7 +175,7 @@ class ReviewRecommendationsPage(BasePage):
                 file_count = int(file_recs.get("recommended_count", 0))
                 file_total = int(file_recs.get("input_count", 0))
                 self.file_summary.setText(
-                    f"File recommendations: {file_count}/{file_total} selected for migration."
+                    f"{file_count} of {file_total} selected files will be included in your migration bundle."
                 )
                 recs = file_recs.get("recommendations", [])
                 files_text = "\n".join(
@@ -196,18 +185,18 @@ class ReviewRecommendationsPage(BasePage):
                     files_text += f"\n... and {len(recs) - 10} more files"
                 self.file_details.setPlainText(files_text or "No file recommendations available.")
             else:
-                self.file_summary.setText("Failed to generate file recommendations.")
+                self.file_summary.setText("We couldn't generate file recommendations right now — you can continue anyway.")
                 self.file_details.setPlainText("")
 
-            self.status.setText("Recommendations ready. Review above and click 'Continue to Backup' to proceed.")
+            self.status.setText("Your migration plan is ready! Review the lists above, then click 'Continue to Backup'.")
         else:
-            self.status.setText("Recommendation generation returned unexpected format.")
+            self.status.setText("Something unexpected happened — please try refreshing the plan again.")
 
         self.refresh()
 
     def _on_error(self, error: str) -> None:
         self.ui_state.last_error = error
-        self.status.setText(f"Recommendation generation failed.\n{user_facing_error(error)}")
+        self.status.setText(f"Couldn't generate recommendations.\n{user_facing_error(error)}")
         self.refresh()
 
     def _on_finished(self) -> None:
@@ -217,9 +206,9 @@ class ReviewRecommendationsPage(BasePage):
 
     def _open_expert_panel(self) -> None:
         if self.ui_state.mode != "expert":
-            self.status.setText("Expert customization is available in Expert mode. Switch modes at the top and return here.")
+            self.status.setText("Fine-tuning is available in Expert mode — switch at the top and come back here.")
         else:
-            self.status.setText("Use Expert Overrides (right panel) to customize app/file selections before backup.")
+            self.status.setText("Use the Expert Overrides panel on the right to adjust which apps and files are included.")
 
     def _set_running_state(self, running: bool) -> None:
         self.is_running = running
@@ -232,14 +221,14 @@ class ReviewRecommendationsPage(BasePage):
         if mode == "guided":
             self.refresh_btn.setVisible(False)
             self.customize_btn.setVisible(False)
-            self.status.setText("Guided mode uses automatic recommendations. Switch to Expert if you need to customize.")
+            self.status.setText("We've automatically prepared the best migration plan for you. Click 'Continue' when ready.")
         elif mode == "balanced":
             self.refresh_btn.setVisible(True)
             self.customize_btn.setVisible(False)
-            self.status.setText("Balanced mode: click Refresh to see recommendations (Expert panel hidden).")
-        else:  # expert
+            self.status.setText("Click 'Refresh Plan' to preview what will be migrated.")
+        else:
             self.refresh_btn.setVisible(True)
             self.customize_btn.setVisible(True)
-            self.status.setText("Expert mode: click Refresh or customize via Expert Overrides panel.")
+            self.status.setText("Click 'Refresh Plan' or use the Expert panel on the right to fine-tune your selections.")
 
         self.next_btn.setEnabled(not self.is_running)

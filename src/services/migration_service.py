@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Any
 
 from src.analysis.hw_matrix import generate_hardware_matrix, write_hardware_matrix
 from src.analysis.software_mapping import generate_software_mapping, write_software_mapping
 from src.backup.manifest import copy_backup_files, generate_manifest, write_manifest, create_backup_archive
-from src.constants import BASE_DIR
+from src.constants import BASE_DIR, RESTORE_DIR
 from src.inventory.hardware import collect_hardware_inventory, write_hardware_inventory
+from src.inventory.settings import collect_settings_inventory, write_settings_inventory
 from src.inventory.software import collect_software_inventory, write_software_inventory
 from src.loggers import get_logger
 from src.orchestration.checkpoints import CheckpointManager
@@ -26,7 +29,7 @@ class MigrationService:
         self.config = config
         self.context = context
         self.logger = get_logger("migration_service")
-        run_id = datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
+        run_id = datetime.now(timezone.utc).strftime("run_%Y%m%d_%H%M%S")
         checkpoint_dir = Path(self.config.automation.checkpoint_dir)
         if not checkpoint_dir.is_absolute():
             checkpoint_dir = BASE_DIR / checkpoint_dir
@@ -56,13 +59,20 @@ class MigrationService:
             sw_out = write_software_inventory(self.config, sw)
             self.logger.info("Software inventory written to %s", sw_out)
 
+            self.logger.info("Collecting settings and desktop personalization inventory...")
+            settings = collect_settings_inventory(export_assets=True)
+            self.logger.info("Writing settings inventory to file...")
+            settings_out = write_settings_inventory(self.config, settings)
+            self.logger.info("Settings inventory written to %s", settings_out)
+
             self.checkpoints.mark_phase(
                 "inventory_completed",
                 hardware_output=str(hw_out),
                 software_output=str(sw_out),
+                settings_output=str(settings_out),
                 scan_depth="deep" if deep_scan else "quick",
             )
-            return {"hardware": hw, "software": sw}
+            return {"hardware": hw, "software": sw, "settings": settings}
         except Exception as exc:
             self.checkpoints.mark_phase("inventory_failed", error=str(exc))
             raise
@@ -99,22 +109,26 @@ class MigrationService:
             self.checkpoints.mark_phase("analysis_failed", error=str(exc))
             raise
 
-    def run_backup(self, selected_folders, selected_file_types, logger=None):
-        """Create the backup manifest and copy the selected files."""
-        if logger is not None:  
+    def run_backup(self, selected_folders, selected_file_types, logger=None, settings_inventory=None, settings_plan=None):
+        """Create the backup manifest, copy selected files, and bundle settings assets."""
+        if logger is not None:
             self.logger = logger
 
         self.logger.info("Starting backup manifest generation...")
         self.checkpoints.mark_phase("backup_started", selected_folders=selected_folders)
-        
+
         try:
             self.config.source_system.backup_paths = selected_folders
             self.config.source_system.file_types = selected_file_types
             manifest = generate_manifest(self.config)
-            
+
             out_file = write_manifest(self.config, manifest)
             self.logger.info("Backup manifest written to %s", out_file)
             copy_backup_files(manifest, self.config)
+
+            # Bundle settings inventory and migration plan so the Linux side can restore them.
+            self._bundle_settings(settings_inventory, settings_plan)
+
             if self.config.backup.compress:
                 backup_root = self.config.source_system.backup_output_dir
                 archive_path = self.config.backup.archive_name
@@ -128,6 +142,30 @@ class MigrationService:
             self.logger.exception("Backup command failed: %s", exc)
             self.checkpoints.mark_phase("backup_failed", error=str(exc))
             raise MigrationError(ERR_BACKUP_FAILED, str(exc)) from exc
+
+    def _bundle_settings(self, settings_inventory: dict | None, settings_plan: dict | None) -> None:
+        """Write settings inventory and plan JSON into RESTORE_DIR and copy exported assets."""
+        RESTORE_DIR.mkdir(parents=True, exist_ok=True)
+
+        if settings_inventory:
+            inv_path = RESTORE_DIR / "settings_inventory.json"
+            inv_path.write_text(json.dumps(settings_inventory, indent=2), encoding="utf-8")
+            self.logger.info("Settings inventory bundled at %s", inv_path)
+
+            # Copy exported wallpaper/theme assets alongside the manifest.
+            exported = settings_inventory.get("exported_assets", {}) if isinstance(settings_inventory, dict) else {}
+            assets_dst = RESTORE_DIR / "settings_assets"
+            assets_dst.mkdir(parents=True, exist_ok=True)
+            for label, src_path in exported.items():
+                if src_path and Path(src_path).is_file():
+                    dst = assets_dst / Path(src_path).name
+                    shutil.copy2(src_path, dst)
+                    self.logger.info("Settings asset '%s' copied to %s", label, dst)
+
+        if settings_plan:
+            plan_path = RESTORE_DIR / "settings_migration_plan.json"
+            plan_path.write_text(json.dumps(settings_plan, indent=2), encoding="utf-8")
+            self.logger.info("Settings migration plan bundled at %s", plan_path)
 
     def run_task(self, worker_fn: Callable[[], Any], on_done: Callable[[Any], None]) -> None:
         """Run a worker function asynchronously and hand the result back on completion."""

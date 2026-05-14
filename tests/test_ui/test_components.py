@@ -13,6 +13,9 @@ class TestPageModules:
     def test_scan_page_module_exists(self):
         assert find_spec("src.qt_ui.pages.scan_page") is not None
 
+    def test_settings_page_module_exists(self):
+        assert find_spec("src.qt_ui.pages.settings_page") is not None
+
     def test_data_selection_page_module_exists(self):
         assert find_spec("src.qt_ui.pages.data_selection_page") is not None
 

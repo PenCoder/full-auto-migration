@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/ -x --tb=short -q)",
+      "Bash(python -m pytest tests/ --tb=short -q)",
+      "Bash(python -m pytest tests/test_unit/test_qt_ui_controllers.py::TestOperationsController -x --tb=long -q)"
+    ]
+  }
+}

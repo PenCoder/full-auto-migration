@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QRadioButton, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QRadioButton, QSizePolicy, QVBoxLayout, QWidget
 
 from src.qt_ui.state import QtUiState
 
@@ -25,7 +25,7 @@ class BasePage(QWidget):
         """Create a centered card layout used by the wizard pages."""
         page_layout = QVBoxLayout(self)
         page_layout.setContentsMargins(0, 0, 0, 0)
-        page_layout.addStretch(1)
+        # page_layout.addStretch(1)
 
         card = QWidget()
         card.setObjectName("StepCard")
@@ -130,13 +130,56 @@ class BasePage(QWidget):
         container.setLayout(layout)
         return container
     
+    def create_page_header(self, icon: str, title: str, subtitle: str = "") -> QWidget:
+        """Create a prominent page header with icon, bold title, and optional subtitle."""
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 4, 0, 8)
+        layout.setSpacing(6)
+
+        icon_lbl = QLabel(icon)
+        icon_lbl.setObjectName("PageIcon")
+        icon_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(icon_lbl)
+
+        title_lbl = QLabel(title)
+        title_lbl.setObjectName("PageTitle")
+        title_lbl.setAlignment(Qt.AlignCenter)
+        title_lbl.setWordWrap(True)
+        layout.addWidget(title_lbl)
+
+        if subtitle:
+            sub_lbl = QLabel(subtitle)
+            sub_lbl.setObjectName("PageSubtitle")
+            sub_lbl.setAlignment(Qt.AlignCenter)
+            sub_lbl.setWordWrap(True)
+            layout.addWidget(sub_lbl)
+
+        return container
+
     def hint_label(self, text: str) -> QLabel:
         """Create a small muted hint label."""
         hint_label = QLabel(text)
         hint_label.setWordWrap(True)
-        hint_label.setStyleSheet("font-size: 12px; margin-left: 20px;")
-        # hint_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
+        hint_label.setStyleSheet("font-size: 12px; color: #546E7A; margin-left: 20px;")
         return hint_label
+    
+    def activit_list(self) -> QListWidget:
+        """Create a simple activity list widget for logging."""
+        
+        a_list = QListWidget()
+        # a_list.setObjectName("ActivityLog")
+        a_list.setMinimumHeight(92)
+        a_list.setMaximumHeight(136)
+
+        return a_list
+    
+    def checklist_item(self, text: str, checked: bool) -> QListWidgetItem:
+        """Create a checklist item with a checkbox."""
+        item = QListWidgetItem(text)
+        item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+        item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        return item
         
 
     def refresh(self) -> None:

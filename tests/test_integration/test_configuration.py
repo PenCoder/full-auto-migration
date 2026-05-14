@@ -24,6 +24,12 @@ source_system:
   backup_paths:
     - Documents
     - Desktop
+  file_types:
+    .pdf: true
+    .docx: true
+  file_type_labels:
+    .pdf: PDF files
+    .docx: Word document files
 
 target_system:
   distro: ubuntu
@@ -58,6 +64,7 @@ validation:
             assert config.project.name == "Test Migration"
             assert config.migration.mode == "full_clean"
             assert config.target_system.distro == "ubuntu"
+            assert config.source_system.file_type_labels[".pdf"] == "PDF files"
         finally:
             temp_path.unlink()
 

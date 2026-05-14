@@ -65,6 +65,7 @@ class FileRecommendationService:
         self,
         recommendations: list[dict[str, Any]],
         choice_mode: str,
+        selected_file_types: dict[str, bool] | None = None,
     ) -> list[dict[str, Any]]:
         """Filter and reorder recommendations based on user data choice mode."""
         if choice_mode == "manual":
@@ -83,8 +84,17 @@ class FileRecommendationService:
             )
 
         if choice_mode == "selected_types":
-            # Whitelist by extension; let UI let user select types
-            return recommendations
+            selected = {
+                str(ext).lower()
+                for ext, enabled in (selected_file_types or {}).items()
+                if bool(enabled)
+            }
+            if not selected:
+                return []
+            return [
+                rec for rec in recommendations
+                if str(rec.get("extension", "")).lower() in selected
+            ]
 
         if choice_mode == "ai_recommended":
             # Rely on AI to prioritize; keep full set for AI to rank
@@ -92,20 +102,17 @@ class FileRecommendationService:
 
         return recommendations
 
-    @staticmethod
-    def _ai_enabled() -> bool:
-        """Return whether AI ranking can be attempted from environment variables."""
-        return bool(os.getenv("AI_RECOMMENDER_ENDPOINT") and os.getenv("AI_RECOMMENDER_MODEL"))
-
     def _ai_rank_files(
         self,
         recommendations: list[dict[str, Any]],
         choice_mode: str,
+        ai_config: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], str]:
         """Use AI to rank files by migration priority and explain reasoning."""
-        endpoint = os.getenv("AI_RECOMMENDER_ENDPOINT", "").strip()
-        model = os.getenv("AI_RECOMMENDER_MODEL", "").strip()
-        api_key = os.getenv("AI_RECOMMENDER_API_KEY", "").strip()
+        cfg = ai_config or {}
+        endpoint = str(cfg.get("endpoint") or os.getenv("AI_RECOMMENDER_ENDPOINT", "")).strip()
+        model = str(cfg.get("model") or os.getenv("AI_RECOMMENDER_MODEL", "")).strip()
+        api_key = str(cfg.get("api_key") or os.getenv("AI_RECOMMENDER_API_KEY", "")).strip()
 
         if not endpoint or not model:
             return recommendations, "deterministic"
@@ -187,6 +194,7 @@ class FileRecommendationService:
         choice_mode: str = "all_files",
         use_ai: bool = False,
         ai_config: dict[str, Any] | None = None,
+        selected_file_types: dict[str, bool] | None = None,
     ) -> dict[str, Any]:
         """Generate file-level recommendations and write report artifacts."""
         # If user chose manual, return empty set
@@ -231,17 +239,26 @@ class FileRecommendationService:
             recommendations.append(recommendation)
 
         # Apply choice mode selection
-        recommendations = self._apply_choice_mode(recommendations, choice_mode)
+        recommendations = self._apply_choice_mode(
+            recommendations,
+            choice_mode,
+            selected_file_types=selected_file_types,
+        )
 
         ranking_method = "deterministic"
-        if use_ai and choice_mode == "ai_recommended" and recommendations:
+        cfg = ai_config or {}
+        file_online_allowed = bool(cfg.get("file_recommendation_online_enabled", False))
+        if use_ai and choice_mode == "ai_recommended" and recommendations and file_online_allowed:
             try:
                 recommendations, ranking_method = self._ai_rank_files(
                     recommendations=recommendations,
                     choice_mode=choice_mode,
+                    ai_config=cfg,
                 )
             except Exception:
                 pass
+        elif use_ai and choice_mode == "ai_recommended" and recommendations and not file_online_allowed:
+            ranking_method = "local_privacy_policy"
 
         generated_at = datetime.now().isoformat()
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")

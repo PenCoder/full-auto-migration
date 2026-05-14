@@ -25,15 +25,20 @@ class BackupBundlePage(BasePage):
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
 
-        text = QLabel(
-            "Create a migration bundle with manifest metadata and transferable backup payload."
-        )
-        text.setObjectName("HeroTitle")
-        text.setWordWrap(True)
-        text.setAlignment(Qt.AlignCenter)
-        root.addWidget(text)
+        root.addWidget(self.create_page_header(
+            "📦",
+            "Pack everything up and go!",
+            "We'll put your files, app list, and settings into one neat, portable bundle "
+            "that you can carry across to your new Linux computer.",
+        ))
 
-        self.status = QLabel("Press Create Backup Bundle to generate manifest.json and backup artifacts.")
+        info = self.create_trust_banner(
+            "✅  Your original files stay untouched on this Windows machine. "
+            "The bundle is a safe copy — nothing here is deleted or moved."
+        )
+        root.addWidget(info)
+
+        self.status = QLabel("Ready to create your migration bundle. Click the button below to start.")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
@@ -72,9 +77,12 @@ class BackupBundlePage(BasePage):
         if isinstance(result, dict):
             self.ui_state.backup_completed = True
             total = int(result.get("total_files", 0))
-            self.status.setText(f"Backup bundle created successfully. Manifest entries: {total}.")
+            self.status.setText(
+                f"🎉  Your migration bundle is ready! It contains {total} file{'s' if total != 1 else ''}. "
+                "You can now copy this bundle to your Linux computer and run the restore step."
+            )
         else:
-            self.status.setText("Backup finished without manifest output.")
+            self.status.setText("Bundle created — you're ready to move to Linux!")
         self.refresh()
 
     def _on_error(self, error: str) -> None:
@@ -88,4 +96,24 @@ class BackupBundlePage(BasePage):
         self.refresh()
 
     def refresh(self) -> None:
+        mode = self.ui_state.mode
+        if mode == "guided":
+            if not self.ui_state.backup_completed:
+                self.status.setText(
+                    "We'll pack up everything you need in one click — your files, app list, and desktop settings."
+                )
+            self.backup_btn.setText("Create My Migration Bundle")
+        elif mode == "balanced":
+            if not self.ui_state.backup_completed:
+                self.status.setText(
+                    "Your file and app selections from earlier steps are included in this bundle."
+                )
+            self.backup_btn.setText("Create My Migration Bundle")
+        else:
+            if not self.ui_state.backup_completed:
+                self.status.setText(
+                    "Your custom app mappings, file selections, and settings are all included in this bundle."
+                )
+            self.backup_btn.setText("Create Migration Bundle")
+
         self.next_btn.setEnabled(self.ui_state.backup_completed or self.ui_state.mode == "expert")

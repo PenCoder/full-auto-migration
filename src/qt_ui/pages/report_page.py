@@ -7,12 +7,13 @@ from typing import Callable
 
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QTextEdit, QVBoxLayout
+from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QTextEdit
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
 from src.qt_ui.workers import FunctionWorker
 from src.services.report_service import ReportService
+from src.services.settings_service import SettingsMigrationService
 
 
 class ReportPage(BasePage):
@@ -23,19 +24,28 @@ class ReportPage(BasePage):
         self.generate_report_cb = generate_report_cb
         self.thread_pool = QThreadPool.globalInstance()
         self.report_paths: dict[str, str] = {}
+        self.settings_service = SettingsMigrationService()
         self._build_ui()
         self.refresh()
 
     def _build_ui(self) -> None:
         root = self.create_center_card_layout(max_width=980)
 
+        root.addWidget(self.create_page_header(
+            "📋",
+            "Your Migration Report",
+            "This is your official record of the migration — what was moved, what was verified, "
+            "and your final Migration Score. You can save and share it.",
+        ))
+
         root.addWidget(
             self.create_trust_banner(
-                "This report consolidates validation evidence, sovereignty score, and migration recommendations."
+                "✅  This report is generated entirely on your computer. "
+                "No data is uploaded or shared unless you choose to share the file."
             )
         )
 
-        self.score_display = QLabel("Sovereignty score: 0%")
+        self.score_display = QLabel("Migration Score: —")
         self.score_display.setObjectName("HeroTitle")
         self.score_display.setAlignment(Qt.AlignCenter)
         root.addWidget(self.score_display)
@@ -43,9 +53,19 @@ class ReportPage(BasePage):
         self.summary_text = QTextEdit()
         self.summary_text.setReadOnly(True)
         self.summary_text.setMinimumHeight(220)
+        self.summary_text.setStyleSheet(
+            "QTextEdit {"
+            " font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;"
+            " font-size: 12px;"
+            " border: 1px solid rgba(120,120,120,0.35);"
+            " border-radius: 8px;"
+            " padding: 10px;"
+            " background: rgba(20, 24, 32, 0.05);"
+            "}"
+        )
         root.addWidget(self.summary_text)
 
-        self.report_status = QLabel("Generate the final report to create markdown, HTML, and JSON evidence artifacts.")
+        self.report_status = QLabel("Click below to generate your full migration report in multiple formats you can save and share.")
         self.report_status.setObjectName("BodyText")
         self.report_status.setWordWrap(True)
         self.report_status.setAlignment(Qt.AlignCenter)
@@ -56,27 +76,28 @@ class ReportPage(BasePage):
         self.loading.setVisible(False)
         root.addWidget(self.loading)
 
-        self.generate_btn = QPushButton("Generate Final Report")
+        self.generate_btn = QPushButton("Generate My Migration Report")
         self.generate_btn.setProperty("role", "primary")
         self.generate_btn.setMinimumHeight(48)
+        self.generate_btn.setMinimumWidth(260)
         self.generate_btn.clicked.connect(self._run_report_generation)
         root.addWidget(self.generate_btn, alignment=Qt.AlignHCenter)
 
-        self.open_markdown_btn = QPushButton("Open Markdown Report")
+        self.open_markdown_btn = QPushButton("Open Report (Markdown)")
         self.open_markdown_btn.setProperty("role", "cta")
-        self.open_markdown_btn.setFixedWidth(230)
+        self.open_markdown_btn.setFixedWidth(240)
         self.open_markdown_btn.clicked.connect(self._open_markdown)
         root.addWidget(self.open_markdown_btn, alignment=Qt.AlignHCenter)
 
-        self.open_html_btn = QPushButton("Open HTML Report")
+        self.open_html_btn = QPushButton("Open Report (Web page)")
         self.open_html_btn.setProperty("role", "badge")
-        self.open_html_btn.setFixedWidth(230)
+        self.open_html_btn.setFixedWidth(240)
         self.open_html_btn.clicked.connect(self._open_html)
         root.addWidget(self.open_html_btn, alignment=Qt.AlignHCenter)
 
-        self.next_btn = QPushButton("Finish")
+        self.next_btn = QPushButton("🎉  Migration Complete — Finish")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(200)
+        self.next_btn.setMinimumWidth(260)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
@@ -114,7 +135,13 @@ class ReportPage(BasePage):
             validation = report.get("validation", {})
             score = int(summary.get("score", 0))
             self.ui_state.total_sovereignty_score = score
-            self.score_display.setText(f"Sovereignty score: {score}%")
+            if score >= 90:
+                score_label = f"🎉  Migration Score: {score}% — Outstanding!"
+            elif score >= 70:
+                score_label = f"✅  Migration Score: {score}% — Great result!"
+            else:
+                score_label = f"Migration Score: {score}% — See report for details"
+            self.score_display.setText(score_label)
             self.summary_text.setPlainText(
                 "Final report generated successfully.\n\n"
                 f"Rating: {summary.get('rating', 'Unknown')}\n"
@@ -126,7 +153,28 @@ class ReportPage(BasePage):
                 f"HTML: {self.report_paths.get('html', '')}\n"
                 f"JSON: {self.report_paths.get('json', '')}"
             )
-            self.report_status.setText("Report generation complete. Use the buttons below to open the exported artifacts.")
+            settings = self.ui_state.settings_inventory if isinstance(self.ui_state.settings_inventory, dict) else {}
+            if settings:
+                desktop = settings.get("desktop", {}) if isinstance(settings.get("desktop", {}), dict) else {}
+                appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance", {}), dict) else {}
+                exported = settings.get("exported_assets", {}) if isinstance(settings.get("exported_assets", {}), dict) else {}
+                self.summary_text.append("\nSettings Migration Snapshot")
+                self.summary_text.append(f"Wallpaper: {desktop.get('wallpaper_path', 'n/a') or 'n/a'}")
+                self.summary_text.append(f"Theme: {appearance.get('current_theme', 'n/a') or 'n/a'}")
+                self.summary_text.append(f"Wallpaper export: {exported.get('wallpaper', '') or 'not exported'}")
+                self.summary_text.append(f"Theme export: {exported.get('theme', '') or 'not exported'}")
+            plan = self.ui_state.settings_migration_plan if isinstance(self.ui_state.settings_migration_plan, dict) else {}
+            if plan:
+                plan_paths = self.settings_service.write_plan(plan)
+                self.summary_text.append("\nSettings Migration Plan")
+                self.summary_text.append(f"Customization depth: {plan.get('customization_depth', 'n/a')}")
+                self.summary_text.append(f"Auto migrate: {plan.get('counts', {}).get('auto_migrate', 0)}")
+                self.summary_text.append(f"Suggest review: {plan.get('counts', {}).get('suggest_review', 0)}")
+                self.summary_text.append(f"Manual review: {plan.get('counts', {}).get('manual_review', 0)}")
+                self.summary_text.append(f"Excluded: {plan.get('counts', {}).get('excluded', 0)}")
+                self.summary_text.append(f"Plan JSON: {plan_paths.get('json_path', '')}")
+                self.summary_text.append(f"Plan Markdown: {plan_paths.get('markdown_path', '')}")
+            self.report_status.setText("Your report is ready! Use the buttons below to open it — you can save or print it from there.")
             self.ui_state.verification_completed = True
         else:
             self.report_status.setText("Report generation finished without structured output.")

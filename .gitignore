@@ -63,3 +63,7 @@ logs/
 /os/
 .exe
 *.exe
+
+
+# Miscellaneous
+*copy.py
