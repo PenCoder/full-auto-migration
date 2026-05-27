@@ -83,7 +83,7 @@ class MigrationState:
 
     # --- Analysis & Recommendation State ---
     recommendation_strategy: str = "migrate_all"  # "migrate_all" or "prioritize"
-    inventory_strategy: str = "quick"  # "quick", "deep", "online", "agent"
+    inventory_strategy: str = "quick"  # "quick", "deep", "online"
     expert_panel_visible: bool = False
     profile_overrides: dict[str, Any] = field(default_factory=dict)
 

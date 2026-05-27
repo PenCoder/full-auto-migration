@@ -154,26 +154,23 @@ class BackupConfig:
 
 
 @dataclass
-class AIConfig:
+class RepologyConfig:
     """
-    AI model and recommendation engine settings.
+    Repology online package metadata settings.
 
-    Configuration for optional AI services, including model endpoint,
-    credentials, and generation parameters.
+    Controls whether and how the system queries Repology to verify
+    Linux package availability. No user data is ever transmitted.
     """
-    enabled: bool = False
-    endpoint: str = ""
-    model: str = ""
-    api_key: str = ""
-    temperature: float = 0.2
-    timeout_seconds: int = 10
-    file_recommendation_online_enabled: bool = False
-    software_online_lookup_enabled: bool = True
-    software_online_provider: str = "repology"
-    software_online_send_fields: List[str] = field(
+    enabled: bool = True
+    provider: str = "repology"
+    send_fields: List[str] = field(
         default_factory=lambda: ["name", "version", "publisher"]
     )
     redact_user_paths: bool = True
+
+
+# Backward-compatible alias used by legacy callers that reference AIConfig.
+AIConfig = RepologyConfig
 
 
 @dataclass
@@ -193,7 +190,9 @@ class MigrationConfigRoot:
     research: ResearchConfig
     app_demo: DemoConfig
     backup: BackupConfig
-    ai: AIConfig
+    repology: RepologyConfig = field(default_factory=RepologyConfig)
+    # Legacy alias kept so existing code that reads config.ai still works.
+    ai: RepologyConfig = field(default_factory=RepologyConfig)
 
     @classmethod
     def load(cls, path: str) -> MigrationConfigRoot:

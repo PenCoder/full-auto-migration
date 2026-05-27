@@ -342,71 +342,53 @@ class TestLinuxPipeline:
 
 
 # ---------------------------------------------------------------------------
-# Recommendation fallback regression
+# ScanPage navigation guard regression
 # ---------------------------------------------------------------------------
 
-class TestRecommendationFallback:
-    """Guard the scan page's auto-fallback to local strategy on AI/online errors."""
+class TestScanPageNavGuard:
+    """Verify that ScanPage blocks forward navigation until inventory is complete."""
 
-    def test_fallback_flag_defaults_to_local(self):
-        from src.qt_ui.pages.scan_page import ScanPage
-        state = _make_state("balanced")
-
-        dummy_scan_cb = MagicMock(return_value={"software": {"entries": []}, "hardware": {}})
-        dummy_rec_cb = MagicMock(return_value={"recommended_count": 0, "input_count": 0, "recommendations": []})
-
-        import sys
-        if "PySide6" not in sys.modules:
-            pytest.skip("PySide6 not available in this environment")
-
-        page = ScanPage.__new__(ScanPage)
-        page._current_rec_strategy = "local"
-        assert page._current_rec_strategy == "local"
-
-    def test_on_recommendation_error_falls_back_when_agent(self):
-        """_on_recommendation_error auto-retries with 'local' when strategy is 'agent'."""
+    def test_can_proceed_false_before_scan(self):
         import sys
         if "PySide6" not in sys.modules:
             pytest.skip("PySide6 not available in this environment")
 
         from src.qt_ui.pages.scan_page import ScanPage
         page = ScanPage.__new__(ScanPage)
-        page._current_rec_strategy = "agent"
-        page.ui_state = _make_state("expert")
+        page.ui_state = _make_state("guided")
+        page.ui_state.inventory_completed = False
+        assert page.can_proceed() is False
 
-        retry_calls: list[str] = []
-
-        def fake_run_recommendations(strategy: str) -> None:
-            retry_calls.append(strategy)
-
-        page._run_recommendations = fake_run_recommendations  # type: ignore[method-assign]
-        page.status = MagicMock()
-        page._render_scan_report = MagicMock()
-        page.refresh = MagicMock()
-
-        page._on_recommendation_error("Connection refused")
-
-        assert retry_calls == ["local"]
-        page.status.setText.assert_called_once()
-
-    def test_on_recommendation_error_no_fallback_when_local(self):
-        """_on_recommendation_error does not loop when strategy is already 'local'."""
+    def test_can_proceed_true_after_scan(self):
         import sys
         if "PySide6" not in sys.modules:
             pytest.skip("PySide6 not available in this environment")
 
         from src.qt_ui.pages.scan_page import ScanPage
         page = ScanPage.__new__(ScanPage)
-        page._current_rec_strategy = "local"
-        page.ui_state = _make_state("expert")
+        page.ui_state = _make_state("guided")
+        page.ui_state.inventory_completed = True
+        assert page.can_proceed() is True
 
-        retry_calls: list[str] = []
-        page._run_recommendations = lambda s: retry_calls.append(s)  # type: ignore[method-assign]
-        page.status = MagicMock()
-        page._render_scan_report = MagicMock()
-        page.refresh = MagicMock()
+    def test_is_processing_set_during_scan(self):
+        """set_scanning() updates is_processing and emits processing_changed."""
+        import sys
+        if "PySide6" not in sys.modules:
+            pytest.skip("PySide6 not available in this environment")
 
-        page._on_recommendation_error("Service unavailable")
+        from src.qt_ui.pages.scan_page import ScanPage
+        page = ScanPage.__new__(ScanPage)
+        page.ui_state = _make_state("balanced")
+        page.is_processing = False
+        page._page_scan_bar = None
+        emitted: list[bool] = []
+        page.processing_changed = MagicMock()
+        page.processing_changed.emit = lambda v: emitted.append(v)
 
-        assert retry_calls == []
-        page.status.setText.assert_called_once()
+        page.set_scanning(True)
+        assert page.is_processing is True
+        assert emitted == [True]
+
+        page.set_scanning(False)
+        assert page.is_processing is False
+        assert emitted == [True, False]

@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-import requests
 
 from src.constants import BASE_DIR, CONFIG_DIR
 
@@ -96,112 +93,18 @@ class FileRecommendationService:
                 if str(rec.get("extension", "")).lower() in selected
             ]
 
-        if choice_mode == "ai_recommended":
-            # Rely on AI to prioritize; keep full set for AI to rank
-            return recommendations
-
         return recommendations
-
-    def _ai_rank_files(
-        self,
-        recommendations: list[dict[str, Any]],
-        choice_mode: str,
-        ai_config: dict[str, Any] | None = None,
-    ) -> tuple[list[dict[str, Any]], str]:
-        """Use AI to rank files by migration priority and explain reasoning."""
-        cfg = ai_config or {}
-        endpoint = str(cfg.get("endpoint") or os.getenv("AI_RECOMMENDER_ENDPOINT", "")).strip()
-        model = str(cfg.get("model") or os.getenv("AI_RECOMMENDER_MODEL", "")).strip()
-        api_key = str(cfg.get("api_key") or os.getenv("AI_RECOMMENDER_API_KEY", "")).strip()
-
-        if not endpoint or not model:
-            return recommendations, "deterministic"
-
-        headers = {"Content-Type": "application/json"}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
-        compact_items = [
-            {
-                "file_path": rec.get("file_path", ""),
-                "file_size": int(rec.get("file_size", 0)),
-                "extension": rec.get("extension", ""),
-                "importance": rec.get("importance", "low"),
-                "last_accessed_days_ago": rec.get("last_accessed_days_ago"),
-            }
-            for rec in recommendations
-        ]
-
-        prompt = {
-            "task": "Prioritize files for migration to Linux based on importance and usage.",
-            "choice_mode": choice_mode,
-            "requirements": [
-                "Return strict JSON only.",
-                "Preserve file_path values exactly.",
-                "Use keys: ranked_files, where ranked_files is a list of objects with file_path, priority_rank, ai_reason.",
-            ],
-            "candidates": compact_items,
-        }
-
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": "You are a file migration priority assistant that returns strict JSON."},
-                {"role": "user", "content": json.dumps(prompt)},
-            ],
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"},
-        }
-
-        try:
-            response = requests.post(endpoint, headers=headers, json=body, timeout=10)
-            if response.status_code != 200:
-                return recommendations, "deterministic"
-
-            payload = response.json()
-            content = payload.get("choices", [{}])[0].get("message", {}).get("content", "{}")
-            data = json.loads(content)
-            ranked_files = data.get("ranked_files", []) if isinstance(data, dict) else []
-
-            rank_by_path = {
-                str(item.get("file_path", "")): item
-                for item in ranked_files
-                if isinstance(item, dict)
-            }
-
-            ordered: list[dict[str, Any]] = []
-            for rec in recommendations:
-                file_path = str(rec.get("file_path", ""))
-                ai_item = rank_by_path.get(file_path)
-                if not ai_item:
-                    continue
-                merged = dict(rec)
-                merged["priority_rank"] = int(ai_item.get("priority_rank", 0))
-                merged["ai_reason"] = str(ai_item.get("ai_reason", ""))
-                ordered.append(merged)
-
-            if not ordered:
-                return recommendations, "deterministic"
-
-            ordered.sort(key=lambda item: int(item.get("priority_rank", 10**6)))
-            return ordered, "ai_model"
-        except Exception:
-            return recommendations, "deterministic"
 
     def generate_recommendations(
         self,
         file_inventory: dict[str, Any],
         choice_mode: str = "all_files",
-        use_ai: bool = False,
-        ai_config: dict[str, Any] | None = None,
         selected_file_types: dict[str, bool] | None = None,
     ) -> dict[str, Any]:
         """Generate file-level recommendations and write report artifacts."""
-        # If user chose manual, return empty set
         if choice_mode == "manual":
             return {
                 "choice_mode": choice_mode,
-                "ranking_method": "skipped",
                 "recommendations": [],
                 "recommended_count": 0,
                 "input_count": 0,
@@ -228,37 +131,20 @@ class FileRecommendationService:
                 last_accessed_days_ago=last_accessed_days,
             )
 
-            recommendation: dict[str, Any] = {
+            recommendations.append({
                 "file_path": file_path,
                 "extension": extension,
                 "file_size": file_size,
                 "importance": importance,
                 "last_accessed_days_ago": last_accessed_days,
-                "migrate": importance in {"critical", "important"},  # Default decision
-            }
-            recommendations.append(recommendation)
+                "migrate": importance in {"critical", "important"},
+            })
 
-        # Apply choice mode selection
         recommendations = self._apply_choice_mode(
             recommendations,
             choice_mode,
             selected_file_types=selected_file_types,
         )
-
-        ranking_method = "deterministic"
-        cfg = ai_config or {}
-        file_online_allowed = bool(cfg.get("file_recommendation_online_enabled", False))
-        if use_ai and choice_mode == "ai_recommended" and recommendations and file_online_allowed:
-            try:
-                recommendations, ranking_method = self._ai_rank_files(
-                    recommendations=recommendations,
-                    choice_mode=choice_mode,
-                    ai_config=cfg,
-                )
-            except Exception:
-                pass
-        elif use_ai and choice_mode == "ai_recommended" and recommendations and not file_online_allowed:
-            ranking_method = "local_privacy_policy"
 
         generated_at = datetime.now().isoformat()
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -269,7 +155,6 @@ class FileRecommendationService:
         payload = {
             "generated_at": generated_at,
             "choice_mode": choice_mode,
-            "ranking_method": ranking_method,
             "input_count": len(entries),
             "recommended_count": len(recommendations),
             "recommendations": recommendations,
@@ -281,7 +166,6 @@ class FileRecommendationService:
             "",
             f"Generated at: {generated_at}",
             f"Choice mode: {choice_mode}",
-            f"Ranking method: {ranking_method}",
             f"Selected files: {len(recommendations)} / {len(entries)}",
             "",
             "| File Path | Size (MB) | Importance | Migrate |",
@@ -297,7 +181,6 @@ class FileRecommendationService:
 
         return {
             "choice_mode": choice_mode,
-            "ranking_method": ranking_method,
             "recommendations": recommendations,
             "recommended_count": len(recommendations),
             "input_count": len(entries),

@@ -51,18 +51,9 @@ class ReportPage(BasePage):
         root.addWidget(self.score_display)
 
         self.summary_text = QTextEdit()
+        self.summary_text.setObjectName("ReportView")
         self.summary_text.setReadOnly(True)
         self.summary_text.setMinimumHeight(220)
-        self.summary_text.setStyleSheet(
-            "QTextEdit {"
-            " font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;"
-            " font-size: 12px;"
-            " border: 1px solid rgba(120,120,120,0.35);"
-            " border-radius: 8px;"
-            " padding: 10px;"
-            " background: rgba(20, 24, 32, 0.05);"
-            "}"
-        )
         root.addWidget(self.summary_text)
 
         self.report_status = QLabel("Click below to generate your full migration report in multiple formats you can save and share.")
@@ -107,6 +98,7 @@ class ReportPage(BasePage):
         self.open_html_btn.setEnabled(False)
         self.next_btn.setEnabled(False)
         self.loading.setVisible(True)
+        self.set_scanning(True)
         self.report_status.setText("Generating report artifacts and visual summary...")
 
         if self.generate_report_cb is not None:
@@ -135,6 +127,7 @@ class ReportPage(BasePage):
             validation = report.get("validation", {})
             score = int(summary.get("score", 0))
             self.ui_state.total_sovereignty_score = score
+
             if score >= 90:
                 score_label = f"🎉  Migration Score: {score}% — Outstanding!"
             elif score >= 70:
@@ -142,38 +135,68 @@ class ReportPage(BasePage):
             else:
                 score_label = f"Migration Score: {score}% — See report for details"
             self.score_display.setText(score_label)
-            self.summary_text.setPlainText(
-                "Final report generated successfully.\n\n"
-                f"Rating: {summary.get('rating', 'Unknown')}\n"
-                f"Files restored: {validation.get('restored_files', 0)} / {validation.get('total_files', 0)}\n"
-                f"Hash verified: {validation.get('hash_verified_files', 0)}\n"
-                f"Hash failed: {validation.get('hash_failed_files', 0)}\n"
-                f"Applications mapped: {validation.get('apps_mapped', 0)}\n\n"
-                f"Markdown: {self.report_paths.get('markdown', '')}\n"
-                f"HTML: {self.report_paths.get('html', '')}\n"
-                f"JSON: {self.report_paths.get('json', '')}"
+
+            # ── Score + files section ──────────────────────────────────────
+            rating = str(summary.get("rating", "Unknown"))
+            restored = int(validation.get("restored_files", 0))
+            total_files = int(validation.get("total_files", 0))
+            coverage = f"{round(restored / total_files * 100)}%" if total_files else "—"
+            score_color = "#1B5E20" if score >= 90 else ("#E65100" if score >= 70 else "#546E7A")
+            score_bg = "#E8F5E9" if score >= 90 else ("#FFF3E0" if score >= 70 else "#ECEFF1")
+            summary_rows = (
+                self.html_row("Rating", self.html_pill(rating, score_color, score_bg))
+                + self.html_row("Files restored", f"{restored} / {total_files} ({coverage})")
+                + self.html_row("Hash verified", str(validation.get("hash_verified_files", 0)))
+                + self.html_row("Hash failed", str(validation.get("hash_failed_files", 0)))
+                + self.html_row("Apps mapped", str(validation.get("apps_mapped", 0)))
             )
+            sections = [self.html_section("📊", "Migration Summary",
+                f'<table style="width:100%;">{summary_rows}</table>')]
+
+            # ── Report file paths ──────────────────────────────────────────
+            def short(p: str) -> str:
+                return ("…" + p[-52:]) if len(p) > 55 else p
+
+            path_rows = (
+                self.html_row("Markdown", f'<span style="color:#546E7A;font-size:12px;">{short(self.report_paths["markdown"])}</span>')
+                + self.html_row("Web page", f'<span style="color:#546E7A;font-size:12px;">{short(self.report_paths["html"])}</span>')
+                + self.html_row("JSON", f'<span style="color:#546E7A;font-size:12px;">{short(self.report_paths["json"])}</span>')
+            )
+            sections.append(self.html_section("📁", "Report Files",
+                f'<table style="width:100%;">{path_rows}</table>'))
+
+            # ── Settings snapshot (optional) ──────────────────────────────
             settings = self.ui_state.settings_inventory if isinstance(self.ui_state.settings_inventory, dict) else {}
             if settings:
                 desktop = settings.get("desktop", {}) if isinstance(settings.get("desktop", {}), dict) else {}
                 appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance", {}), dict) else {}
                 exported = settings.get("exported_assets", {}) if isinstance(settings.get("exported_assets", {}), dict) else {}
-                self.summary_text.append("\nSettings Migration Snapshot")
-                self.summary_text.append(f"Wallpaper: {desktop.get('wallpaper_path', 'n/a') or 'n/a'}")
-                self.summary_text.append(f"Theme: {appearance.get('current_theme', 'n/a') or 'n/a'}")
-                self.summary_text.append(f"Wallpaper export: {exported.get('wallpaper', '') or 'not exported'}")
-                self.summary_text.append(f"Theme export: {exported.get('theme', '') or 'not exported'}")
+                snap_rows = (
+                    self.html_row("Wallpaper", desktop.get("wallpaper_path", "n/a") or "n/a")
+                    + self.html_row("Theme", appearance.get("current_theme", "n/a") or "n/a")
+                    + self.html_row("Wallpaper export", exported.get("wallpaper", "") or "not exported")
+                    + self.html_row("Theme export", exported.get("theme", "") or "not exported")
+                )
+                sections.append(self.html_section("🖥️", "Settings Snapshot",
+                    f'<table style="width:100%;">{snap_rows}</table>'))
+
+            # ── Settings plan (optional) ───────────────────────────────────
             plan = self.ui_state.settings_migration_plan if isinstance(self.ui_state.settings_migration_plan, dict) else {}
             if plan:
                 plan_paths = self.settings_service.write_plan(plan)
-                self.summary_text.append("\nSettings Migration Plan")
-                self.summary_text.append(f"Customization depth: {plan.get('customization_depth', 'n/a')}")
-                self.summary_text.append(f"Auto migrate: {plan.get('counts', {}).get('auto_migrate', 0)}")
-                self.summary_text.append(f"Suggest review: {plan.get('counts', {}).get('suggest_review', 0)}")
-                self.summary_text.append(f"Manual review: {plan.get('counts', {}).get('manual_review', 0)}")
-                self.summary_text.append(f"Excluded: {plan.get('counts', {}).get('excluded', 0)}")
-                self.summary_text.append(f"Plan JSON: {plan_paths.get('json_path', '')}")
-                self.summary_text.append(f"Plan Markdown: {plan_paths.get('markdown_path', '')}")
+                counts = plan.get("counts", {}) if isinstance(plan.get("counts", {}), dict) else {}
+                plan_rows = (
+                    self.html_row("Depth", str(plan.get("customization_depth", "n/a")).capitalize())
+                    + self.html_row("Auto-migrate", str(counts.get("auto_migrate", 0)))
+                    + self.html_row("Suggest review", str(counts.get("suggest_review", 0)))
+                    + self.html_row("Manual review", str(counts.get("manual_review", 0)))
+                    + self.html_row("Excluded", str(counts.get("excluded", 0)))
+                    + self.html_row("Plan Markdown", f'<span style="color:#546E7A;font-size:12px;">{short(plan_paths.get("markdown_path", ""))}</span>')
+                )
+                sections.append(self.html_section("📋", "Settings Migration Plan",
+                    f'<table style="width:100%;">{plan_rows}</table>'))
+
+            self.summary_text.setHtml(self.html_wrap("".join(sections)))
             self.report_status.setText("Your report is ready! Use the buttons below to open it — you can save or print it from there.")
             self.ui_state.verification_completed = True
         else:
@@ -189,6 +212,7 @@ class ReportPage(BasePage):
         self.open_html_btn.setEnabled(bool(self.report_paths.get("html")))
         self.next_btn.setEnabled(True)
         self.loading.setVisible(False)
+        self.set_scanning(False)
         self.refresh()
 
     def _open_markdown(self) -> None:

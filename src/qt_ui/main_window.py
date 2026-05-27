@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
 
 from src.constants import RESTORE_REPORT
 from src.config import MigrationConfigRoot
-from src.qt_ui.pages.application_mapping_page import ApplicationMappingPage
 from src.qt_ui.pages.backup_bundle_page import BackupBundlePage
 from src.qt_ui.pages.data_selection_page import DataSelectionPage
 from src.qt_ui.pages.report_page import ReportPage
@@ -69,6 +68,7 @@ class QtMigrationWindow(QMainWindow):
         self.ui_state = QtUiState()
         self.runtime_data: dict[str, object] = {}
         self.auto_running = False
+        self._busy_count: int = 0
         self.thread_pool = QThreadPool.globalInstance()
         self.completed_actions: set[str] = set()
         self.total_actions = 7 if runtime_mode == "windows" else 3
@@ -161,6 +161,14 @@ class QtMigrationWindow(QMainWindow):
         self.error_banner.setVisible(False)
         root_layout.addWidget(self.error_banner)
 
+        self.global_scan_bar = QProgressBar()
+        self.global_scan_bar.setObjectName("GlobalScanBar")
+        self.global_scan_bar.setRange(0, 0)
+        self.global_scan_bar.setFixedHeight(4)
+        self.global_scan_bar.setTextVisible(False)
+        self.global_scan_bar.setVisible(False)
+        root_layout.addWidget(self.global_scan_bar)
+
         # Main content with left stepper + page stack.
         content_row = QHBoxLayout()
         content_row.setSpacing(16)
@@ -178,7 +186,6 @@ class QtMigrationWindow(QMainWindow):
                     "Windows Scan\nInventory + app recommendations",
                     "Settings Migration\nDesktop preferences & themes",
                     "Data Selection\nChoose your files & folders",
-                    "Application Mapping\nPlan your Linux app setup",
                     "Review & Customize\nFinalise recommendations",
                     "Create Backup Bundle\nPack and export your data",
                 ],
@@ -189,7 +196,7 @@ class QtMigrationWindow(QMainWindow):
             self.scan_page = ScanPage(
                 self.ui_state,
                 run_inventory_cb=self._run_inventory,
-                run_recommendations_cb=self._generate_software_recommendations,
+                run_analysis_cb=self._run_analysis,
                 privacy_policy=self.operations.get_ai_config(self.config),
             )
             self.settings_page = SettingsPage(self.ui_state)
@@ -199,7 +206,6 @@ class QtMigrationWindow(QMainWindow):
                 file_type_labels=self.config.source_system.file_type_labels,
                 usage_recommendation_cb=self._collect_usage_recommendations,
             )
-            self.mapping_page = ApplicationMappingPage(self.ui_state, run_analysis_cb=self._run_analysis)
             self.review_page = ReviewRecommendationsPage(
                 self.ui_state,
                 run_app_recommendations_cb=self._run_app_recommendations,
@@ -212,7 +218,6 @@ class QtMigrationWindow(QMainWindow):
             self.scan_page.request_next.connect(self.next_page)
             self.settings_page.request_next.connect(self.next_page)
             self.data_page.request_next.connect(self.next_page)
-            self.mapping_page.request_next.connect(self.next_page)
             self.review_page.request_next.connect(self.next_page)
             self.backup_page.request_next.connect(self.next_page)
 
@@ -224,16 +229,22 @@ class QtMigrationWindow(QMainWindow):
             self.mode_page.balanced_radio.toggled.connect(lambda checked: self.balanced_radio.setChecked(checked))
             self.mode_page.expert_radio.toggled.connect(lambda checked: self.expert_radio.setChecked(checked))
 
-            # Order: Welcome → Mode → Scan → Settings → Data → Mapping → Review → Backup
-            # Scan comes before Settings so settings_inventory is populated when user reaches SettingsPage.
+            # Order: Welcome → Mode → Scan (inventory + analysis + strategy) → Settings → Data → Review → Backup
             self.stack.addWidget(self.welcome_page)
             self.stack.addWidget(self.mode_page)
             self.stack.addWidget(self.scan_page)
             self.stack.addWidget(self.settings_page)
             self.stack.addWidget(self.data_page)
-            self.stack.addWidget(self.mapping_page)
             self.stack.addWidget(self.review_page)
             self.stack.addWidget(self.backup_page)
+
+            # Connect each page's processing_changed → sync_nav so nav buttons update in real-time.
+            for _p in [
+                self.welcome_page, self.mode_page, self.scan_page, self.settings_page,
+                self.data_page, self.review_page, self.backup_page,
+            ]:
+                _p.processing_changed.connect(self._sync_nav)
+                _p.processing_changed.connect(self._on_any_page_processing_changed)
         else:
             self.stepper = StepperSidebar(
                 title="Migration Steps",
@@ -430,6 +441,7 @@ class QtMigrationWindow(QMainWindow):
             next_btn=self.next_btn,
             clear_error_banner=self._clear_error_banner,
             is_auto_running=lambda: self.auto_running,
+            is_busy=self._is_busy,
         )
 
         self.setCentralWidget(root)
@@ -483,12 +495,25 @@ class QtMigrationWindow(QMainWindow):
         if self.mode_controller is not None:
             self.mode_controller.toggle_expert_panel()
 
+    def _is_busy(self) -> bool:
+        return self._busy_count > 0
+
+    def _on_any_page_processing_changed(self, _: bool) -> None:
+        any_busy = any(
+            getattr(self.stack.widget(i), "is_processing", False)
+            for i in range(self.stack.count())
+        )
+        self.global_scan_bar.setVisible(any_busy)
+
+    def _set_busy(self, busy: bool) -> None:
+        self._busy_count = max(0, self._busy_count + (1 if busy else -1))
+        self._sync_nav()
+
     def _set_automation_running(self, running: bool) -> None:
         self.auto_running = running
         self.complete_all_btn.setEnabled(not running and self.ui_state.mode != "guided")
         self.expert_toggle_btn.setEnabled(not running and self.ui_state.mode != "guided")
-        self.back_btn.setEnabled(not running and self.stack.currentIndex() > 0)
-        self.next_btn.setEnabled(not running and self.stack.currentIndex() < self.stack.count() - 1)
+        self._sync_nav()
         if running:
             self.activity_status.setText("Automation is running. Follow step-by-step events below.")
 
@@ -588,8 +613,6 @@ class QtMigrationWindow(QMainWindow):
             page_key = "settings_migration"
         elif isinstance(current, DataSelectionPage):
             page_key = "data_selection"
-        elif isinstance(current, ApplicationMappingPage):
-            page_key = "application_mapping"
         elif isinstance(current, ReviewRecommendationsPage):
             page_key = "review_recommendations"
         elif isinstance(current, ScanPage):

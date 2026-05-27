@@ -65,7 +65,7 @@ class AppRecommendationService:
                     confidence = mapping.get("confidence", "low")
                     linux_package = mapping.get("linux_package", "")
                     online_signal = self._query_package_availability(linux_package)
-                    agent_score = self._score_recommendation(confidence, mapping.get("category", ""), online_signal)
+                    repology_score = self._score_recommendation(confidence, mapping.get("category", ""), online_signal)
                     
                     recommendations.append({
                         "windows_app": app_name,
@@ -73,7 +73,7 @@ class AppRecommendationService:
                         "mapping_confidence": confidence,
                         "category": mapping.get("category", ""),
                         "online_signal": online_signal,
-                        "agent_score": agent_score,
+                        "repology_score": repology_score,
                     })
             
             # Apply selection profile
@@ -158,7 +158,7 @@ class AppRecommendationService:
         ranked = sorted(
             recommendations,
             key=lambda rec: (
-                int(rec.get("agent_score", 0)),
+                int(rec.get("repology_score", 0)),
                 self._confidence_rank(rec.get("mapping_confidence", "")),
                 1 if rec.get("online_signal") == "verified" else 0,
             ),

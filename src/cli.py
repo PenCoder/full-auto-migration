@@ -228,11 +228,11 @@ def scan_command(
     -----
     guided   – inventory + local recommendations only (fast, minimal decisions)
     balanced – inventory + analysis + app/file recommendations  [default]
-    expert   – balanced + agent-ranked recommendations via AI endpoint
+    expert   – balanced + online Repology-verified recommendations
     """
     try:
         valid_modes = {"guided", "balanced", "expert"}
-        valid_recommendations = {"none", "local", "online", "agent"}
+        valid_recommendations = {"none", "local", "online"}
         valid_profiles = {"migrate_all", "prioritize"}
 
         if mode not in valid_modes:
@@ -242,7 +242,7 @@ def scan_command(
 
         # Apply mode-default strategy when not explicitly overridden.
         if recommendations is None:
-            recommendations = {"guided": "local", "balanced": "local", "expert": "agent"}[mode]
+            recommendations = {"guided": "local", "balanced": "local", "expert": "online"}[mode]
 
         # Analysis runs by default in balanced/expert; skip in guided unless forced.
         if include_analysis is None:
@@ -296,16 +296,17 @@ def scan_command(
             }
 
         if recommendations != "none":
-            ai_cfg = {
-                "software_online_lookup_enabled": getattr(cfg.ai, "software_online_lookup_enabled", False),
-                "software_online_provider": getattr(cfg.ai, "software_online_provider", "repology"),
-                "software_online_send_fields": getattr(cfg.ai, "software_online_send_fields", ["name"]),
+            repology_cfg = {
+                "software_online_lookup_enabled": getattr(cfg.repology, "enabled", True),
+                "software_online_provider": getattr(cfg.repology, "provider", "repology"),
+                "software_online_send_fields": list(getattr(cfg.repology, "send_fields", ["name", "version", "publisher"])),
+                "redact_user_paths": getattr(cfg.repology, "redact_user_paths", True),
             }
             rec_result = RecommendationService().generate_recommendations(
                 software_inventory=sw_inventory,
                 strategy=recommendations,
                 selection_profile=selection_profile,
-                ai_config=ai_cfg,
+                repology_config=repology_cfg,
             )
             result["recommendations"] = {
                 "strategy": recommendations,
@@ -318,34 +319,23 @@ def scan_command(
         # File recommendations run in balanced and expert modes (mirrors Qt AutomationCoordinator).
         if mode in {"balanced", "expert"} and recommendations != "none":
             file_inventory = _build_file_inventory(cfg)
-            choice_mode = "ai_recommended" if mode == "expert" else "all_files"
-            use_ai = mode == "expert"
-            ai_file_cfg = {
-                "file_recommendation_online_enabled": getattr(cfg.ai, "file_recommendation_online_enabled", False),
-                "endpoint": getattr(cfg.ai, "endpoint", ""),
-                "model": getattr(cfg.ai, "model", ""),
-                "api_key": getattr(cfg.ai, "api_key", ""),
-            }
+            choice_mode = "all_files"
             file_rec_result = FileRecommendationService().generate_recommendations(
                 file_inventory=file_inventory,
                 choice_mode=choice_mode,
-                use_ai=use_ai,
-                ai_config=ai_file_cfg,
                 selected_file_types=cfg.source_system.file_types,
             )
             result["file_recommendations"] = {
                 "choice_mode": choice_mode,
-                "ranking_method": file_rec_result.get("ranking_method", ""),
                 "recommended_count": file_rec_result.get("recommended_count", 0),
                 "input_count": file_rec_result.get("input_count", 0),
                 "json_path": file_rec_result.get("json_path", ""),
                 "markdown_path": file_rec_result.get("markdown_path", ""),
             }
             logger.info(
-                "File recommendations: %d / %d files selected (%s)",
+                "File recommendations: %d / %d files selected",
                 file_rec_result.get("recommended_count", 0),
                 file_rec_result.get("input_count", 0),
-                file_rec_result.get("ranking_method", ""),
             )
 
         typer.echo(json.dumps(result, indent=2))

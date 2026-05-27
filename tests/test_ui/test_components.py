@@ -28,14 +28,8 @@ class TestPageModules:
     def test_verification_page_module_exists(self):
         assert find_spec("src.qt_ui.pages.verification_page") is not None
 
-    def test_execution_page_module_exists(self):
-        assert find_spec("src.qt_ui.pages.execution_page") is not None
-
     def test_restore_page_module_exists(self):
         assert find_spec("src.qt_ui.pages.restore_page") is not None
-
-    def test_summary_page_module_exists(self):
-        assert find_spec("src.qt_ui.pages.summary_page") is not None
 
     def test_report_page_module_exists(self):
         assert find_spec("src.qt_ui.pages.report_page") is not None

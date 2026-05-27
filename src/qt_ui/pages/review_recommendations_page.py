@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtCore import QThreadPool, QTimer, Qt
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QLabel,
     QProgressBar,
     QPushButton,
@@ -66,6 +65,7 @@ class ReviewRecommendationsPage(BasePage):
         root.addWidget(self.app_summary)
 
         self.app_details = QTextEdit()
+        self.app_details.setObjectName("ReportView")
         self.app_details.setReadOnly(True)
         self.app_details.setMinimumHeight(120)
         self.app_details.setMaximumHeight(180)
@@ -83,6 +83,7 @@ class ReviewRecommendationsPage(BasePage):
         root.addWidget(self.file_summary)
 
         self.file_details = QTextEdit()
+        self.file_details.setObjectName("ReportView")
         self.file_details.setReadOnly(True)
         self.file_details.setMinimumHeight(120)
         self.file_details.setMaximumHeight(180)
@@ -99,24 +100,12 @@ class ReviewRecommendationsPage(BasePage):
         self.loading.setVisible(False)
         root.addWidget(self.loading)
 
-        button_row = QHBoxLayout()
-        button_row.setSpacing(10)
-
-        self.refresh_btn = QPushButton("Refresh Plan")
-        self.refresh_btn.setProperty("role", "primary")
-        self.refresh_btn.setMinimumHeight(48)
-        self.refresh_btn.setFixedWidth(200)
-        self.refresh_btn.clicked.connect(self._run_recommendations)
-        button_row.addWidget(self.refresh_btn)
-
         self.customize_btn = QPushButton("Fine-tune (Expert)")
         self.customize_btn.setProperty("role", "badge")
         self.customize_btn.setMinimumHeight(48)
         self.customize_btn.setFixedWidth(180)
         self.customize_btn.clicked.connect(self._open_expert_panel)
-        button_row.addWidget(self.customize_btn)
-
-        root.addLayout(button_row)
+        root.addWidget(self.customize_btn, alignment=Qt.AlignHCenter)
 
         self.next_btn = QPushButton("Looks good — Continue to Backup")
         self.next_btn.setProperty("role", "cta")
@@ -124,7 +113,14 @@ class ReviewRecommendationsPage(BasePage):
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self.is_processing and not self.app_recommendations and not self.file_recommendations:
+            QTimer.singleShot(300, self._run_recommendations)
+
     def _run_recommendations(self) -> None:
+        if self.is_processing:
+            return
         self._set_running_state(True)
         self.loading.setVisible(True)
         self.status.setText("Working out the best migration plan for you...")
@@ -160,15 +156,40 @@ class ReviewRecommendationsPage(BasePage):
                     f"We found Linux alternatives for {app_count} of your {app_total} Windows apps."
                 )
                 recs = app_recs.get("recommendations", [])
-                apps_text = "\n".join(
-                    [f"✓ {rec.get('windows_app', '')}" for rec in recs[:10]]
-                )
-                if len(recs) > 10:
-                    apps_text += f"\n... and {len(recs) - 10} more"
-                self.app_details.setPlainText(apps_text or "No app recommendations available.")
+                if recs:
+                    conf_color = {"high": "#1B5E20", "medium": "#E65100", "low": "#546E7A"}
+                    conf_bg = {"high": "#E8F5E9", "medium": "#FFF3E0", "low": "#ECEFF1"}
+                    rows = ""
+                    for rec in recs[:10]:
+                        win = str(rec.get("windows_app", ""))
+                        linux = str(rec.get("linux_package", ""))
+                        conf = str(rec.get("mapping_confidence", ""))
+                        badge = self.html_pill(
+                            conf, conf_color.get(conf, "#546E7A"), conf_bg.get(conf, "#ECEFF1")
+                        )
+                        rows += (
+                            f'<tr>'
+                            f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#0D1929;">✓ {win}</td>'
+                            f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#1565C0;">{linux}</td>'
+                            f'<td style="padding:3px 0;">{badge}</td>'
+                            f'</tr>'
+                        )
+                    if len(recs) > 10:
+                        rows += (f'<tr><td colspan="3" style="color:#90A4AE;font-size:12px;padding-top:4px;">'
+                                 f'+ {len(recs) - 10} more matched apps</td></tr>')
+                    body = (
+                        f'<table style="width:100%;">'
+                        f'<tr><th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Windows App</th>'
+                        f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Linux Package</th>'
+                        f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Match</th></tr>'
+                        f'{rows}</table>'
+                    )
+                else:
+                    body = self.html_empty("No app recommendations available.")
+                self.app_details.setHtml(self.html_wrap(body))
             else:
                 self.app_summary.setText("We couldn't generate app recommendations right now — you can continue anyway.")
-                self.app_details.setPlainText("")
+                self.app_details.setHtml(self.html_wrap(self.html_empty("No app recommendations available.")))
 
             if isinstance(file_recs, dict) and "error" not in file_recs:
                 self.file_recommendations = file_recs
@@ -178,16 +199,33 @@ class ReviewRecommendationsPage(BasePage):
                     f"{file_count} of {file_total} selected files will be included in your migration bundle."
                 )
                 recs = file_recs.get("recommendations", [])
-                files_text = "\n".join(
-                    [f"✓ {rec.get('file_path', '')[:60]}" for rec in recs[:10]]
-                )
-                if len(recs) > 10:
-                    files_text += f"\n... and {len(recs) - 10} more files"
-                self.file_details.setPlainText(files_text or "No file recommendations available.")
+                if recs:
+                    imp_color = {"critical": "#B71C1C", "important": "#1565C0", "useful": "#1B5E20", "low": "#546E7A"}
+                    imp_bg = {"critical": "#FFEBEE", "important": "#E3F2FD", "useful": "#E8F5E9", "low": "#ECEFF1"}
+                    rows = ""
+                    for rec in recs[:10]:
+                        path = str(rec.get("file_path", ""))
+                        short_path = ("…" + path[-45:]) if len(path) > 48 else path
+                        imp = str(rec.get("importance", "low"))
+                        badge = self.html_pill(imp, imp_color.get(imp, "#546E7A"), imp_bg.get(imp, "#ECEFF1"))
+                        rows += (
+                            f'<tr>'
+                            f'<td style="padding:3px 10px 3px 0;font-size:12px;color:#0D1929;font-family:\'Cascadia Mono\',monospace;">✓ {short_path}</td>'
+                            f'<td style="padding:3px 0;">{badge}</td>'
+                            f'</tr>'
+                        )
+                    if len(recs) > 10:
+                        rows += (f'<tr><td colspan="2" style="color:#90A4AE;font-size:12px;padding-top:4px;">'
+                                 f'+ {len(recs) - 10} more files selected</td></tr>')
+                    body = f'<table style="width:100%;">{rows}</table>'
+                else:
+                    body = self.html_empty("No file recommendations available.")
+                self.file_details.setHtml(self.html_wrap(body))
             else:
                 self.file_summary.setText("We couldn't generate file recommendations right now — you can continue anyway.")
-                self.file_details.setPlainText("")
+                self.file_details.setHtml(self.html_wrap(self.html_empty("No file recommendations available.")))
 
+            self.ui_state.analysis_completed = True
             self.status.setText("Your migration plan is ready! Review the lists above, then click 'Continue to Backup'.")
         else:
             self.status.setText("Something unexpected happened — please try refreshing the plan again.")
@@ -200,7 +238,7 @@ class ReviewRecommendationsPage(BasePage):
         self.refresh()
 
     def _on_finished(self) -> None:
-        self.is_running = False
+        self._set_running_state(False)
         self.loading.setVisible(False)
         self.refresh()
 
@@ -212,23 +250,25 @@ class ReviewRecommendationsPage(BasePage):
 
     def _set_running_state(self, running: bool) -> None:
         self.is_running = running
-        self.refresh_btn.setEnabled(not running)
+        self.set_scanning(running)
         self.customize_btn.setEnabled(not running)
         self.next_btn.setEnabled(not running)
 
     def refresh(self) -> None:
         mode = self.ui_state.mode
         if mode == "guided":
-            self.refresh_btn.setVisible(False)
             self.customize_btn.setVisible(False)
-            self.status.setText("We've automatically prepared the best migration plan for you. Click 'Continue' when ready.")
+            if not self.is_running and not self.app_recommendations:
+                self.status.setText("Preparing your migration plan automatically — just a moment…")
+            elif not self.is_running:
+                self.status.setText("Your migration plan is ready. Click 'Continue' when ready.")
         elif mode == "balanced":
-            self.refresh_btn.setVisible(True)
             self.customize_btn.setVisible(False)
-            self.status.setText("Click 'Refresh Plan' to preview what will be migrated.")
+            if not self.is_running and not self.app_recommendations:
+                self.status.setText("Loading your migration preview…")
         else:
-            self.refresh_btn.setVisible(True)
             self.customize_btn.setVisible(True)
-            self.status.setText("Click 'Refresh Plan' or use the Expert panel on the right to fine-tune your selections.")
+            if not self.is_running and not self.app_recommendations:
+                self.status.setText("Loading your migration plan. Use the Expert panel on the right to fine-tune.")
 
         self.next_btn.setEnabled(not self.is_running)

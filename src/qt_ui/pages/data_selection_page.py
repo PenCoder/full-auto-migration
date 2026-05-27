@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton, QWidget
 from src.qt_ui.pages.base_page import BasePage
 
@@ -28,6 +28,9 @@ class DataSelectionPage(BasePage):
         self.file_type_labels = dict(file_type_labels or {})
         self.usage_recommendation_cb = usage_recommendation_cb
         self.file_type_checkboxes: dict[str, QCheckBox] = {}
+        self._debounce_timer = QTimer()
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.timeout.connect(self._usage_recommendation_callback)
         self._build_ui()
         self.refresh()
 
@@ -191,17 +194,12 @@ class DataSelectionPage(BasePage):
     def _build_usage_panel(self) -> QWidget:
         panel = self.create_guided_questionnaire(
             "Usage-based recommendations",
-            "Recommendations are computed from observed file usage signals on this system (counts and recency).",
+            "Recommendations are computed from observed file usage signals on this system (counts and recency). "
+            "Loading automatically — results appear below.",
             options=[],
         )
 
-        self.refresh_usage_btn = QPushButton("Refresh Usage Recommendations")
-        self.refresh_usage_btn.setProperty("role", "primary")
-        self.refresh_usage_btn.setFixedWidth(260)
-        self.refresh_usage_btn.clicked.connect(self._usage_recommendation_callback)
-        panel.layout().addWidget(self.refresh_usage_btn)
-
-        self.usage_summary = QLabel("Run refresh to load file-type usage percentages.")
+        self.usage_summary = QLabel("Analysing your file usage patterns…")
         self.usage_summary.setObjectName("BodyText")
         self.usage_summary.setWordWrap(True)
         panel.layout().addWidget(self.usage_summary)
@@ -234,6 +232,8 @@ class DataSelectionPage(BasePage):
         self.choice_summary.setText(
             f"Current choice: Migrate selected file types ({selected_count}/{total_count} enabled)."
         )
+        if self.ui_state.data_choice_mode == "ai_recommended":
+            self._debounce_timer.start(500)
 
     def _usage_recommendation_callback(self) -> None:
         if not self.usage_recommendation_cb:
@@ -241,17 +241,17 @@ class DataSelectionPage(BasePage):
             self.activity_view_list.clear()
             return
 
-        self.refresh_usage_btn.setEnabled(False)
-        self.usage_summary.setText("Loading usage recommendations based on local file activity...")
+        self.set_scanning(True)
+        self.usage_summary.setText("Analysing your file usage patterns…")
         self.activity_view_list.clear()
         self.usage_recommendation_cb()
-        self.refresh_usage_btn.setEnabled(True)
 
     def _refresh_usage_recommendations(self) -> None:
+        self.set_scanning(False)
+        self.activity_view_list.clear()
         recommendations = self.ui_state.usage_recommendations or []
         if not recommendations:
             self.usage_summary.setText("No usage stats available yet. Scanning folders may be needed.")
-            self.activity_view_list.clear()
             return
 
         self.usage_summary.setText(

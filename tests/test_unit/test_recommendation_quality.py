@@ -220,24 +220,24 @@ class TestRecommendationReportGeneration:
                 f"{rec.get('windows_app')!r} has signal {rec.get('online_signal')!r}"
             )
 
-    def test_agent_strategy_enriches_each_recommendation_with_a_score(
+    def test_online_strategy_enriches_each_recommendation_with_a_repology_score(
         self, recommendation_service: RecommendationService, csv_map_rows
     ):
-        """Expert mode gives users an AI-derived score for each app — so they know
+        """Expert mode gives users a Repology-derived score for each app — so they know
         which migrations to tackle first and which might need extra attention."""
         recommendation_service._load_mapping_rows = lambda: csv_map_rows  # type: ignore[method-assign]
         with patch.object(recommendation_service, "_query_online_package_signal", return_value="verified"):
             result = recommendation_service.generate_recommendations(
                 software_inventory=SAMPLE_SOFTWARE_INVENTORY,
-                strategy="agent",
-                ai_config={"software_online_lookup_enabled": True, "software_online_send_fields": ["name"]},
+                strategy="online",
+                repology_config={"software_online_lookup_enabled": True, "software_online_send_fields": ["name"]},
             )
         for rec in result["recommendations"]:
-            assert "agent_score" in rec, (
-                f"Agent strategy must score every recommendation; "
+            assert "repology_score" in rec, (
+                f"Online strategy must score every recommendation; "
                 f"{rec.get('windows_app')!r} has no score"
             )
-            assert 0 <= int(rec["agent_score"]) <= 100, "Score must be a percentage 0–100"
+            assert 0 <= int(rec["repology_score"]) <= 100, "Score must be a percentage 0–100"
 
     def test_confidence_labels_are_always_meaningful(
         self, recommendation_service: RecommendationService

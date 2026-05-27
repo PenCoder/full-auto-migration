@@ -385,7 +385,7 @@ class TestOperationsController:
         selected = ctl.resolve_selected_folders(ui_state, cfg)
         assert "Documents" in selected
         ai_cfg = ctl.get_ai_config(cfg)
-        assert "enabled" in ai_cfg
+        assert "software_online_lookup_enabled" in ai_cfg
 
     def test_runtime_guard_inventory(self):
         ctl = OperationsController()

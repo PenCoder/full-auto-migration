@@ -108,21 +108,17 @@ class OperationsController:
         return list(dict.fromkeys(combined))
 
     @staticmethod
-    def get_ai_config(config) -> dict:
-        ai_cfg = config.ai
+    def get_repology_config(config) -> dict:
+        cfg = getattr(config, "repology", None) or getattr(config, "ai", None)
         return {
-            "enabled": ai_cfg.enabled,
-            "endpoint": ai_cfg.endpoint or "",
-            "model": ai_cfg.model or "",
-            "api_key": ai_cfg.api_key or "",
-            "temperature": ai_cfg.temperature,
-            "timeout_seconds": ai_cfg.timeout_seconds,
-            "file_recommendation_online_enabled": getattr(ai_cfg, "file_recommendation_online_enabled", False),
-            "software_online_lookup_enabled": getattr(ai_cfg, "software_online_lookup_enabled", True),
-            "software_online_provider": getattr(ai_cfg, "software_online_provider", "repology"),
-            "software_online_send_fields": list(getattr(ai_cfg, "software_online_send_fields", ["name", "version", "publisher"])),
-            "redact_user_paths": getattr(ai_cfg, "redact_user_paths", True),
+            "software_online_lookup_enabled": getattr(cfg, "enabled", True),
+            "software_online_provider": getattr(cfg, "provider", "repology"),
+            "software_online_send_fields": list(getattr(cfg, "send_fields", ["name", "version", "publisher"])),
+            "redact_user_paths": getattr(cfg, "redact_user_paths", True),
         }
+
+    # Backward-compatible alias.
+    get_ai_config = get_repology_config
 
     def run_inventory(
         self,
@@ -225,7 +221,7 @@ class OperationsController:
             software_inventory=software_inventory,
             strategy=strategy,
             selection_profile=effective_profile,
-            ai_config=ai_config,
+            repology_config=ai_config,
         )
         runtime_data[f"recommendations_{strategy}_{effective_profile}"] = result
         log_activity(
@@ -254,7 +250,7 @@ class OperationsController:
             inventory = run_inventory(deep_scan=False)
 
         software_inventory = inventory.get("software", {}) if isinstance(inventory, dict) else {}
-        strategy = "agent" if ui_state.mode == "expert" else "local"
+        strategy = "online" if ui_state.mode == "expert" else "local"
         selection_profile = ui_state.recommendation_strategy
 
         log_activity("recommendations", f"Generating {strategy} app recommendations ({selection_profile})...")
@@ -262,7 +258,7 @@ class OperationsController:
             software_inventory=software_inventory,
             strategy=strategy,
             selection_profile=selection_profile,
-            ai_config=ai_config,
+            repology_config=ai_config,
         )
         runtime_data["review_app_recommendations"] = result
         log_activity(
@@ -311,8 +307,6 @@ class OperationsController:
         result = file_recommendation_service.generate_recommendations(
             file_inventory=file_inventory,
             choice_mode=choice_mode,
-            use_ai=ui_state.mode == "expert",
-            ai_config=ai_config,
             selected_file_types=catalog,
         )
         runtime_data["review_file_recommendations"] = result

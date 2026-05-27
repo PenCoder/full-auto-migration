@@ -45,6 +45,7 @@ class QtUiState:
             "file_associations": False,
         }
     )
+    is_scanning: bool = False
     last_error: str = ""
     advanced_operations: dict[str, bool] = field(
         default_factory=lambda: {

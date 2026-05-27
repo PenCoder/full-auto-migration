@@ -136,7 +136,7 @@ class TestRecommendationPipeline:
         assert payload["strategy"] == "local"
         assert isinstance(payload["recommendations"], list)
 
-    def test_agent_strategy_adds_agent_fields(
+    def test_online_strategy_adds_repology_score(
         self, tmp_dirs: dict[str, Path], csv_map_rows
     ):
         svc = RecommendationService(reports_dir=tmp_dirs["reports"])
@@ -146,13 +146,12 @@ class TestRecommendationPipeline:
         with patch.object(svc, "_query_online_package_signal", return_value="verified"):
             result = svc.generate_recommendations(
                 software_inventory=inventory,
-                strategy="agent",
-                ai_config={"software_online_lookup_enabled": True, "software_online_send_fields": ["name"]},
+                strategy="online",
+                repology_config={"software_online_lookup_enabled": True, "software_online_send_fields": ["name"]},
             )
 
         for rec in result["recommendations"]:
-            assert "agent_score" in rec
-            assert "agent_reason" in rec
+            assert "repology_score" in rec
 
     def test_category_is_populated_from_csv(
         self, tmp_dirs: dict[str, Path], csv_map_rows
@@ -185,10 +184,10 @@ class TestRecommendationPipeline:
             f"CSV 'high' confidence must floor the score to ≥0.90; got {decision.confidence_score}"
         )
 
-    def test_agent_score_benefits_from_category(
+    def test_repology_score_benefits_from_category(
         self, tmp_dirs: dict[str, Path], csv_map_rows
     ):
-        """WP2.5: agent_score for a categorised app must exceed the score for one without a category."""
+        """WP2.5: repology_score for a categorised app must exceed the score for one without a category."""
         svc = RecommendationService(reports_dir=tmp_dirs["reports"])
         svc._load_mapping_rows = lambda: csv_map_rows  # type: ignore[method-assign]
 
@@ -196,13 +195,13 @@ class TestRecommendationPipeline:
         with patch.object(svc, "_query_online_package_signal", return_value="not_verified"):
             result = svc.generate_recommendations(
                 software_inventory=inventory,
-                strategy="agent",
-                ai_config={"software_online_lookup_enabled": True, "software_online_send_fields": ["name"]},
+                strategy="online",
+                repology_config={"software_online_lookup_enabled": True, "software_online_send_fields": ["name"]},
             )
 
         for rec in result["recommendations"]:
             # Firefox has category="Browser" — category_bonus (12) must be included.
-            assert int(rec.get("agent_score", 0)) > RecommendationService._agent_score(
+            assert int(rec.get("repology_score", 0)) > RecommendationService._agent_score(
                 confidence=rec["mapping_confidence"],
                 category="",
                 online_signal=rec["online_signal"],

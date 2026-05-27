@@ -362,6 +362,55 @@ QTextEdit:focus {
     border-color: #1565C0;
 }
 
+/* === Report / preview text areas used across wizard pages === */
+
+QTextEdit#ReportView {
+    font-family: "Segoe UI", "Noto Sans", sans-serif;
+    font-size: 14px;
+    border: 1.5px solid #BBDEFB;
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: #F8FBFF;
+    color: #0D1929;
+}
+
+QTextEdit#ReportView:focus {
+    border-color: #1565C0;
+}
+
+QTextEdit#ReportView QScrollBar:vertical {
+    width: 6px;
+    background: transparent;
+}
+
+QTextEdit#ReportView QScrollBar::handle:vertical {
+    background: #BBDEFB;
+    border-radius: 3px;
+    min-height: 20px;
+}
+
+QTextEdit#ReportView QScrollBar::add-line:vertical,
+QTextEdit#ReportView QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* ================================================================
+   GLOBAL SCAN BAR (fixed position above content, always visible)
+   ================================================================ */
+
+QProgressBar#GlobalScanBar {
+    border: none;
+    border-radius: 2px;
+    background: #E3F2FD;
+    min-height: 4px;
+    max-height: 4px;
+}
+
+QProgressBar#GlobalScanBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1565C0, stop:1 #42A5F5);
+    border-radius: 2px;
+}
+
 /* ================================================================
    PROGRESS BAR
    ================================================================ */
@@ -619,6 +668,43 @@ QTabBar::tab:selected {
 QScrollArea {
     background: white;
     border: none;
+}
+
+/* ================================================================
+   SCROLLBARS — visible track + handle for page scroll areas
+   ================================================================ */
+
+QScrollBar:vertical {
+    width: 10px;
+    background: #F0F4F8;
+    border: none;
+    border-radius: 5px;
+    margin: 2px 1px;
+}
+
+QScrollBar::handle:vertical {
+    background: #90A4AE;
+    border-radius: 4px;
+    min-height: 36px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #546E7A;
+}
+
+QScrollBar::handle:vertical:pressed {
+    background: #37474F;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: transparent;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
 }
 
 QStackedWidget#PageStack {

@@ -48,25 +48,10 @@ class SettingsPage(BasePage):
         root.addWidget(self.expert_panel)
 
         self.preview = QTextEdit()
+        self.preview.setObjectName("ReportView")
         self.preview.setReadOnly(True)
         self.preview.setMinimumHeight(190)
-        self.preview.setStyleSheet(
-            "QTextEdit {"
-            " font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;"
-            " font-size: 12px;"
-            " border: 1px solid rgba(120,120,120,0.35);"
-            " border-radius: 8px;"
-            " padding: 10px;"
-            " background: rgba(20, 24, 32, 0.05);"
-            "}"
-        )
         root.addWidget(self.preview)
-
-        self.refresh_btn = QPushButton("Refresh Settings Plan")
-        self.refresh_btn.setProperty("role", "primary")
-        self.refresh_btn.setMinimumHeight(46)
-        self.refresh_btn.clicked.connect(self.refresh)
-        root.addWidget(self.refresh_btn, alignment=Qt.AlignHCenter)
 
         self.next_btn = QPushButton("Continue")
         self.next_btn.setProperty("role", "cta")
@@ -215,21 +200,58 @@ class SettingsPage(BasePage):
     def _update_preview(self) -> None:
         plan = self.ui_state.settings_migration_plan if isinstance(self.ui_state.settings_migration_plan, dict) else {}
         if not plan:
-            self.preview.setPlainText("No settings migration plan is available yet.")
+            self.preview.setHtml(self.html_wrap(
+                self.html_section("🖥️", "Settings Migration Plan",
+                    self.html_empty("Complete the scan step first — your settings plan will appear here."))
+            ))
             return
 
         counts = plan.get("counts", {}) if isinstance(plan.get("counts", {}), dict) else {}
-        lines = [
-            f"Mode: {plan.get('mode', self.ui_state.mode)}",
-            f"Customization depth: {plan.get('customization_depth', 'n/a')}",
-            f"Summary: {plan.get('summary', 'n/a')}",
-            f"Auto migrate: {counts.get('auto_migrate', 0)}",
-            f"Suggest review: {counts.get('suggest_review', 0)}",
-            f"Manual review: {counts.get('manual_review', 0)}",
-            f"Excluded: {counts.get('excluded', 0)}",
-            "",
-            "Selected items:",
-        ]
-        for item in plan.get("items", []):
-            lines.append(f"- {item.get('name', '')}: {item.get('action', '')} ({item.get('confidence', '')})")
-        self.preview.setPlainText("\n".join(lines))
+        depth = str(plan.get("customization_depth", "n/a")).capitalize()
+        summary = str(plan.get("summary", ""))
+
+        overview_rows = (
+            self.html_row("Mode", str(plan.get("mode", self.ui_state.mode)).capitalize())
+            + self.html_row("Customization depth", depth)
+            + (self.html_row("Summary", summary) if summary and summary != "n/a" else "")
+            + self.html_row("Auto-migrate", str(counts.get("auto_migrate", 0)))
+            + self.html_row("Suggest review", str(counts.get("suggest_review", 0)))
+            + self.html_row("Manual review", str(counts.get("manual_review", 0)))
+            + self.html_row("Excluded", str(counts.get("excluded", 0)))
+        )
+        overview = self.html_section(
+            "🖥️", "Settings Migration Plan",
+            f'<table style="width:100%;">{overview_rows}</table>'
+        )
+
+        items = plan.get("items", [])
+        if items:
+            action_color = {"auto_migrate": "#1B5E20", "suggest_review": "#E65100", "manual_review": "#1565C0", "excluded": "#546E7A"}
+            action_bg = {"auto_migrate": "#E8F5E9", "suggest_review": "#FFF3E0", "manual_review": "#E3F2FD", "excluded": "#ECEFF1"}
+            item_rows = ""
+            for item in items:
+                action = str(item.get("action", ""))
+                label = action.replace("_", " ").capitalize()
+                color = action_color.get(action, "#546E7A")
+                bg = action_bg.get(action, "#ECEFF1")
+                badge = self.html_pill(label, color, bg)
+                conf = str(item.get("confidence", ""))
+                item_rows += (
+                    f'<tr>'
+                    f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#0D1929;">{item.get("name", "")}</td>'
+                    f'<td style="padding:3px 6px;font-size:13px;">{badge}</td>'
+                    f'<td style="padding:3px 0;font-size:12px;color:#90A4AE;">{conf}</td>'
+                    f'</tr>'
+                )
+            items_section = self.html_section(
+                "📋", "Selected Items",
+                f'<table style="width:100%;">'
+                f'<tr><th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Setting</th>'
+                f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Action</th>'
+                f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Confidence</th></tr>'
+                f'{item_rows}</table>'
+            )
+        else:
+            items_section = ""
+
+        self.preview.setHtml(self.html_wrap(overview + items_section))

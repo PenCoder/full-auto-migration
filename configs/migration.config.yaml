@@ -161,17 +161,10 @@ research:
   anonymize_machine_id: true
   save_run_summary: "logs/run_summary.json"
 
-ai:
-  enabled: false
-  endpoint: ""
-  model: ""
-  api_key: ""
-  temperature: 0.2
-  timeout_seconds: 10
-  file_recommendation_online_enabled: false
-  software_online_lookup_enabled: true
-  software_online_provider: "repology"
-  software_online_send_fields:
+repology:
+  enabled: true                    # set to false to run fully offline
+  provider: "repology"
+  send_fields:
     - "name"
     - "version"
     - "publisher"

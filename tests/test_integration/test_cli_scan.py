@@ -9,7 +9,7 @@ import src.cli as cli
 
 
 class _DummyRecommendationService:
-    def generate_recommendations(self, software_inventory, strategy, selection_profile, ai_config=None, mapping_overrides=None):
+    def generate_recommendations(self, software_inventory, strategy, selection_profile, repology_config=None, mapping_overrides=None):
         return {
             "recommended_count": len(software_inventory.get("entries", [])),
             "json_path": "docs/reports/recs.json",
@@ -20,10 +20,9 @@ class _DummyRecommendationService:
 
 
 class _DummyFileRecommendationService:
-    def generate_recommendations(self, file_inventory, choice_mode="all_files", use_ai=False, ai_config=None, selected_file_types=None):
+    def generate_recommendations(self, file_inventory, choice_mode="all_files", selected_file_types=None):
         return {
             "choice_mode": choice_mode,
-            "ranking_method": "deterministic",
             "recommended_count": len(file_inventory.get("files", [])),
             "input_count": len(file_inventory.get("files", [])),
             "json_path": "docs/reports/file_recs.json",

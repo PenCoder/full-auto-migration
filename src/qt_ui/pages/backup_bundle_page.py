@@ -66,6 +66,7 @@ class BackupBundlePage(BasePage):
         self.backup_btn.setEnabled(False)
         self.next_btn.setEnabled(False)
         self.loading.setVisible(True)
+        self.set_scanning(True)
         self.status.setText("Creating backup bundle and optional archive...")
         worker = FunctionWorker(self.run_backup_cb)
         worker.signals.result.connect(self._on_result)
@@ -93,6 +94,7 @@ class BackupBundlePage(BasePage):
     def _on_finished(self) -> None:
         self.backup_btn.setEnabled(True)
         self.loading.setVisible(False)
+        self.set_scanning(False)
         self.refresh()
 
     def refresh(self) -> None:

@@ -15,17 +15,18 @@ class BasePage(QWidget):
     request_back = Signal()
     loading_progress = Signal(int)
     mode_changed = Signal(str)
+    processing_changed = Signal(bool)
 
     def __init__(self, ui_state: QtUiState) -> None:
         """Store the shared UI state for a page."""
         super().__init__()
         self.ui_state = ui_state
+        self.is_processing: bool = False
 
     def create_center_card_layout(self, max_width: int = 920) -> QVBoxLayout:
         """Create a centered card layout used by the wizard pages."""
         page_layout = QVBoxLayout(self)
         page_layout.setContentsMargins(0, 0, 0, 0)
-        # page_layout.addStretch(1)
 
         card = QWidget()
         card.setObjectName("StepCard")
@@ -39,6 +40,15 @@ class BasePage(QWidget):
         page_layout.addWidget(card)
         page_layout.addStretch(1)
         return card_layout
+
+    def set_scanning(self, busy: bool, message: str = "") -> None:
+        """Update the processing state and notify the main window to show the global scan bar."""
+        self.is_processing = busy
+        self.processing_changed.emit(busy)
+
+    def can_proceed(self) -> bool:
+        """Return True if the user is allowed to navigate forward from this page."""
+        return True
 
     def create_trust_banner(self, text: str) -> QWidget:
         """Create a centered informational trust banner."""
@@ -181,6 +191,55 @@ class BasePage(QWidget):
         item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
         return item
         
+
+    # ── HTML report helpers ──────────────────────────────────────────────────
+    # Used by pages that render rich content into QTextEdit#ReportView widgets.
+    # HTML content styles must be inline — Qt's HTML renderer ignores .qss.
+
+    @staticmethod
+    def html_pill(text: str, color: str = "#1565C0", bg: str = "#E3F2FD") -> str:
+        """Small coloured badge for use inside report HTML."""
+        return (
+            f'<span style="background:{bg};color:{color};border-radius:4px;'
+            f'padding:1px 7px;font-size:12px;font-weight:600;">{text}</span>'
+        )
+
+    @staticmethod
+    def html_row(label: str, value: str) -> str:
+        """One key-value table row for report sections."""
+        return (
+            f'<tr>'
+            f'<td style="color:#546E7A;padding:3px 12px 3px 0;white-space:nowrap;font-size:13px;">{label}</td>'
+            f'<td style="color:#0D1929;padding:3px 0;font-weight:500;font-size:13px;">{value}</td>'
+            f'</tr>'
+        )
+
+    @staticmethod
+    def html_section(icon: str, title: str, body: str) -> str:
+        """Titled section block with a blue header line."""
+        return (
+            f'<div style="margin-bottom:14px;">'
+            f'<div style="color:#1565C0;font-size:13px;font-weight:700;letter-spacing:0.3px;'
+            f'margin-bottom:6px;border-bottom:1px solid #BBDEFB;padding-bottom:4px;">'
+            f'{icon}&nbsp;&nbsp;{title}</div>'
+            f'{body}'
+            f'</div>'
+        )
+
+    @staticmethod
+    def html_wrap(body: str) -> str:
+        """Wrap body HTML in a full document with consistent base font."""
+        return (
+            '<html><body style="font-family:\'Segoe UI\',\'Noto Sans\',sans-serif;'
+            'font-size:14px;color:#0D1929;margin:0;padding:0;">'
+            + body
+            + '</body></html>'
+        )
+
+    @staticmethod
+    def html_empty(message: str) -> str:
+        """Muted placeholder shown when a section has no data yet."""
+        return f'<span style="color:#90A4AE;font-size:13px;">{message}</span>'
 
     def refresh(self) -> None:
         """Refresh page content when global state changes."""
