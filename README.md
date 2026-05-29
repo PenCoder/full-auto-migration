@@ -1,254 +1,267 @@
-﻿# Full Automation: Windows to Linux Migration Framework
+# Migration Wizard — Windows 11 to Linux Mint
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
+[![Tests](https://img.shields.io/badge/Tests-190%20passing-brightgreen)](#testing)
 
-A reproducible migration tool for moving from Windows to Linux with a Qt UI, CLI utilities, analysis services, backup and restore flows, and report generation.
-
-## Project Map
-
-- `app.py` launches the Qt application.
-- `qt_app.py` is an alternate Qt launcher entry point.
-- `src/qt_ui/` contains the active UI.
-- `src/services/`, `src/analysis/`, `src/backup/`, and `src/inventory/` contain the core migration logic.
-- `src/cli.py` provides command-line access to inventory, analysis, backup, profile, and reporting tasks.
-
-## End-to-end flow
-
-The tool runs in two phases on two machines:
-
-| Phase | Machine | What happens |
-|---|---|---|
-| **1 — Prepare** | Windows 11 | Scan → app mapping → backup bundle created in `data/restore/` |
-| **2 — Restore** | Linux Mint | Copy bundle → run tool → files restored, apps installed, settings applied |
+A guided, privacy-preserving migration tool that moves your files, applications, and desktop settings from Windows 11 to Linux Mint — automatically, step by step, with no technical knowledge required.
 
 ---
 
-## Phase 1 — Windows (scan + backup)
+## How it works
+
+The tool runs in two phases on two machines.
+
+| Phase | Machine | What happens |
+|---|---|---|
+| **1 — Prepare** | Windows 11 | Scan → app mapping → files and settings packed into a bundle |
+| **2 — Restore** | Linux Mint | Bundle copied via USB → files restored, apps installed, settings applied |
+
+---
+
+## Quick start — Windows
+
+### Option A — Double-click (no setup)
+
+Build or download `MigrationWizard.exe`, double-click it, and follow the 7-step wizard.
+
+### Option B — Run from source
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# Launch the Qt wizard (guided 7-step flow)
+# 2. Launch the Qt wizard
 python app.py
 
-# Or use the CLI directly
+# 3. Or use the CLI
 python -m src.cli scan --mode balanced
 python -m src.cli backup --yes
 ```
 
-The wizard writes the backup bundle to `data/restore/`:
-
-```
-data/restore/
-├── manifest.json          # file list + SHA-256 checksums
-├── backup.zip             # all selected files, directory structure preserved
-├── apps_to_install.json   # Linux packages to install (apt)
-├── settings_inventory.json
-├── settings_migration_plan.json
-└── settings_assets/
-    └── wallpaper.jpg      # exported wallpaper image
-```
-
-Copy this entire `data/restore/` folder to a USB stick alongside the project folder.
-
 ---
 
-## Phase 2 — Linux Mint (restore)
+## Quick start — Linux Mint
 
-### Option A — Setup script (recommended, no build required)
+### Option A — AppImage (recommended, double-click, no setup)
 
-Copy the project folder to the Linux machine (via USB, network, etc.), then:
+Copy `MigrationWizard-x86_64.AppImage` from the USB stick to your Linux machine and double-click it.
+
+> If nothing happens on double-click: right-click the file → Properties → Permissions → tick "Allow executing file as program".
+
+### Option B — Setup script (from source, no Docker)
 
 ```bash
-bash setup_linux.sh           # installs deps + launches Qt wizard
-bash setup_linux.sh --cli     # installs deps + shows CLI help
-bash setup_linux.sh --restore /path/to/bundle   # headless restore
+bash setup_linux.sh                                    # installs deps + opens wizard
+bash setup_linux.sh --restore /media/usb/data/restore  # headless restore
 ```
 
-The script:
-1. Checks Python 3.10+ is installed
-2. Installs system Qt/graphics libraries via `apt`
-3. Creates a `.venv` and installs Python deps
-4. Launches the app
-
-### Option B — AppImage (double-click, no installation, no Python needed)
-
-Build the AppImage on any machine with Docker:
+### Option C — CLI (headless)
 
 ```bash
-bash build_linux.sh
-```
-
-Output: `dist/MigrationWizard-x86_64.AppImage` (~120 MB, fully self-contained).
-
-Copy it to the USB stick alongside the bundle folder. On Linux Mint:
-- **Double-click** the `.AppImage` file in the file manager, or
-- Run from terminal: `./MigrationWizard-x86_64.AppImage`
-
-No installation, no Python, no dependencies required on the target machine.
-
-### Option C — CLI restore (headless)
-
-```bash
-bash setup_linux.sh --restore /media/usb/data/restore
-# or after activating the venv:
-python -m src.cli restore --source /media/usb/data/restore
+python -m src.cli restore --source /path/to/bundle
 python -m src.cli validate
 python -m src.cli report
 ```
 
 ---
 
+## The migration bundle
+
+Everything the Linux restore needs lives in one folder — `data/restore/` on Windows.
+Copy this entire folder to your USB stick.
+
+```
+data/restore/
+├── manifest.json             # file list + SHA-256 checksums
+├── backup.zip                # all selected files, directory structure preserved
+├── apps_to_install.json      # Linux packages to install via apt
+├── settings_inventory.json   # wallpaper path, light/dark preference, accent colour
+├── settings_migration_plan.json
+└── settings_assets/
+    └── wallpaper.jpg         # your actual wallpaper image
+```
+
+---
+
 ## What the restore does
 
-1. **Files** — extracted from `backup.zip` into the correct Linux home folders:
-   - `Documents/` → `~/Documents/`
-   - `Pictures/` → `~/Pictures/`
-   - `Music/`, `Videos/`, `Desktop/`, `Downloads/` → matching Linux paths
-   - Unknown folders → `~/Restored_Migration/<folder>/`
-2. **File integrity** — SHA-256 verified against the manifest after copy
-3. **Desktop settings** — applied automatically where possible:
-   - Wallpaper copied to `~/.local/share/backgrounds/` and set via `gsettings`/`xfconf-query`
-   - Light/Dark preference applied via the detected DE (Cinnamon, GNOME, XFCE, KDE, MATE)
-   - A `~/settings_migration_guidance.md` file is written with manual steps for accent color, theme
-4. **Linux apps** — installed via `apt` using `pkexec` (GUI password prompt)
+1. **Files** restored to the correct Linux home folders:
+
+   | Windows folder | Linux destination |
+   |---|---|
+   | Documents | `~/Documents/` |
+   | Pictures | `~/Pictures/` |
+   | Music | `~/Music/` |
+   | Videos | `~/Videos/` |
+   | Desktop | `~/Desktop/` |
+   | Downloads | `~/Downloads/` |
+   | Other folders | `~/Restored_Migration/<folder>/` |
+
+2. **File integrity** — every file SHA-256 verified against the manifest after copy
+
+3. **Desktop settings** applied automatically:
+   - Wallpaper set via `gsettings` / `xfconf-query` / KDE D-Bus
+   - Light or dark mode applied to the detected desktop environment
+   - A `~/settings_migration_guidance.md` file written for anything that needs manual attention
+
+4. **Linux apps** installed via `apt` using `pkexec` (a password prompt appears — this is normal)
+
+---
+
+## Building the distributables
+
+### Windows — `.exe`
+
+Run `build.ps1` in PowerShell. Requires PyInstaller (`pip install pyinstaller`).
+
+```powershell
+.\build.ps1
+# Output: dist\MigrationWizard.exe
+```
+
+### Linux — AppImage
+
+Requires Docker. Works on Windows, macOS, or Linux.
+
+```bash
+bash build_linux.sh
+# Output: dist/MigrationWizard-x86_64.AppImage
+```
+
+---
+
+## Wizard pages (Windows side)
+
+| Step | Page | What happens |
+|---|---|---|
+| 1 | Welcome | Introduction and overview |
+| 2 | Mode Selection | Choose Guided, Balanced, or Expert |
+| 3 | Scan & Plan | Inventory runs automatically; app alternatives matched |
+| 4 | Settings Migration | Wallpaper and theme captured |
+| 5 | Data Selection | Choose file types and folders |
+| 6 | Review & Confirm | App list and file list previewed |
+| 7 | Create Backup Bundle | Bundle created automatically |
+
+All pages auto-trigger their work on entry — no action buttons to click.
+
+---
+
+## Interaction modes
+
+| Mode | Who it is for | What the user controls |
+|---|---|---|
+| **Guided** | Non-technical users | Nothing — the tool decides everything |
+| **Balanced** | Comfortable with computers | File types and app selection |
+| **Expert** | Advanced users | All of the above plus manual app mapping and overrides |
+
+---
+
+## CLI reference
+
+```bash
+python -m src.cli scan       --mode guided|balanced|expert  --deep
+python -m src.cli backup     --yes
+python -m src.cli restore    --source /path/to/bundle
+python -m src.cli validate
+python -m src.cli report
+python -m src.cli inventory  all|hardware|software
+python -m src.cli analyze    all|hardware|software
+python -m src.cli usb        --iso /path/to/linuxmint.iso --device /dev/sdX
+```
 
 ---
 
 ## Configuration
 
-`configs/migration.config.yaml` is the primary runtime configuration file.
+`configs/migration.config.yaml` controls runtime behaviour.
 
-Key sections:
+| Section | What it controls |
+|---|---|
+| `source_system.backup_paths` | Which Windows folders to back up |
+| `source_system.excluded_paths` | Folders to skip — junk dirs are excluded automatically |
+| `source_system.file_types` | Which file extensions to include |
+| `backup.compress` | `true` creates `backup.zip`; `false` copies files as a directory |
+| `target_system.distro` | `linux-mint` or `ubuntu` |
+| `automation.auto_start_full_flow` | Run the full pipeline automatically on launch |
+| `repology.enabled` | Enable online package verification (default: true) |
 
-- `source_system.backup_paths` — which Windows folders to back up
-- `source_system.excluded_paths` — folders to skip (AppData/Temp, etc.)
-- `source_system.file_types` — which file extensions to include
-- `target_system.distro` — `linux-mint` or `ubuntu`
-- `automation.auto_start_full_flow` — run the full pipeline automatically on launch
+`configs/linux_ms_map.csv` is the Windows-to-Linux application mapping database (150+ entries).
 
-## Configuration
-
-`configs/migration.config.yaml` is the primary runtime configuration file. The typed loader lives in `src/config.py`.
-
-Key sections:
-
-- `project` for metadata
-- `source_system` for inventory and backup inputs
-- `target_system` for Linux target settings
-- `migration` for backup and install behavior
-- `automation` for startup, logging, and checkpoints
-- `validation` for post-install checks
-- `research` for reproducibility tracking
-- `ai` for optional recommendation ranking
-
-Important notes:
-
-- AI features are optional and must fall back safely when unavailable.
-- Keep secrets out of the repository; use config values or environment variables for local testing only.
-- `configs/linux_ms_map.csv` is the current Windows-to-Linux mapping source.
+---
 
 ## Architecture
 
-The repository uses a layered structure so the migration flow stays readable and easy to extend.
+```
+app.py                          Qt application entry point
+src/
+├── qt_ui/
+│   ├── main_window.py          Orchestrates the wizard and navigation
+│   ├── pages/                  One file per wizard page
+│   ├── widgets/                Stepper sidebar, expert panel
+│   ├── controllers/            Navigation, mode, operations, activity log
+│   ├── state.py                Shared UI state (QtUiState)
+│   └── theme.qss               Stylesheet
+├── services/
+│   ├── migration_service.py    Inventory, analysis, backup orchestration
+│   ├── restore_service.py      Linux-side restore — files, settings, apps
+│   ├── recommendation_service.py
+│   ├── file_recommendation_service.py
+│   ├── validation_service.py
+│   ├── report_service.py
+│   └── pipeline_service.py     End-to-end pipeline with timing
+├── inventory/                  Hardware, software, settings collectors
+├── analysis/                   HW compatibility matrix, SW mapping, fuzzy rules
+├── backup/                     Manifest generator, file copy, zip creation
+├── orchestration/              Error handling, checkpointing
+└── cli.py                      Typer CLI
+configs/
+├── migration.config.yaml       Runtime configuration
+└── linux_ms_map.csv            App mapping database
+```
 
-Entry points:
+---
 
-- `app.py` and `qt_app.py` start the Qt application.
-- `src/cli.py` exposes the command-line interface.
+## Testing
 
-Qt UI layer:
+```bash
+# Run all tests
+python -m pytest tests/
 
-- `src/qt_ui/main_window.py` orchestrates the wizard flow.
-- `src/qt_ui/pages/` contains the individual pages.
-- `src/qt_ui/state.py` stores UI state shared across pages.
+# Run with coverage
+python -m pytest tests/ --cov=src
 
-Orchestration layer:
+# Run a specific level
+python -m pytest tests/test_unit/
+python -m pytest tests/test_integration/
+python -m pytest tests/test_e2e/
+python -m pytest tests/test_performance/
+```
 
-- `src/orchestration/` centralizes user-facing error handling and step coordination.
+Current status: **190 passing, 3 skipped** (PySide6 not available in CI).
 
-Service layer:
+---
 
-- `src/services/` runs migration analysis, recommendation, reporting, restore, and validation workflows.
+## Documentation
 
-Domain layer:
+| Document | Description |
+|---|---|
+| [User Manual](docs/USER_MANUAL.md) | Step-by-step guide for end users |
+| [Praktikum Report](docs/PRAKTIKUM_REPORT.md) | Technical and academic project summary |
+| [Project Management Plan](docs/PROJECT_MANAGEMENT_PLAN.md) | WBS, timeline, risk register |
 
-- `src/inventory/`, `src/analysis/`, and `src/backup/` collect and transform the migration data.
-
-Guidelines:
-
-- Do not duplicate Tk and Qt implementations.
-- Prefer new services over embedding business logic in UI pages.
-- Keep the report layer separate from UI display logic.
-- Treat generated artifacts as outputs, not source code.
-
-## Reproducibility
-
-Use these inputs as reproducibility anchors:
-
-- `configs/migration.config.yaml`
-- `configs/linux_ms_map.csv`
-- inventory outputs in `data/`
-- restore report artifacts in `data/restore/`
-- generated reports in `docs/reports/`
-
-Validation commands:
-
-- `python -m py_compile app.py qt_app.py src/**/*.py`
-- `python -m src.cli --help`
-- start the Qt application and confirm the migration pages load in order
+---
 
 ## Contributing
 
-Keep changes small, focused, and deterministic.
+- Keep the separation between UI pages, service layer, and domain layer
+- All pages must call `set_scanning(True/False)` around background operations
+- New features go in `src/services/` — not in UI pages
+- Update `configs/linux_ms_map.csv` to add new app mappings
+- Run `python -m pytest tests/` before committing
 
-Rules of thumb:
+---
 
-- preserve the separation between UI, orchestration, and services
-- update the README whenever behavior, configuration, or file layout changes
-- prefer descriptive names and short, purpose-driven functions
-- remove unused files instead of keeping parallel implementations around
-- document any AI or network-backed feature with its required environment variables and failure mode
+## Licence
 
-Before opening a change, validate at minimum:
-
-- `python -m py_compile` for touched Python files
-- the Qt launcher import path
-- config loading after YAML or schema changes
-- any changed UI flow with the relevant page path
-
-## Full Automation Startup
-
-Enable these settings in `configs/migration.config.yaml` to auto-run the full flow when the Qt app opens:
-
-- `automation.auto_start_full_flow: true`
-- `automation.auto_start_delay_ms: 250`
-
-Behavior:
-
-- Windows runtime: scan -> analysis -> backup
-- Linux runtime: restore -> validation
-
-Linux requirement:
-
-- `data/restore/manifest.json` and `data/restore/backup.zip` must exist before startup auto-run.
-
-## Report Generation
-
-After restore and validation, the app generates a final report bundle in `docs/reports/`.
-
-Artifacts:
-
-- `docs/reports/final_report.json`
-- `docs/reports/final_report.md`
-- `docs/reports/final_report.html`
-
-What the report contains:
-
-- sovereignty score and rating
-- restore and validation summary
-- file-level evidence from the restore report
-- links to the generated markdown, HTML, and JSON outputs
-
-If you are using the Qt app, the final wizard step is the report dashboard. It lets you generate the same report bundle and open the exported markdown or HTML directly.
+MIT — see [LICENSE](LICENSE).
