@@ -129,14 +129,16 @@ app.py
     └── QtMigrationWindow      # Main window
         ├── Controllers
         │   ├── AutomationCoordinator   # Full-flow automation
-        │   ├── NavigationController    # Page transitions
+        │   ├── NavigationController    # Page transitions (+ stepper click-to-navigate)
         │   ├── ModeController          # guided/balanced/expert UI
         │   ├── OperationsController    # Individual operation runners
         │   └── ActivityLogController   # Event logging
-        └── Pages (wizard steps)
-            └── WelcomePage, ModePage, ScanPage, DataSelectionPage,
-                ApplicationMappingPage, ReviewRecommendationsPage,
-                BackupBundlePage, RestorePage, VerificationPage, ReportPage
+        └── Pages (7 wizard steps — Windows side)
+            └── WelcomePage, ModePage, ScanPage (inventory + analysis + strategy),
+                SettingsPage, DataSelectionPage,
+                ReviewRecommendationsPage, BackupBundlePage
+            └── Pages (3 steps — Linux side)
+            └── RestorePage, VerificationPage, ReportPage
 
 src/cli.py                     # Typer CLI (scan, backup, restore, validate, report)
 src/services/
@@ -212,9 +214,17 @@ Per-stage timing is now recorded in every pipeline run, providing data for the e
 
 | Item | Priority | Notes |
 |---|---|---|
-| Live USB automation | Low | `usb` CLI command is a stub; Rufus integration deferred |
 | Real E2E test on physical machine | High | Current E2E tests use mocked inventory; a real Windows scan test requires a live system |
 | Final Praktikum presentation slides | High | To be prepared separately |
+| Live USB automation | Low | `usb` CLI command is a stub; Rufus/ISO integration deferred |
+
+### UI improvements completed post-report
+
+- Scan page and Application Mapping page merged into a single step — inventory chains directly into compatibility analysis, followed by the app-strategy choice (automatic / let me pick / manual)
+- Stepper sidebar steps are now clickable — completed steps navigate directly on click
+- Global scan bar fixed above the scroll area — always visible during any background operation
+- Backup file paths now preserve directory structure (`Documents/Work/report.pdf` instead of `Work/report.pdf`) and restore to Linux home equivalents (`~/Documents`, `~/Pictures`, etc.)
+- Backup enumeration now excludes junk directories (`node_modules`, `__pycache__`, `.git`, `AppData`, etc.) and enforces a 500 MB per-file cap; `excluded_paths` from config is now wired and active
 
 ---
 

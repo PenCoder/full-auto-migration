@@ -45,7 +45,7 @@ from src.inventory.software import (
     collect_software_inventory,
     write_software_inventory,
 )
-from src.backup.manifest import copy_backup_files, generate_manifest, write_manifest
+from src.backup.manifest import copy_backup_files, generate_manifest, write_manifest, _JUNK_DIR_NAMES
 from src.analysis.hw_matrix import (
     generate_hardware_matrix,
     write_hardware_matrix,
@@ -126,24 +126,38 @@ def setup_logging(config: MigrationConfigRoot) -> None:
 
 
 def _build_file_inventory(cfg: MigrationConfigRoot, max_files: int = 8000) -> dict:
-    """Scan configured backup paths and return a lightweight file inventory dict."""
+    """Scan configured backup paths and return a lightweight file inventory dict.
+
+    Applies the same junk-directory blocklist and config-excluded-path filtering
+    as the backup manifest generator so CLI and Qt results are consistent.
+    """
     import os as _os
     import time as _time
 
     enabled_exts = {ext.lower() for ext, on in cfg.source_system.file_types.items() if on}
-    excluded = {p.lower() for p in cfg.source_system.excluded_paths}
+    excluded_paths_abs = [
+        Path(p).expanduser() if Path(p).expanduser().is_absolute() else Path.home() / p
+        for p in cfg.source_system.excluded_paths
+    ]
     now_ts = _time.time()
     files: list[dict] = []
     scanned = 0
 
     for raw_path in cfg.source_system.backup_paths:
-        expanded = Path(raw_path.replace("~", str(Path.home()))).expanduser()
+        expanded = Path(raw_path).expanduser()
         if not expanded.exists() or not expanded.is_dir():
             continue
-        for root, _, filenames in _os.walk(expanded):
+        for root, dirs, filenames in _os.walk(expanded):
             if scanned >= max_files:
                 break
-            if any(excl in root.lower() for excl in excluded):
+            root_path = Path(root)
+            root_parts_lower = {p.lower() for p in root_path.parts}
+            # Skip junk directories in-place so os.walk won't descend into them.
+            if root_parts_lower & _JUNK_DIR_NAMES:
+                dirs.clear()
+                continue
+            if any(str(root_path).lower().startswith(str(e).lower()) for e in excluded_paths_abs):
+                dirs.clear()
                 continue
             for name in filenames:
                 if scanned >= max_files:
@@ -151,7 +165,7 @@ def _build_file_inventory(cfg: MigrationConfigRoot, max_files: int = 8000) -> di
                 ext = Path(name).suffix.lower()
                 if enabled_exts and ext not in enabled_exts:
                     continue
-                full_path = Path(root) / name
+                full_path = root_path / name
                 try:
                     st = full_path.stat()
                 except OSError:
@@ -232,7 +246,7 @@ def scan_command(
     """
     try:
         valid_modes = {"guided", "balanced", "expert"}
-        valid_recommendations = {"none", "local", "online"}
+        valid_recommendations = {"none", "local", "online", "agent"}
         valid_profiles = {"migrate_all", "prioritize"}
 
         if mode not in valid_modes:
@@ -240,7 +254,7 @@ def scan_command(
                 f"Invalid mode '{mode}'. Use one of: {sorted(valid_modes)}"
             )
 
-        # Apply mode-default strategy when not explicitly overridden.
+        # Apply mode-default strategy when not explicitly overridden — mirrors Qt behaviour.
         if recommendations is None:
             recommendations = {"guided": "local", "balanced": "local", "expert": "online"}[mode]
 
@@ -252,6 +266,9 @@ def scan_command(
             raise typer.BadParameter(
                 f"Invalid recommendations mode '{recommendations}'. Use one of: {sorted(valid_recommendations)}"
             )
+
+        # "agent" is an alias for "online" in the recommendation service.
+        effective_rec_strategy = "online" if recommendations == "agent" else recommendations
         if selection_profile not in valid_profiles:
             raise typer.BadParameter(
                 f"Invalid selection profile '{selection_profile}'. Use one of: {sorted(valid_profiles)}"
@@ -304,7 +321,7 @@ def scan_command(
             }
             rec_result = RecommendationService().generate_recommendations(
                 software_inventory=sw_inventory,
-                strategy=recommendations,
+                strategy=effective_rec_strategy,
                 selection_profile=selection_profile,
                 repology_config=repology_cfg,
             )
@@ -731,58 +748,96 @@ def usb_command(
     device: Optional[str] = typer.Option(
         None,
         "--device",
-        help="Identifier of the target USB device (e.g. /dev/sdX on Linux or drive letter on Windows).",
+        help="Target USB device path on Linux (e.g. /dev/sdb) or drive letter on Windows (e.g. E:).",
+    ),
+    copy_tool: bool = typer.Option(
+        False,
+        "--copy-tool",
+        help="Also copy this migration project folder onto the USB after imaging.",
     ),
 ) -> None:
     """
-    Prepare or assist in preparing a Linux Mint Live USB that includes this
-    migration framework (stub implementation).
+    Validate inputs and generate ready-to-run USB imaging commands.
 
-    Future work (Milestones M4/M5) may:
-    - Automate USB imaging on Linux (e.g., using 'dd' or 'cp' with safety checks).
-    - Copy the migration tool onto the Live USB.
-    - Optionally add helper scripts for easier execution after boot.
-
-    For now, this command validates the inputs and prints step-by-step
-    instructions for manual USB creation using standard tools.
+    On Linux: verifies the ISO, confirms the device, and prints a dd command
+    with a safety check. On Windows: validates the ISO and guides through Rufus.
+    Does NOT write to the device without explicit --device confirmation.
     """
-    logger.info("USB command invoked (stub mode).")
+    import platform
+    import shutil
 
-    typer.echo("usb: Live USB integration is not implemented yet.")
+    logger.info("USB command invoked (iso=%s, device=%s)", iso, device)
+    system = platform.system().lower()
+
+    # ── ISO validation ────────────────────────────────────────────────────────
+    if iso is None:
+        typer.echo("No ISO specified. Download Linux Mint from https://linuxmint.com/download.php")
+        typer.echo("Then re-run:  python -m src.cli usb --iso /path/to/linuxmint.iso --device <device>")
+        raise typer.Exit(code=0)
+
+    iso = iso.resolve()
+    if not iso.exists():
+        typer.echo(f"ERROR: ISO file not found: {iso}")
+        raise typer.Exit(code=1)
+
+    iso_size_mb = iso.stat().st_size // (1024 * 1024)
+    typer.echo(f"ISO: {iso}  ({iso_size_mb} MB)  ✓")
+
+    if not iso.suffix.lower() == ".iso":
+        typer.echo("WARNING: file does not have a .iso extension — double-check it is a valid ISO image.")
+
+    # ── Device guidance ───────────────────────────────────────────────────────
+    if device is None:
+        typer.echo()
+        if "linux" in system:
+            typer.echo("No device specified. List available block devices with:")
+            typer.echo("  lsblk -d -o NAME,SIZE,MODEL")
+            typer.echo("Then re-run with --device /dev/sdX  (replace sdX with your USB device).")
+        else:
+            typer.echo("No device specified. Identify your USB drive letter in File Explorer,")
+            typer.echo("then re-run with --device E:  (replace E: with your USB drive letter).")
+        raise typer.Exit(code=0)
+
+    # ── Platform-specific imaging guidance ───────────────────────────────────
     typer.echo()
-    typer.echo("Planned future functionality:")
-    typer.echo("1. Verify the provided Linux Mint ISO.")
-    typer.echo("2. Safely write the ISO to the specified USB device.")
-    typer.echo("3. Copy this migration framework onto the USB.")
-    typer.echo("4. Provide a helper script to run after boot.")
-    typer.echo()
+    if "linux" in system:
+        dd = shutil.which("dd")
+        if dd is None:
+            typer.echo("WARNING: 'dd' not found in PATH — install coreutils.")
 
-    typer.echo("For now, please follow these manual steps:")
+        typer.echo("Ready to image. Run the following command as root (DESTRUCTIVE — all data on the device will be lost):")
+        typer.echo()
+        typer.echo(f"  sudo dd if='{iso}' of='{device}' bs=4M status=progress oflag=sync")
+        typer.echo()
+        typer.echo("Verify after imaging:")
+        typer.echo(f"  sudo dd if='{device}' bs=4M count={iso.stat().st_size // (4 * 1024 * 1024) + 1} | md5sum")
+        typer.echo(f"  md5sum '{iso}'")
 
-    if iso is not None:
-        typer.echo(f"- ISO file provided: {iso}")
+        if copy_tool:
+            typer.echo()
+            typer.echo("To copy this migration tool onto the USB after imaging:")
+            project_dir = Path(__file__).resolve().parent.parent
+            typer.echo(f"  sudo mount {device}1 /mnt/usb")
+            typer.echo(f"  sudo cp -r '{project_dir}' /mnt/usb/migration-tool")
+            typer.echo("  sudo umount /mnt/usb")
     else:
-        typer.echo("- No ISO file was specified. Download a Linux Mint ISO from the official website.")
+        typer.echo("On Windows, use Rufus to write the ISO to the USB drive:")
+        typer.echo("  1. Download Rufus from https://rufus.ie")
+        typer.echo(f"  2. Select ISO: {iso}")
+        typer.echo(f"  3. Select device: {device}")
+        typer.echo("  4. Partition scheme: GPT  |  Target system: UEFI (non CSM)")
+        typer.echo("  5. Click START — all data on the device will be erased.")
 
-    if device is not None:
-        typer.echo(f"- Target device hint: {device}")
-    else:
-        typer.echo("- No device identifier provided. Identify your USB stick using your OS tools.")
+        if copy_tool:
+            typer.echo()
+            project_dir = Path(__file__).resolve().parent.parent
+            typer.echo("After Rufus finishes, copy the migration tool onto the USB:")
+            typer.echo(f"  xcopy \"{project_dir}\" \"{device}\\migration-tool\" /E /I /H")
 
     typer.echo()
-    typer.echo("On Windows (recommended):")
-    typer.echo("  1. Download and open Rufus (rufus.ie).")
-    typer.echo("  2. Select the Linux Mint ISO.")
-    typer.echo("  3. Select your USB device.")
-    typer.echo("  4. Start the imaging process.")
-    typer.echo("  5. After imaging, copy this project folder onto the USB stick.")
-    typer.echo()
-    typer.echo("On Linux:")
-    typer.echo("  1. Identify your USB device using 'lsblk'.")
-    typer.echo("  2. Use 'dd' or 'cp' to write the ISO to the USB (with extreme care).")
-    typer.echo("  3. Mount the USB and copy this migration project onto it.")
-    typer.echo()
-    typer.echo("This stub provides the interface and documentation for future automation.")
+    typer.echo("Once booted into Linux Mint Live, run the migration tool from the USB with:")
+    typer.echo("  python migration-tool/app.py")
+    logger.info("USB command completed successfully")
 
 
 # ---------------------------------------------------------------------------

@@ -37,6 +37,42 @@ from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
 from src.loggers import get_logger
 from src.config import load_default_config, load_config, MigrationConfigRoot
 
+# Directory names that are never backed up, regardless of where they appear in the path.
+# Checked case-insensitively against every component of each file's path.
+_JUNK_DIR_NAMES: frozenset[str] = frozenset({
+    # Package / dependency caches
+    "node_modules",
+    ".npm",
+    ".nuget",
+    ".cargo",
+    ".gradle",
+    # Python
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".tox",
+    ".pytest_cache",
+    ".mypy_cache",
+    # Version control
+    ".git",
+    ".svn",
+    ".hg",
+    # OS junk
+    "$recycle.bin",
+    ".trash",
+    ".ds_store",
+    # Windows system / app data
+    "appdata",
+    "temp",
+    "tmp",
+    # Build artefacts
+    ".next",
+    ".nuxt",
+})
+
+# Files larger than this are skipped (protects against accidentally including huge binaries).
+_MAX_FILE_BYTES: int = 500 * 1024 * 1024  # 500 MB
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -88,23 +124,28 @@ def _sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
 def _enumerate_backup_files(
     include_paths: List[str],
     accepted_extensions: set[str],
+    excluded_paths: List[str] | None = None,
+    max_file_bytes: int = _MAX_FILE_BYTES,
 ) -> List[Path]:
-    """
-    Enumerate files to be included in the backup, respecting exclusions.
+    """Enumerate files for backup, filtering junk directories and large files.
 
-    Parameters
-    ----------
-    include_paths : List[str]
-        List of root directories to include.
-    accepted_extensions : set[str]
-        Set of accepted file extensions (lowercase, with dot, e.g. ".docx").
-
-    Returns
-    -------
-    List[Path]
-        List of file paths to be included.
+    Applies three layers of filtering in order:
+    1. Extension allowlist — only extensions in accepted_extensions are included.
+    2. Junk-directory blocklist — any file whose path contains a known junk
+       directory (node_modules, __pycache__, .git, AppData, temp, etc.) is skipped.
+    3. Config-excluded paths — any path listed in excluded_paths (expanded relative
+       to the user home directory) is skipped.
+    4. Size cap — files larger than max_file_bytes are skipped.
     """
     include_dirs = [Path(p).expanduser() for p in include_paths]
+
+    # Expand config-excluded paths relative to the user home directory.
+    excluded_dirs_abs: list[Path] = []
+    for ep in (excluded_paths or []):
+        expanded = Path(ep).expanduser()
+        if not expanded.is_absolute():
+            expanded = Path.home() / ep
+        excluded_dirs_abs.append(expanded)
 
     all_files: List[Path] = []
 
@@ -112,12 +153,37 @@ def _enumerate_backup_files(
         if not directory.exists():
             logger.warning("Backup include path does not exist: %s", directory)
             continue
-        
+
         for file_path in directory.rglob("*"):
             if not file_path.is_file():
                 continue
-            
+
+            # 1. Extension allowlist.
             if file_path.suffix.lower() not in accepted_extensions:
+                continue
+
+            # 2. Junk-directory blocklist — check every path component.
+            path_parts_lower = {p.lower() for p in file_path.parts}
+            if path_parts_lower & _JUNK_DIR_NAMES:
+                continue
+
+            # 3. Config-excluded path prefixes.
+            if any(
+                str(file_path).lower().startswith(str(excl).lower())
+                for excl in excluded_dirs_abs
+            ):
+                continue
+
+            # 4. File size cap.
+            try:
+                if file_path.stat().st_size > max_file_bytes:
+                    logger.warning(
+                        "Skipping oversized file (>%d MB): %s",
+                        max_file_bytes // (1024 * 1024),
+                        file_path,
+                    )
+                    continue
+            except OSError:
                 continue
 
             all_files.append(file_path)
@@ -146,8 +212,13 @@ def generate_manifest(config: MigrationConfigRoot) -> Dict[str, Any]:
 
     include_paths = config.source_system.backup_paths
     file_types = config.source_system.file_types
+    excluded_paths = list(getattr(config.source_system, "excluded_paths", None) or [])
     accepted_extensions = {ft.lower() for ft, selected in file_types.items() if selected}
-    file_list = _enumerate_backup_files(include_paths, accepted_extensions)
+    file_list = _enumerate_backup_files(
+        include_paths,
+        accepted_extensions,
+        excluded_paths=excluded_paths,
+    )
     
     entries = []
     for file_path in file_list:
@@ -155,19 +226,20 @@ def generate_manifest(config: MigrationConfigRoot) -> Dict[str, Any]:
             sha256 = _sha256_file(file_path)
             size = file_path.stat().st_size
             
-            # relative path inside the backup hierarchy
-            # computed relative to the FIRST include_path that matches
+            # Relative path inside the backup hierarchy.
+            # Includes the root folder name so structure is preserved:
+            # e.g. C:\Users\Kofi\Documents\Work\report.pdf → Documents/Work/report.pdf
             rel = None
             for root in include_paths:
-                root_p = Path(root)
+                root_p = Path(root).expanduser()
                 try:
-                    rel = file_path.relative_to(root_p)
+                    inner = file_path.relative_to(root_p)
+                    rel = Path(root_p.name) / inner
                     break
                 except ValueError:
                     continue
             if rel is None:
-                # fallback: use name only
-                rel = file_path.name
+                rel = Path(file_path.name)
 
             entries.append({
                 "source_path": str(file_path),

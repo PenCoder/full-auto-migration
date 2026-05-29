@@ -167,40 +167,20 @@ class TestServicePerformance:
 class TestUIPerformance:
     """Test suite for UI performance."""
 
-    def test_page_presenter_update_performance(self, ui_state):
-        """Test that page presenter updates are fast."""
-        from src.qt_ui.presenters import ModePresenter
-        
-        presenter = ModePresenter(ui_state)
-        
+    def test_mode_state_update_performance(self, ui_state):
+        """Rapid mode changes through ui_state should be near-instantaneous."""
         start_time = time.time()
-        
-        # Simulate rapid mode changes
         for i in range(1000):
-            mode = ["guided", "balanced", "expert"][i % 3]
-            presenter.set_mode(mode)
-        
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        
+            ui_state.mode = ["guided", "balanced", "expert"][i % 3]
+        elapsed_time = time.time() - start_time
         assert elapsed_time < 1.0
 
-    def test_scan_presenter_update_performance(self, ui_state, mock_inventory_callback, mock_recommendations_callback):
-        """Test that scan presenter updates are fast."""
-        from src.qt_ui.presenters import ScanPresenter
-        
-        presenter = ScanPresenter(ui_state, mock_inventory_callback, mock_recommendations_callback)
-        
+    def test_strategy_state_update_performance(self, ui_state):
+        """Rapid strategy changes through ui_state should be near-instantaneous."""
         start_time = time.time()
-        
-        # Simulate rapid strategy changes
         for i in range(1000):
-            strategy = ["migrate_all", "prioritize"][i % 2]
-            presenter.set_recommendation_strategy(strategy)
-        
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        
+            ui_state.recommendation_strategy = ["migrate_all", "prioritize"][i % 2]
+        elapsed_time = time.time() - start_time
         assert elapsed_time < 1.0
 
 
@@ -276,23 +256,16 @@ class TestScalability:
         assert len(state.custom_paths) == 5000
 
     def test_workflow_with_many_operations(self, ui_state):
-        """Test complete workflow with many operations."""
-        from src.qt_ui.presenters import ModePresenter
-        
+        """Simulated multi-step workflow should complete well under 2 seconds."""
         start_time = time.time()
-        
-        # Simulate complex workflow
-        presenter = ModePresenter(ui_state)
-        
-        for _ in range(100):
-            presenter.set_mode("expert")
+
+        for i in range(100):
+            ui_state.mode = "expert"
             ui_state.total_sovereignty_score += 1
-            ui_state.custom_paths.append(f"/path/{_}")
-        
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        
-        # Complex workflow should still complete quickly
+            ui_state.custom_paths.append(f"/path/{i}")
+
+        elapsed_time = time.time() - start_time
+
         assert elapsed_time < 2.0
         assert ui_state.total_sovereignty_score == 100
         assert len(ui_state.custom_paths) == 100

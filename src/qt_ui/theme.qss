@@ -146,6 +146,16 @@ QLabel#StepperTitle {
     font-weight: 700;
 }
 
+/* Completed step rows are clickable — show a subtle hover highlight */
+QWidget[clickable="true"] {
+    border-radius: 6px;
+}
+
+QWidget[clickable="true"]:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-radius: 6px;
+}
+
 QLabel#StepperSubtitle {
     color: rgba(255, 255, 255, 0.45);
     font-size: 11px;

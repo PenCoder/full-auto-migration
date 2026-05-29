@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtCore import QThreadPool, QTimer, Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton, QTextEdit
 
@@ -67,10 +67,11 @@ class ReportPage(BasePage):
         self.loading.setVisible(False)
         root.addWidget(self.loading)
 
-        self.generate_btn = QPushButton("Generate My Migration Report")
-        self.generate_btn.setProperty("role", "primary")
-        self.generate_btn.setMinimumHeight(48)
-        self.generate_btn.setMinimumWidth(260)
+        self.generate_btn = QPushButton("Re-generate Report")
+        self.generate_btn.setProperty("role", "badge")
+        self.generate_btn.setMinimumHeight(40)
+        self.generate_btn.setMinimumWidth(200)
+        self.generate_btn.setVisible(False)
         self.generate_btn.clicked.connect(self._run_report_generation)
         root.addWidget(self.generate_btn, alignment=Qt.AlignHCenter)
 
@@ -92,7 +93,14 @@ class ReportPage(BasePage):
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self.report_paths and not self.is_processing:
+            QTimer.singleShot(300, self._run_report_generation)
+
     def _run_report_generation(self) -> None:
+        if self.is_processing:
+            return
         self.generate_btn.setEnabled(False)
         self.open_markdown_btn.setEnabled(False)
         self.open_html_btn.setEnabled(False)
@@ -207,6 +215,7 @@ class ReportPage(BasePage):
         self.report_status.setText(f"Report generation failed.\n{user_facing_error(error)}")
 
     def _on_finished(self) -> None:
+        self.generate_btn.setVisible(True)
         self.generate_btn.setEnabled(True)
         self.open_markdown_btn.setEnabled(bool(self.report_paths.get("markdown")))
         self.open_html_btn.setEnabled(bool(self.report_paths.get("html")))

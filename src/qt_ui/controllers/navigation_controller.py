@@ -62,6 +62,21 @@ class NavigationController:
             self.stack.setCurrentIndex(current - 1)
             self.sync_nav()
 
+    def go_to_page(self, index: int) -> None:
+        """Navigate directly to a completed page (index must be before the current page)."""
+        if self._globally_blocked():
+            return
+        current = self.stack.currentIndex()
+        if index < 0 or index >= current:
+            return
+        self.clear_error_banner()
+        self.stack.setCurrentIndex(index)
+        page = self.stack.currentWidget()
+        refresh = getattr(page, "refresh", None)
+        if callable(refresh):
+            refresh()
+        self.sync_nav()
+
     def sync_nav(self) -> None:
         current = self.stack.currentIndex()
         blocked = self._globally_blocked()

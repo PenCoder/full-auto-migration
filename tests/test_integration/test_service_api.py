@@ -133,49 +133,31 @@ class TestDataFlowIntegration:
         assert hasattr(mock_config, 'target_system')
 
 
-class TestPresenterAPI:
-    """Test suite for presenter interfaces."""
+class TestUiStateAPI:
+    """Test ui_state exposes the expected interface used by all pages."""
 
-    def test_page_presenter_interface(self, ui_state):
-        """Test BasePresenter interface."""
-        from src.qt_ui.presenters import BasePresenter
-        
-        # Abstract interface, check methods via concrete implementation
-        from src.qt_ui.presenters import ModePresenter
-        
-        presenter = ModePresenter(ui_state)
-        assert hasattr(presenter, 'on_page_shown')
-        assert hasattr(presenter, 'on_page_before_next')
-        assert hasattr(presenter, 'on_page_before_previous')
-        assert callable(presenter.on_page_shown)
-        assert callable(presenter.on_page_before_next)
+    def test_mode_field_exists(self, ui_state):
+        assert hasattr(ui_state, "mode")
+        ui_state.mode = "guided"
+        assert ui_state.mode == "guided"
 
-    def test_mode_presenter_api(self, ui_state):
-        """Test ModePresenter specific API."""
-        from src.qt_ui.presenters import ModePresenter
-        
-        presenter = ModePresenter(ui_state)
-        assert hasattr(presenter, 'set_mode')
-        assert hasattr(presenter, 'get_mode')
-        assert callable(presenter.set_mode)
+    def test_inventory_completed_field(self, ui_state):
+        assert hasattr(ui_state, "inventory_completed")
+        ui_state.inventory_completed = True
+        assert ui_state.inventory_completed is True
 
-    def test_scan_presenter_api(self, ui_state, mock_inventory_callback, mock_recommendations_callback):
-        """Test ScanPresenter specific API."""
-        from src.qt_ui.presenters import ScanPresenter
-        
-        presenter = ScanPresenter(ui_state, mock_inventory_callback, mock_recommendations_callback)
-        assert hasattr(presenter, 'run_inventory_scan')
-        assert hasattr(presenter, 'get_recommendation_strategy')
-        assert hasattr(presenter, 'set_recommendation_strategy')
+    def test_analysis_completed_field(self, ui_state):
+        assert hasattr(ui_state, "analysis_completed")
+        ui_state.analysis_completed = True
+        assert ui_state.analysis_completed is True
 
-    def test_signal_interface(self, ui_state):
-        """Test signal/callback interface."""
-        from src.qt_ui.presenters import ModePresenter
-        
-        presenter = ModePresenter(ui_state)
-        
-        # Verify signal attributes exist
-        assert hasattr(presenter, 'page_title_changed')
-        assert hasattr(presenter, 'error_occurred')
-        assert hasattr(presenter, 'request_next')
-        assert hasattr(presenter, 'request_back')
+    def test_recommendation_strategy_field(self, ui_state):
+        assert hasattr(ui_state, "recommendation_strategy")
+        ui_state.recommendation_strategy = "prioritize"
+        assert ui_state.recommendation_strategy == "prioritize"
+
+    def test_mapping_choice_mode_field(self, ui_state):
+        assert hasattr(ui_state, "mapping_choice_mode")
+        for choice in ("migrate_all_supported", "choose_from_recommendations", "manual_mapping"):
+            ui_state.mapping_choice_mode = choice
+            assert ui_state.mapping_choice_mode == choice

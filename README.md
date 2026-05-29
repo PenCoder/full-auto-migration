@@ -1,5 +1,7 @@
 ﻿# Full Automation: Windows to Linux Migration Framework
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A reproducible migration tool for moving from Windows to Linux with a Qt UI, CLI utilities, analysis services, backup and restore flows, and report generation.
 
 ## Project Map

@@ -217,31 +217,27 @@ class TestServiceErrorHandling:
             pass
 
 
-class TestPresenterErrorHandling:
-    """Test suite for presenter error handling."""
+class TestUiStateErrorHandling:
+    """Test ui_state handles edge-case assignments gracefully."""
 
-    def test_presenter_with_none_state(self):
-        """Test presenter with None state."""
-        from src.qt_ui.presenters import ModePresenter
-        presenter = ModePresenter(None)
-        assert presenter is not None
-
-    def test_presenter_with_invalid_state(self):
-        """Test presenter with invalid state object."""
-        from src.qt_ui.presenters import ModePresenter
-        
-        invalid_state = "not a state"
-        presenter = ModePresenter(invalid_state)
-        assert presenter is not None
-
-    def test_scan_presenter_missing_callbacks(self):
-        """Test scan presenter with missing callbacks."""
-        from src.qt_ui.presenters import ScanPresenter
+    def test_state_accepts_none_for_optional_fields(self):
         from src.qt_ui.state import QtUiState
-        
         state = QtUiState()
-        presenter = ScanPresenter(state, None, None)
-        assert presenter is not None
+        state.last_error = None
+        assert state.last_error is None
+
+    def test_state_error_field_stores_string(self):
+        from src.qt_ui.state import QtUiState
+        state = QtUiState()
+        state.last_error = "Something went wrong"
+        assert state.last_error == "Something went wrong"
+
+    def test_state_bool_flags_default_false(self):
+        from src.qt_ui.state import QtUiState
+        state = QtUiState()
+        assert state.inventory_completed is False
+        assert state.backup_completed is False
+        assert state.analysis_completed is False
 
 
 class TestEdgeCases:

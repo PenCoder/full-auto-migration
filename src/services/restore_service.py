@@ -10,6 +10,21 @@ from src.loggers import get_logger
 from src.orchestration.errors import ERR_ARCHIVE_UNSAFE_PATH, ERR_MISSING_BUNDLE, MigrationError
 from src.services.package_manager import detect_package_manager, install_packages
 
+# Maps Windows user-folder names (lowercase) to Linux home-directory equivalents.
+# Files in known folders land directly in ~/Documents, ~/Pictures, etc.
+# Everything else falls back to target_home/<folder_name>/.
+_WIN_FOLDER_MAP: dict[str, str] = {
+    "documents": "Documents",
+    "pictures": "Pictures",
+    "music": "Music",
+    "videos": "Videos",
+    "desktop": "Desktop",
+    "downloads": "Downloads",
+    "saved games": "Games",
+    "favorites": ".favorites",
+    "onedrive": "OneDrive",
+}
+
 # logger = logging.getLogger("restore")
 
 
@@ -97,6 +112,28 @@ class RestoreService:
 
 
     # -------------------------
+    # PATH RESOLUTION
+    # -------------------------
+    def _resolve_destination(self, relative_path: str) -> Path:
+        """Map a backup relative_path to its Linux destination.
+
+        The first path component is the original Windows folder name (e.g. 'Documents').
+        Known Windows user-folders are translated to their Linux home equivalents so
+        files land in ~/Documents, ~/Pictures, etc. rather than ~/Restored_Migration/.
+        Unknown folders fall back to target_home/<folder_name>/.
+        """
+        parts = Path(relative_path).parts
+        if not parts:
+            return self.target_home
+
+        top = parts[0]
+        linux_name = _WIN_FOLDER_MAP.get(top.lower())
+        base = Path.home() / linux_name if linux_name else self.target_home / top
+
+        rest = parts[1:]
+        return base.joinpath(*rest) if rest else base
+
+    # -------------------------
     # FILE RESTORE
     # -------------------------
     def _load_manifest(self) -> dict:
@@ -133,7 +170,7 @@ class RestoreService:
 
         for i, entry in enumerate(entries, start=1):
             src = extract_dir / entry["relative_path"]
-            dst = self.target_home / entry["relative_path"]
+            dst = self._resolve_destination(entry["relative_path"])
 
             dst.parent.mkdir(parents=True, exist_ok=True)
 
@@ -154,7 +191,6 @@ class RestoreService:
                 "verification_status": verification_status,
             })
 
-            # map restore phase into 15%..70%
             pct = 15 + int((i / total) * 55)
             self._progress(pct, f"Restoring files… ({i}/{total})")
 
@@ -165,7 +201,7 @@ class RestoreService:
         total = max(1, len(entries))
 
         for i, entry in enumerate(entries, start=1):
-            path = self.target_home / entry["relative_path"]
+            path = self._resolve_destination(entry["relative_path"])
             expected = entry["sha256"]
 
             actual = self._hash_file(path)

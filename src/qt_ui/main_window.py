@@ -444,6 +444,8 @@ class QtMigrationWindow(QMainWindow):
             is_busy=self._is_busy,
         )
 
+        self.stepper.step_clicked.connect(self._on_stepper_step_clicked)
+
         self.setCentralWidget(root)
 
         # Right expert panel (dock).
@@ -578,6 +580,11 @@ class QtMigrationWindow(QMainWindow):
         self._set_automation_running(False)
         self.complete_all_btn.setText("Complete All Phases")
         self._sync_nav()
+
+    def _on_stepper_step_clicked(self, index: int) -> None:
+        if self.navigation is not None:
+            self.navigation.go_to_page(index)
+        self._sync_expert_page_context()
 
     def next_page(self) -> None:
         current = self.stack.currentWidget()

@@ -2,20 +2,46 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 
+class _StepRow(QWidget):
+    """A single step row that becomes clickable when its state is 'done'."""
+
+    def __init__(self, index: int, on_click, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._index = index
+        self._on_click = on_click
+        self._clickable = False
+
+    def set_clickable(self, clickable: bool) -> None:
+        self._clickable = clickable
+        self.setCursor(Qt.PointingHandCursor if clickable else Qt.ArrowCursor)
+        self.setProperty("clickable", "true" if clickable else "false")
+        style = self.style()
+        style.unpolish(self)
+        style.polish(self)
+
+    def mousePressEvent(self, event) -> None:
+        if self._clickable:
+            self._on_click(self._index)
+        super().mousePressEvent(event)
+
+
 class StepperSidebar(QWidget):
-    """Render a vertical step list with state-aware labels."""
+    """Render a vertical step list with state-aware, clickable labels."""
+
+    step_clicked = Signal(int)
 
     def __init__(self, title: str, subtitle: str, steps: list[str]) -> None:
-        """Create the sidebar and populate it with the provided steps."""
         super().__init__()
         self.steps = steps
         self.dot_labels: list[QLabel] = []
         self.title_labels: list[QLabel] = []
         self.meta_labels: list[QLabel] = []
+        self._row_widgets: list[_StepRow] = []
+        self._step_states: list[str] = ["pending"] * len(steps)
         self._build_ui(title, subtitle)
 
     def _build_ui(self, title: str, subtitle: str) -> None:
@@ -39,15 +65,15 @@ class StepperSidebar(QWidget):
         line.setObjectName("StepperSeparator")
         root.addWidget(line)
 
-        for idx, step in enumerate(self.steps, start=1):
-            row = QWidget()
+        for idx, step in enumerate(self.steps):
+            row = _StepRow(idx, self._on_row_click)
             row.setMinimumHeight(52)
             row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(0, 6, 0, 6)
+            row_layout.setContentsMargins(4, 6, 4, 6)
             row_layout.setSpacing(10)
             row_layout.setAlignment(Qt.AlignTop)
 
-            dot = QLabel(str(idx))
+            dot = QLabel(str(idx + 1))
             dot.setAlignment(Qt.AlignCenter)
             dot.setObjectName("StepDot")
             dot.setFixedSize(26, 26)
@@ -77,9 +103,14 @@ class StepperSidebar(QWidget):
             self.dot_labels.append(dot)
             self.title_labels.append(step_title)
             self.meta_labels.append(step_meta)
+            self._row_widgets.append(row)
             root.addWidget(row)
 
         root.addStretch(1)
+
+    def _on_row_click(self, index: int) -> None:
+        if self._step_states[index] == "done":
+            self.step_clicked.emit(index)
 
     def set_active_index(self, index: int) -> None:
         for i, dot in enumerate(self.dot_labels):
@@ -92,6 +123,9 @@ class StepperSidebar(QWidget):
             else:
                 state = "pending"
                 dot.setText(str(i + 1))
+
+            self._step_states[i] = state
+            self._row_widgets[i].set_clickable(state == "done")
 
             dot.setProperty("state", state)
             self._repolish(dot)
