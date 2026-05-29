@@ -109,8 +109,8 @@ class MigrationService:
             self.checkpoints.mark_phase("analysis_failed", error=str(exc))
             raise
 
-    def run_backup(self, selected_folders, selected_file_types, logger=None, settings_inventory=None, settings_plan=None):
-        """Create the backup manifest, copy selected files, and bundle settings assets."""
+    def run_backup(self, selected_folders, selected_file_types, logger=None, settings_inventory=None, settings_plan=None, app_recommendations=None):
+        """Create the backup manifest, copy selected files, and bundle settings and app data."""
         if logger is not None:
             self.logger = logger
 
@@ -126,14 +126,25 @@ class MigrationService:
             self.logger.info("Backup manifest written to %s", out_file)
             copy_backup_files(manifest, self.config)
 
-            # Bundle settings inventory and migration plan so the Linux side can restore them.
+            # Bundle settings and app recommendations for the Linux restore side.
             self._bundle_settings(settings_inventory, settings_plan)
+            self._bundle_apps(app_recommendations)
 
             if self.config.backup.compress:
                 backup_root = self.config.source_system.backup_output_dir
                 archive_path = self.config.backup.archive_name
                 create_backup_archive(backup_root + "/files", archive_path)
                 self.logger.info("Backup archive created at: %s", archive_path)
+            else:
+                # No zip — copy the staged files into RESTORE_DIR/files/ so the
+                # bundle folder is self-contained and can be taken to Linux as-is.
+                staged = DATA_DIR / self.config.source_system.backup_output_dir / "files"
+                bundle_files = RESTORE_DIR / "files"
+                if staged.exists():
+                    if bundle_files.exists():
+                        shutil.rmtree(bundle_files)
+                    shutil.copytree(staged, bundle_files)
+                    self.logger.info("Uncompressed files copied to bundle at %s", bundle_files)
             self.logger.info("Backup files copied successfully.")
             self.checkpoints.complete(manifest_entries=manifest.get("total_files", 0), archive_enabled=self.config.backup.compress)
 
@@ -166,6 +177,48 @@ class MigrationService:
             plan_path = RESTORE_DIR / "settings_migration_plan.json"
             plan_path.write_text(json.dumps(settings_plan, indent=2), encoding="utf-8")
             self.logger.info("Settings migration plan bundled at %s", plan_path)
+
+    def _bundle_apps(self, app_recommendations: dict | None) -> None:
+        """Write apps_to_install.json into RESTORE_DIR so the Linux restore can install packages.
+
+        Filters to only installable entries (migration_strategy == 'apt') and
+        drops duplicates by linux_package name before writing.
+        """
+        if not app_recommendations:
+            return
+
+        recs = app_recommendations.get("recommendations", [])
+        if not recs:
+            return
+
+        RESTORE_DIR.mkdir(parents=True, exist_ok=True)
+
+        seen: set[str] = set()
+        installable: list[dict] = []
+        for rec in recs:
+            pkg = str(rec.get("linux_package", "")).strip()
+            strategy = str(rec.get("migration_strategy", "")).lower()
+            if not pkg or pkg in seen:
+                continue
+            seen.add(pkg)
+            installable.append({
+                "windows_app": str(rec.get("windows_app", "")),
+                "linux_package": pkg,
+                "migration_strategy": strategy,
+                "mapping_confidence": str(rec.get("mapping_confidence", "")),
+                "category": str(rec.get("category", "")),
+            })
+
+        apps_path = RESTORE_DIR / "apps_to_install.json"
+        apps_path.write_text(
+            json.dumps({"applications": installable}, indent=2),
+            encoding="utf-8",
+        )
+        self.logger.info(
+            "App install list bundled: %d installable packages → %s",
+            len(installable),
+            apps_path,
+        )
 
     def run_task(self, worker_fn: Callable[[], Any], on_done: Callable[[Any], None]) -> None:
         """Run a worker function asynchronously and hand the result back on completion."""

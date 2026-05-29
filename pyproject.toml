@@ -69,9 +69,10 @@ addopts = "--tb=short -q"
 name = "MigrationWizard"
 onefile = false
 windowed = true
-icon = "src/qt_ui/assets/icon.ico"
+icon = "src/qt_ui/assets/app.png"
 add-data = [
     "configs:configs",
     "src/qt_ui/theme.qss:src/qt_ui",
     "src/qt_ui/assets:src/qt_ui/assets",
+    "packaging:packaging",
 ]

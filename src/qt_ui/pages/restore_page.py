@@ -86,7 +86,10 @@ class RestorePage(BasePage):
         if not self.bundle_path:
             self.status.setText("Please select a backup bundle folder first.")
             return
+        if self.is_processing:
+            return
 
+        self.set_scanning(True)
         self.restore_btn.setEnabled(False)
         self.next_btn.setEnabled(False)
         self.loading.setVisible(True)
@@ -114,6 +117,7 @@ class RestorePage(BasePage):
         self.refresh()
 
     def _on_finished(self) -> None:
+        self.set_scanning(False)
         self.restore_btn.setEnabled(True)
         self.loading.setVisible(False)
         self.refresh()

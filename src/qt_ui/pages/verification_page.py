@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QThreadPool, Qt
+from pathlib import Path
+
+from PySide6.QtCore import QThreadPool, QTimer, Qt
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton
 
 from src.orchestration.errors import user_facing_error
@@ -75,11 +78,19 @@ class VerificationPage(BasePage):
         self.report_btn.clicked.connect(self._show_report_path)
         root.addWidget(self.report_btn, alignment=Qt.AlignHCenter)
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if self.ui_state.restore_completed and not self.ui_state.verification_completed and not self.is_processing:
+            QTimer.singleShot(300, self._run_verification)
+
     def _run_verification(self) -> None:
+        if self.is_processing:
+            return
+        self.set_scanning(True)
         self.verify_btn.setEnabled(False)
         self.report_btn.setEnabled(False)
         self.loading.setVisible(True)
-        self.status.setText("Checking your files now — comparing what was backed up with what arrived on Linux...")
+        self.status.setText("Checking your files — comparing what was backed up with what arrived on Linux...")
         worker = FunctionWorker(self.run_validation_cb)
         worker.signals.result.connect(self._on_result)
         worker.signals.error.connect(self._on_error)
@@ -119,12 +130,15 @@ class VerificationPage(BasePage):
         self.refresh()
 
     def _show_report_path(self) -> None:
-        if self.report_path:
-            self.status.setText(f"Report available at: {self.report_path}")
+        if self.report_path and Path(self.report_path).exists():
+            QDesktopServices.openUrl(Path(self.report_path).as_uri())
+        elif self.report_path:
+            self.status.setText(f"Report path: {self.report_path}")
         else:
-            self.status.setText("No report available yet. Run verification first.")
+            self.status.setText("No report available yet — run verification first.")
 
     def _on_finished(self) -> None:
+        self.set_scanning(False)
         self.verify_btn.setEnabled(True)
         self.loading.setVisible(False)
         self.refresh()

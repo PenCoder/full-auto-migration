@@ -12,34 +12,121 @@ A reproducible migration tool for moving from Windows to Linux with a Qt UI, CLI
 - `src/services/`, `src/analysis/`, `src/backup/`, and `src/inventory/` contain the core migration logic.
 - `src/cli.py` provides command-line access to inventory, analysis, backup, profile, and reporting tasks.
 
-## Quick Start
+## End-to-end flow
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
+The tool runs in two phases on two machines:
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+| Phase | Machine | What happens |
+|---|---|---|
+| **1 — Prepare** | Windows 11 | Scan → app mapping → backup bundle created in `data/restore/` |
+| **2 — Restore** | Linux Mint | Copy bundle → run tool → files restored, apps installed, settings applied |
 
-3. Review `configs/migration.config.yaml`.
-4. Start the Qt app:
+---
 
-   ```bash
-   python app.py
-   ```
+## Phase 1 — Windows (scan + backup)
 
-   or:
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-   ```bash
-   python qt_app.py
-   ```
+# Launch the Qt wizard (guided 7-step flow)
+python app.py
 
-## Command-Line Usage
+# Or use the CLI directly
+python -m src.cli scan --mode balanced
+python -m src.cli backup --yes
+```
 
-- `python -m src.cli inventory all`
-- `python -m src.cli analyze all`
-- `python -m src.cli backup`
-- `python -m src.cli report`
+The wizard writes the backup bundle to `data/restore/`:
+
+```
+data/restore/
+├── manifest.json          # file list + SHA-256 checksums
+├── backup.zip             # all selected files, directory structure preserved
+├── apps_to_install.json   # Linux packages to install (apt)
+├── settings_inventory.json
+├── settings_migration_plan.json
+└── settings_assets/
+    └── wallpaper.jpg      # exported wallpaper image
+```
+
+Copy this entire `data/restore/` folder to a USB stick alongside the project folder.
+
+---
+
+## Phase 2 — Linux Mint (restore)
+
+### Option A — Setup script (recommended, no build required)
+
+Copy the project folder to the Linux machine (via USB, network, etc.), then:
+
+```bash
+bash setup_linux.sh           # installs deps + launches Qt wizard
+bash setup_linux.sh --cli     # installs deps + shows CLI help
+bash setup_linux.sh --restore /path/to/bundle   # headless restore
+```
+
+The script:
+1. Checks Python 3.10+ is installed
+2. Installs system Qt/graphics libraries via `apt`
+3. Creates a `.venv` and installs Python deps
+4. Launches the app
+
+### Option B — AppImage (double-click, no installation, no Python needed)
+
+Build the AppImage on any machine with Docker:
+
+```bash
+bash build_linux.sh
+```
+
+Output: `dist/MigrationWizard-x86_64.AppImage` (~120 MB, fully self-contained).
+
+Copy it to the USB stick alongside the bundle folder. On Linux Mint:
+- **Double-click** the `.AppImage` file in the file manager, or
+- Run from terminal: `./MigrationWizard-x86_64.AppImage`
+
+No installation, no Python, no dependencies required on the target machine.
+
+### Option C — CLI restore (headless)
+
+```bash
+bash setup_linux.sh --restore /media/usb/data/restore
+# or after activating the venv:
+python -m src.cli restore --source /media/usb/data/restore
+python -m src.cli validate
+python -m src.cli report
+```
+
+---
+
+## What the restore does
+
+1. **Files** — extracted from `backup.zip` into the correct Linux home folders:
+   - `Documents/` → `~/Documents/`
+   - `Pictures/` → `~/Pictures/`
+   - `Music/`, `Videos/`, `Desktop/`, `Downloads/` → matching Linux paths
+   - Unknown folders → `~/Restored_Migration/<folder>/`
+2. **File integrity** — SHA-256 verified against the manifest after copy
+3. **Desktop settings** — applied automatically where possible:
+   - Wallpaper copied to `~/.local/share/backgrounds/` and set via `gsettings`/`xfconf-query`
+   - Light/Dark preference applied via the detected DE (Cinnamon, GNOME, XFCE, KDE, MATE)
+   - A `~/settings_migration_guidance.md` file is written with manual steps for accent color, theme
+4. **Linux apps** — installed via `apt` using `pkexec` (GUI password prompt)
+
+---
+
+## Configuration
+
+`configs/migration.config.yaml` is the primary runtime configuration file.
+
+Key sections:
+
+- `source_system.backup_paths` — which Windows folders to back up
+- `source_system.excluded_paths` — folders to skip (AppData/Temp, etc.)
+- `source_system.file_types` — which file extensions to include
+- `target_system.distro` — `linux-mint` or `ubuntu`
+- `automation.auto_start_full_flow` — run the full pipeline automatically on launch
 
 ## Configuration
 

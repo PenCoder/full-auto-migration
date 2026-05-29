@@ -357,11 +357,22 @@ class OperationsController:
             "backup",
             f"Creating bundle from {len(selected_folders)} folder scope(s) and selected file filters...",
         )
+        # Pull app recommendations from runtime_data — prefer the review-page result,
+        # fall back to any earlier scan-page result.
+        app_recommendations = (
+            runtime_data.get("review_app_recommendations")
+            or next(
+                (v for k, v in runtime_data.items() if k.startswith("recommendations_") and isinstance(v, dict)),
+                None,
+            )
+        )
+
         result = migration_service.run_backup(
             selected_folders,
             selected_file_types,
             settings_inventory=ui_state.settings_inventory or None,
             settings_plan=ui_state.settings_migration_plan or None,
+            app_recommendations=app_recommendations,
         )
         runtime_data["backup"] = result
         files = int(result.get("total_files", 0)) if isinstance(result, dict) else 0

@@ -1,16 +1,23 @@
 services:
+  # Build the AppImage using the Dockerfile builder stage.
+  # Usage:  docker compose run --rm builder
+  # Output: ./dist/MigrationWizard-x86_64.AppImage
   builder:
     build:
       context: .
+      target: builder
     volumes:
-      - ./dist:/src/dist
-    # The command now executes the build into the mounted volume
-    command: >
-      sh -c "pyinstaller --noconfirm --onefile 
-      --collect-all ttkbootstrap
-      --hidden-import PIL._tkinter_finder
-      --add-data 'configs:configs' --add-data 'data:data' 
-      --name app
-      app.py && 
-      chmod +x dist/app dist/LinApp.desktop &&
-      chown -R ${UID:-1000}:${GID:-1000} dist/"
+      - ./dist:/build/dist
+    command: echo "AppImage already built during docker build — check dist/"
+
+  # Run the app inside a container with X11 forwarding (for testing).
+  # Usage:  DISPLAY=:0 docker compose up runtime
+  runtime:
+    build:
+      context: .
+      target: runtime
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./data:/data

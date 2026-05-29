@@ -51,9 +51,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Privacy files
+# Privacy files — generated data, reports, and bundles never belong in version control
 /data/
 /build/
+/dist/
+/docs/reports/
+*.zip
 
 # Other files and directories
 logs/
@@ -61,7 +64,6 @@ logs/
 /misc/
 .DS_Store
 /os/
-.exe
 *.exe
 
 
