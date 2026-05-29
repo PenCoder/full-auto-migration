@@ -1,25 +1,26 @@
+"""Expert override panel for mappings, paths, and advanced options."""
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QHeaderView,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QTabWidget,
-    QTableWidget,
-    QTableWidgetItem,
+    QScrollArea,
+    QSizePolicy,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
     QPushButton,
@@ -32,28 +33,389 @@ from src.services.profile_service import ProfileService
 
 
 class ExpertPanel(QWidget):
+    """Expert panel with page-specific control layouts using a stacked widget."""
+
     def __init__(self, ui_state: QtUiState, profile_path: Path | None = None) -> None:
+        """Create the expert panel with page-specific tabs."""
         super().__init__()
         self.ui_state = ui_state
         self.profile_service = ProfileService(profile_path=profile_path)
+        self.current_mode = ui_state.mode
+        self.current_page_key = "mode_selection"
+        self.page_widgets: dict[str, QWidget] = {}
         self._build_ui()
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(10)
 
-        tabs = QTabWidget()
-        tabs.setObjectName("ExpertTabs")
-        self.tabs = tabs
+        self.context_title = QLabel("Expert Configuration")
+        self.context_title.setObjectName("StepTitle")
+        root.addWidget(self.context_title)
 
-        mapping_tab = QWidget()
-        mapping_tab_layout = QVBoxLayout(mapping_tab)
-        mapping_tab_layout.setContentsMargins(6, 6, 6, 6)
-        mapping_tab_layout.setSpacing(10)
+        self.context_description = QLabel("")
+        self.context_description.setObjectName("BodyText")
+        self.context_description.setWordWrap(True)
+        root.addWidget(self.context_description)
 
-        hardware = QGroupBox("Hardware Advisories")
-        hw_form = QFormLayout(hardware)
+        # Stacked widget for page-specific controls
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.stacked_widget.setObjectName("ExpertStack")
+        root.addWidget(self.stacked_widget)
+
+        # Build page-specific panels
+        self.page_widgets["mode_selection"] = self._build_mode_selection_panel()
+        self.page_widgets["settings_migration"] = self._build_settings_migration_panel()
+        self.page_widgets["data_selection"] = self._build_data_selection_panel()
+        self.page_widgets["application_mapping"] = self._build_application_mapping_panel()
+        self.page_widgets["review_recommendations"] = self._build_review_recommendations_panel()
+        self.page_widgets["scan"] = self._build_scan_panel()
+        self.page_widgets["backup_bundle"] = self._build_backup_bundle_panel()
+        self.page_widgets["restore"] = self._build_restore_panel()
+        self.page_widgets["verification"] = self._build_verification_panel()
+        self.page_widgets["report"] = self._build_report_panel()
+
+        # Add all pages to stacked widget
+        for page_key, widget in self.page_widgets.items():
+            self.stacked_widget.addWidget(widget)
+
+        root.addStretch(1)
+        self._load_mapping_overrides()
+        self._load_custom_paths()
+
+    def apply_mode(self, mode: str) -> None:
+        self.current_mode = mode
+        self._apply_mode_restrictions()
+
+    def set_page_context(self, page_key: str) -> None:
+        """Switch to the expert panel for the given page."""
+        self.current_page_key = page_key
+        self._update_page_context()
+        self._apply_mode_restrictions()
+
+    def _update_page_context(self) -> None:
+        """Update context title, description, and show the correct page widget."""
+        context_map = {
+            "mode_selection": {
+                "title": "Mode Selection",
+                "description": "Configure target distro and system-level operations.",
+            },
+            "settings_migration": {
+                "title": "Settings Migration",
+                "description": "Adjust distro and advanced operations for settings portability.",
+            },
+            "data_selection": {
+                "title": "Data Selection",
+                "description": "Customize folder scope and additional paths to include in the migration.",
+            },
+            "application_mapping": {
+                "title": "Application Mapping",
+                "description": "Tune app mappings and hardware advisories for Linux equivalents.",
+            },
+            "review_recommendations": {
+                "title": "Recommendation Review",
+                "description": "Refine mapping overrides and migration scope before bundling.",
+            },
+            "scan": {
+                "title": "Scan",
+                "description": "Review detected apps and adjust mapping overrides and system settings.",
+            },
+            "backup_bundle": {
+                "title": "Backup",
+                "description": "Finalize data scope and backup operations before generating the bundle.",
+            },
+            "restore": {
+                "title": "Restore",
+                "description": "Adjust target-system behavior and advanced operations for restoration.",
+            },
+            "verification": {
+                "title": "Verification",
+                "description": "Review verification results; adjust system settings if needed.",
+            },
+            "report": {
+                "title": "Final Report",
+                "description": "Review the migration report. Expert controls are minimized at this stage.",
+            },
+        }
+
+        cfg = context_map.get(self.current_page_key, context_map["mode_selection"])
+        self.context_title.setText(cfg["title"])
+        self.context_description.setText(cfg["description"])
+
+        # Switch to the appropriate page widget
+        if self.current_page_key in self.page_widgets:
+            index = list(self.page_widgets.keys()).index(self.current_page_key)
+            self.stacked_widget.setCurrentIndex(index)
+
+    def _build_mode_selection_panel(self) -> QWidget:
+        """Expert controls for mode selection page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        # --- System Intelligence Group ---
+        sys_group = QGroupBox("System Intelligence")
+        sys_form = QFormLayout(sys_group)
+        sys_form.setSpacing(10)
+
+        self.mode_dry_run = QCheckBox("Simulation Mode (Dry Run)")
+        self.mode_dry_run.setToolTip("Test migration without writing any data to disk.")
+        
+        self.mode_io_priority = QComboBox()
+        self.mode_io_priority.addItems(["Low (Background)", "Normal", "High (Focus)"])
+        
+        self.mode_verify_level = QComboBox()
+        self.mode_verify_level.addItems(["Size Only", "MD5 Hash", "SHA-256 (Paranoid)"])
+
+        sys_form.addRow(self.mode_dry_run)
+        sys_form.addRow("I/O Priority:", self.mode_io_priority)
+        sys_form.addRow("Verification:", self.mode_verify_level)
+        layout.addWidget(sys_group)
+
+        advanced_group = QGroupBox("Advanced Operations")
+        advanced_layout = QVBoxLayout(advanced_group)
+        self.mode_incremental = QCheckBox("Incremental Backup")
+        self.mode_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
+        self.mode_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+        advanced_layout.addWidget(self.mode_incremental)
+
+        self.mode_parallel = QCheckBox("Parallel Hashing")
+        self.mode_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
+        self.mode_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        advanced_layout.addWidget(self.mode_parallel)
+
+        self.mode_rollback = QCheckBox("Create Rollback Point")
+        self.mode_rollback.setChecked(self.ui_state.advanced_operations.get("create_rollback_point", False))
+        self.mode_rollback.toggled.connect(lambda v: self._set_op("create_rollback_point", v))
+        advanced_layout.addWidget(self.mode_rollback)
+
+        layout.addWidget(advanced_group)
+        layout.addStretch(1)
+        return widget
+
+    def _build_settings_migration_panel(self) -> QWidget:
+        """Expert controls for settings migration page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        distro_group = QGroupBox("Target Distro")
+        distro_layout = QVBoxLayout(distro_group)
+        self.settings_distro_combo = QComboBox()
+        self.settings_distro_combo.addItems(["Linux Mint", "Ubuntu", "Fedora", "Debian"])
+        self.settings_distro_combo.setCurrentText(self.ui_state.target_distro)
+        self.settings_distro_combo.currentTextChanged.connect(self._set_distro)
+        distro_layout.addWidget(self.settings_distro_combo)
+        layout.addWidget(distro_group)
+
+        advanced_group = QGroupBox("Advanced Operations")
+        advanced_layout = QVBoxLayout(advanced_group)
+        self.settings_incremental = QCheckBox("Incremental Backup")
+        self.settings_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
+        self.settings_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+        advanced_layout.addWidget(self.settings_incremental)
+
+        self.settings_parallel = QCheckBox("Parallel Hashing")
+        self.settings_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
+        self.settings_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        advanced_layout.addWidget(self.settings_parallel)
+
+        layout.addWidget(advanced_group)
+        layout.addStretch(1)
+        return widget
+
+    def _build_data_selection_panel(self) -> QWidget:
+        """Expert controls for data selection page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        # --- Conflict & Sanitation Group ---
+        filter_group = QGroupBox("Filter & Conflict Strategy")
+        filter_form = QFormLayout(filter_group)
+
+        self.data_conflict_strategy = QComboBox()
+        self.data_conflict_strategy.addItems(["Rename (Keep Both)", "Overwrite", "Skip Existing"])
+        
+        self.data_exclude_regex = QLineEdit()
+        self.data_exclude_regex.setPlaceholderText("e.g. node_modules; *.tmp; .git")
+        
+        self.data_sanitize_names = QCheckBox("Sanitize Windows Filenames")
+        self.data_sanitize_names.setToolTip("Removes characters like ':', '?', '*' which are illegal on some Linux filesystems.")
+        self.data_sanitize_names.setChecked(True)
+
+        filter_form.addRow("On Conflict:", self.data_conflict_strategy)
+        filter_form.addRow("Exclusions:", self.data_exclude_regex)
+        filter_form.addRow(self.data_sanitize_names)
+        layout.addWidget(filter_group)
+
+        custom_group = QGroupBox("Custom Additional Paths")
+        custom_layout = QVBoxLayout(custom_group)
+        entry_row = QHBoxLayout()
+        self.data_custom_path_input = QLineEdit()
+        self.data_custom_path_input.setPlaceholderText("Enter custom path...")
+        entry_row.addWidget(self.data_custom_path_input)
+
+        add_custom_btn = QPushButton("Add")
+        add_custom_btn.clicked.connect(self._add_custom_path)
+        entry_row.addWidget(add_custom_btn)
+
+        browse_custom_btn = QPushButton("Browse")
+        browse_custom_btn.clicked.connect(self._browse_custom_path)
+        entry_row.addWidget(browse_custom_btn)
+        custom_layout.addLayout(entry_row)
+
+        self.data_custom_paths_list = QListWidget()
+        self.data_custom_paths_list.setMinimumHeight(110)
+        custom_layout.addWidget(self.data_custom_paths_list)
+
+        custom_actions = QHBoxLayout()
+        remove_custom_btn = QPushButton("Remove Selected")
+        remove_custom_btn.clicked.connect(self._remove_selected_custom_paths)
+        custom_actions.addWidget(remove_custom_btn)
+        custom_actions.addStretch(1)
+        custom_layout.addLayout(custom_actions)
+
+        layout.addWidget(custom_group)
+        layout.addStretch(1)
+        return widget
+
+    def _build_application_mapping_panel(self) -> QWidget:
+        """Expert controls for application mapping page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        # --- Compatibility & Strategy ---
+        strategy_group = QGroupBox("Installation Strategy")
+        strat_layout = QHBoxLayout(strategy_group)
+
+        self.app_pkg_pref = QComboBox()
+        self.app_pkg_pref.addItems(["Prefer Native (.deb/.rpm)", "Prefer Flatpak", "Prefer Snap"])
+        
+        self.app_auto_wine = QCheckBox("Auto-Wine Prefix")
+        self.app_auto_wine.setToolTip("Create a Wine bottle for apps without a native Linux version.")
+
+        strat_layout.addWidget(QLabel("Package Type:"))
+        strat_layout.addWidget(self.app_pkg_pref)
+        strat_layout.addWidget(self.app_auto_wine)
+        layout.addWidget(strategy_group)
+
+        mapping_group = QGroupBox("Software Mappings")
+        mapping_layout = QVBoxLayout(mapping_group)
+
+        # Scrollable area for mappings
+        self.app_mappings_scroll = QScrollArea()
+        self.app_mappings_scroll.setWidgetResizable(True)
+        self.app_mappings_scroll.setMinimumHeight(210)
+        self.app_mappings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.app_mappings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        self.app_mappings_container = QWidget()
+        self.app_mappings_layout = QVBoxLayout(self.app_mappings_container)
+        self.app_mappings_layout.setSpacing(10)
+
+        self.app_mappings_scroll.setWidget(self.app_mappings_container)
+        mapping_layout.addWidget(self.app_mappings_scroll)
+
+        actions_row = QHBoxLayout()
+        self.app_add_row_btn = QPushButton("Add Mapping")
+        self.app_add_row_btn.clicked.connect(self._add_mapping_row)
+        actions_row.addWidget(self.app_add_row_btn)
+
+        self.app_remove_row_btn = QPushButton("Remove Selected")
+        self.app_remove_row_btn.clicked.connect(self._remove_selected_mapping_rows)
+        actions_row.addWidget(self.app_remove_row_btn)
+
+        # self.app_load_btn = QPushButton("Load Profile")
+        # self.app_load_btn.clicked.connect(self._load_mapping_overrides)
+        # actions_row.addWidget(self.app_load_btn)
+
+        self.app_save_btn = QPushButton("Save Profile")
+        self.app_save_btn.clicked.connect(self._save_profile)
+        actions_row.addWidget(self.app_save_btn)
+
+        self.app_scan_btn = QPushButton("Scan Apps")
+        self.app_scan_btn.clicked.connect(self._scan_installed_apps)
+        actions_row.addWidget(self.app_scan_btn)
+        mapping_layout.addLayout(actions_row)
+
+        self.app_mapping_status = QLabel("")
+        self.app_mapping_status.setObjectName("BodyText")
+        mapping_layout.addWidget(self.app_mapping_status)
+
+        self.app_confidence_preview = QLabel("")
+        self.app_confidence_preview.setObjectName("BodyText")
+        self.app_confidence_preview.setWordWrap(True)
+        mapping_layout.addWidget(self.app_confidence_preview)
+
+        layout.addWidget(mapping_group)
+        return widget
+
+    def _build_review_recommendations_panel(self) -> QWidget:
+        """Expert controls for review recommendations page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        mapping_group = QGroupBox("Software Mapping Overrides")
+        mapping_layout = QVBoxLayout(mapping_group)
+
+        # Scrollable area for mappings
+        self.review_mappings_scroll = QScrollArea()
+        self.review_mappings_scroll.setWidgetResizable(True)
+        self.review_mappings_scroll.setMinimumHeight(200)
+        self.review_mappings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.review_mappings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        self.review_mappings_container = QWidget()
+        self.review_mappings_layout = QVBoxLayout(self.review_mappings_container)
+        self.review_mappings_layout.setSpacing(10)
+
+        self.review_mappings_scroll.setWidget(self.review_mappings_container)
+        mapping_layout.addWidget(self.review_mappings_scroll)
+
+        actions_row = QHBoxLayout()
+        self.review_add_btn = QPushButton("Add")
+        self.review_add_btn.clicked.connect(self._add_mapping_row)
+        actions_row.addWidget(self.review_add_btn)
+
+        self.review_remove_btn = QPushButton("Remove Selected")
+        self.review_remove_btn.clicked.connect(self._remove_selected_mapping_rows)
+        actions_row.addWidget(self.review_remove_btn)
+        mapping_layout.addLayout(actions_row)
+        layout.addWidget(mapping_group)
+
+        data_scope_group = QGroupBox("Data Scope")
+        data_layout = QVBoxLayout(data_scope_group)
+        self.review_folder_checks: dict[str, QCheckBox] = {}
+        for name in ["Documents", "Desktop", "Downloads", "Pictures"]:
+            box = QCheckBox(name)
+            box.setChecked(self.ui_state.selected_folders.get(name, True))
+            box.toggled.connect(lambda checked, key=name: self._set_folder(key, checked))
+            self.review_folder_checks[name] = box
+            data_layout.addWidget(box)
+        layout.addWidget(data_scope_group)
+
+        layout.addStretch(1)
+        return widget
+
+    def _build_scan_panel(self) -> QWidget:
+        """Expert controls for scan page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        hardware_group = QGroupBox("Hardware Advisories")
+        hw_form = QFormLayout(hardware_group)
         for name, confidence in [
             ("NVIDIA GPU", "88%"),
             ("Intel Wi-Fi", "92%"),
@@ -66,199 +428,191 @@ class ExpertPanel(QWidget):
             toggle = QCheckBox("Override")
             row_layout.addWidget(toggle)
             hw_form.addRow(QLabel(name), row)
-        mapping_tab_layout.addWidget(hardware)
+        layout.addWidget(hardware_group)
 
-        mapping_group = QGroupBox("Software Mappings")
+        mapping_group = QGroupBox("Mapping Overrides")
         mapping_layout = QVBoxLayout(mapping_group)
-        self.mapping_table = QTableWidget(0, 5)
-        self.mapping_table.setHorizontalHeaderLabels(
-            ["Windows", "Package", "Name", "Strategy", "Notes"]
-        )
-        self.mapping_table.verticalHeader().setVisible(False)
-        header = self.mapping_table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(QHeaderView.Interactive)
-        self.mapping_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.mapping_table.horizontalHeader().setDefaultSectionSize(120)
-        self.mapping_table.setMinimumHeight(210)
-        self.mapping_table.itemChanged.connect(self._update_confidence_preview)
-        mapping_layout.addWidget(self.mapping_table)
+
+        # Scrollable area for mappings
+        self.scan_mappings_scroll = QScrollArea()
+        self.scan_mappings_scroll.setWidgetResizable(True)
+        self.scan_mappings_scroll.setMinimumHeight(150)
+        self.scan_mappings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scan_mappings_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        self.scan_mappings_container = QWidget()
+        self.scan_mappings_layout = QVBoxLayout(self.scan_mappings_container)
+        self.scan_mappings_layout.setSpacing(10)
+
+        self.scan_mappings_scroll.setWidget(self.scan_mappings_container)
+        mapping_layout.addWidget(self.scan_mappings_scroll)
 
         actions_row = QHBoxLayout()
-        add_row_btn = QPushButton("Add Mapping")
-        add_row_btn.clicked.connect(self._add_mapping_row)
-        self.add_row_btn = add_row_btn
-        actions_row.addWidget(add_row_btn)
+        self.scan_add_btn = QPushButton("Add")
+        self.scan_add_btn.clicked.connect(self._add_mapping_row)
+        actions_row.addWidget(self.scan_add_btn)
 
-        remove_row_btn = QPushButton("Remove Selected")
-        remove_row_btn.clicked.connect(self._remove_selected_mapping_rows)
-        self.remove_row_btn = remove_row_btn
-        actions_row.addWidget(remove_row_btn)
-
-        load_btn = QPushButton("Load Profile Mappings")
-        load_btn.clicked.connect(self._load_mapping_overrides)
-        self.load_btn = load_btn
-        actions_row.addWidget(load_btn)
-
-        save_btn = QPushButton("Save Profile Mappings")
-        save_btn.clicked.connect(self._save_profile)
-        self.save_btn = save_btn
-        actions_row.addWidget(save_btn)
-
-        scan_btn = QPushButton("Scan Installed Apps")
-        scan_btn.clicked.connect(self._scan_installed_apps)
-        self.scan_btn = scan_btn
-        actions_row.addWidget(scan_btn)
-
-        preview_btn = QPushButton("Preview Confidence")
-        preview_btn.clicked.connect(self._update_confidence_preview)
-        self.preview_btn = preview_btn
-        actions_row.addWidget(preview_btn)
+        self.scan_remove_btn = QPushButton("Remove Selected")
+        self.scan_remove_btn.clicked.connect(self._remove_selected_mapping_rows)
+        actions_row.addWidget(self.scan_remove_btn)
         mapping_layout.addLayout(actions_row)
+        layout.addWidget(mapping_group)
 
-        self.mapping_status = QLabel("")
-        self.mapping_status.setObjectName("BodyText")
-        mapping_layout.addWidget(self.mapping_status)
+        system_group = QGroupBox("System Operations")
+        system_layout = QVBoxLayout(system_group)
+        self.scan_incremental = QCheckBox("Incremental Backup")
+        self.scan_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
+        self.scan_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+        system_layout.addWidget(self.scan_incremental)
 
-        self.confidence_preview = QLabel("")
-        self.confidence_preview.setObjectName("BodyText")
-        self.confidence_preview.setWordWrap(True)
-        mapping_layout.addWidget(self.confidence_preview)
-        mapping_tab_layout.addWidget(mapping_group)
-        tabs.addTab(mapping_tab, "Mappings")
-        self.mappings_tab_index = 0
+        self.scan_parallel = QCheckBox("Parallel Hashing")
+        self.scan_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
+        self.scan_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        system_layout.addWidget(self.scan_parallel)
 
-        paths_tab = QWidget()
-        paths_tab_layout = QVBoxLayout(paths_tab)
-        paths_tab_layout.setContentsMargins(6, 6, 6, 6)
-        paths_tab_layout.setSpacing(10)
+        layout.addWidget(system_group)
+        layout.addStretch(1)
+        return widget
 
-        data_scope = QGroupBox("Data Scope (Used when 'Let Me Choose' is selected)")
-        data_layout = QVBoxLayout(data_scope)
-        self.folder_checks: dict[str, QCheckBox] = {}
+    def _build_backup_bundle_panel(self) -> QWidget:
+        """Expert controls for backup bundle page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
+
+        data_scope_group = QGroupBox("Data Scope")
+        data_layout = QVBoxLayout(data_scope_group)
+        self.backup_folder_checks: dict[str, QCheckBox] = {}
         for name in ["Documents", "Desktop", "Downloads", "Pictures"]:
             box = QCheckBox(name)
             box.setChecked(self.ui_state.selected_folders.get(name, True))
             box.toggled.connect(lambda checked, key=name: self._set_folder(key, checked))
-            self.folder_checks[name] = box
+            self.backup_folder_checks[name] = box
             data_layout.addWidget(box)
-        paths_tab_layout.addWidget(data_scope)
+        layout.addWidget(data_scope_group)
 
-        custom_group = QGroupBox("Custom Additional Paths")
+        custom_group = QGroupBox("Custom Paths")
         custom_layout = QVBoxLayout(custom_group)
         entry_row = QHBoxLayout()
-        self.custom_path_input = QLineEdit()
-        self.custom_path_input.setPlaceholderText("Enter custom absolute path (e.g. C:/Users/name/Projects)")
-        entry_row.addWidget(self.custom_path_input)
+        self.backup_custom_path_input = QLineEdit()
+        self.backup_custom_path_input.setPlaceholderText("Enter custom path...")
+        entry_row.addWidget(self.backup_custom_path_input)
 
         add_custom_btn = QPushButton("Add")
         add_custom_btn.clicked.connect(self._add_custom_path)
         entry_row.addWidget(add_custom_btn)
-
-        browse_custom_btn = QPushButton("Browse")
-        browse_custom_btn.clicked.connect(self._browse_custom_path)
-        entry_row.addWidget(browse_custom_btn)
         custom_layout.addLayout(entry_row)
 
-        self.custom_paths_list = QListWidget()
-        self.custom_paths_list.setMinimumHeight(110)
-        custom_layout.addWidget(self.custom_paths_list)
+        self.backup_custom_paths_list = QListWidget()
+        self.backup_custom_paths_list.setMinimumHeight(100)
+        custom_layout.addWidget(self.backup_custom_paths_list)
 
-        custom_actions = QHBoxLayout()
         remove_custom_btn = QPushButton("Remove Selected")
         remove_custom_btn.clicked.connect(self._remove_selected_custom_paths)
-        custom_actions.addWidget(remove_custom_btn)
-        custom_actions.addStretch(1)
-        custom_layout.addLayout(custom_actions)
+        custom_layout.addWidget(remove_custom_btn)
+        layout.addWidget(custom_group)
 
-        paths_tab_layout.addWidget(custom_group)
-        tabs.addTab(paths_tab, "Paths")
-        self.paths_tab_index = 1
+        advanced_group = QGroupBox("Advanced Operations")
+        advanced_layout = QVBoxLayout(advanced_group)
+        self.backup_incremental = QCheckBox("Incremental Backup")
+        self.backup_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
+        self.backup_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+        advanced_layout.addWidget(self.backup_incremental)
 
-        system_tab = QWidget()
-        system_tab_layout = QVBoxLayout(system_tab)
-        system_tab_layout.setContentsMargins(6, 6, 6, 6)
-        system_tab_layout.setSpacing(10)
+        self.backup_parallel = QCheckBox("Parallel Hashing")
+        self.backup_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
+        self.backup_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        advanced_layout.addWidget(self.backup_parallel)
 
-        distros = QGroupBox("Target Distro Selection")
-        distro_layout = QVBoxLayout(distros)
-        self.distro_combo = QComboBox()
-        self.distro_combo.addItems(["Linux Mint", "Ubuntu", "Fedora", "Debian"])
-        self.distro_combo.setCurrentText(self.ui_state.target_distro)
-        self.distro_combo.currentTextChanged.connect(self._set_distro)
-        distro_layout.addWidget(self.distro_combo)
-        system_tab_layout.addWidget(distros)
+        layout.addWidget(advanced_group)
+        layout.addStretch(1)
+        return widget
 
-        advanced = QGroupBox("Advanced Operations")
-        advanced_layout = QVBoxLayout(advanced)
-        self.incremental = QCheckBox("Incremental Backup")
-        self.incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+    def _build_restore_panel(self) -> QWidget:
+        """Expert controls for restore page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
 
-        self.parallel = QCheckBox("Parallel Hashing")
-        self.parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        distro_group = QGroupBox("Target Distro")
+        distro_layout = QVBoxLayout(distro_group)
+        self.restore_distro_combo = QComboBox()
+        self.restore_distro_combo.addItems(["Linux Mint", "Ubuntu", "Fedora", "Debian"])
+        self.restore_distro_combo.setCurrentText(self.ui_state.target_distro)
+        self.restore_distro_combo.currentTextChanged.connect(self._set_distro)
+        distro_layout.addWidget(self.restore_distro_combo)
+        layout.addWidget(distro_group)
 
-        self.rollback = QCheckBox("Create Rollback Point")
-        self.rollback.setChecked(self.ui_state.advanced_operations.get("create_rollback_point", False))
-        self.rollback.toggled.connect(lambda v: self._set_op("create_rollback_point", v))
+        advanced_group = QGroupBox("Advanced Operations")
+        advanced_layout = QVBoxLayout(advanced_group)
+        self.restore_incremental = QCheckBox("Incremental Backup")
+        self.restore_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
+        self.restore_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+        advanced_layout.addWidget(self.restore_incremental)
 
-        advanced_layout.addWidget(self.incremental)
-        advanced_layout.addWidget(self.parallel)
-        advanced_layout.addWidget(self.rollback)
-        system_tab_layout.addWidget(advanced)
-        system_tab_layout.addStretch(1)
-        tabs.addTab(system_tab, "System")
-        self.system_tab_index = 2
+        self.restore_parallel = QCheckBox("Parallel Hashing")
+        self.restore_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
+        self.restore_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        advanced_layout.addWidget(self.restore_parallel)
 
-        root.addWidget(tabs)
+        self.restore_rollback = QCheckBox("Create Rollback Point")
+        self.restore_rollback.setChecked(self.ui_state.advanced_operations.get("create_rollback_point", False))
+        self.restore_rollback.toggled.connect(lambda v: self._set_op("create_rollback_point", v))
+        advanced_layout.addWidget(self.restore_rollback)
 
-        root.addStretch(1)
-        self._load_mapping_overrides()
-        self._load_custom_paths()
+        layout.addWidget(advanced_group)
+        layout.addStretch(1)
+        return widget
 
-    def apply_mode(self, mode: str) -> None:
-        is_guided = mode == "guided"
-        is_balanced = mode == "balanced"
-        is_expert = mode == "expert"
+    def _build_verification_panel(self) -> QWidget:
+        """Expert controls for verification page."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(10)
 
-        # Guided mode: no expert edits, read-only presentation.
-        if is_guided:
-            self.tabs.setCurrentIndex(self.mappings_tab_index)
-            self.tabs.setTabEnabled(self.paths_tab_index, False)
-            self.tabs.setTabEnabled(self.system_tab_index, False)
-            self.add_row_btn.setEnabled(False)
-            self.remove_row_btn.setEnabled(False)
-            self.scan_btn.setEnabled(False)
-            self.save_btn.setEnabled(False)
-            self.preview_btn.setEnabled(True)
-            self.load_btn.setEnabled(True)
-            return
+        system_group = QGroupBox("System Operations")
+        system_layout = QVBoxLayout(system_group)
+        self.verify_incremental = QCheckBox("Incremental Backup")
+        self.verify_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
+        self.verify_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
+        system_layout.addWidget(self.verify_incremental)
 
-        # Balanced mode: mappings/paths enabled, system-level toggles hidden.
-        if is_balanced:
-            self.tabs.setTabEnabled(self.paths_tab_index, True)
-            self.tabs.setTabEnabled(self.system_tab_index, False)
-            self.add_row_btn.setEnabled(True)
-            self.remove_row_btn.setEnabled(True)
-            self.scan_btn.setEnabled(True)
-            self.save_btn.setEnabled(True)
-            self.preview_btn.setEnabled(True)
-            self.load_btn.setEnabled(True)
-            if self.tabs.currentIndex() == self.system_tab_index:
-                self.tabs.setCurrentIndex(self.mappings_tab_index)
-            return
+        self.verify_parallel = QCheckBox("Parallel Hashing")
+        self.verify_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
+        self.verify_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
+        system_layout.addWidget(self.verify_parallel)
 
-        # Expert mode: full controls available.
-        if is_expert:
-            self.tabs.setTabEnabled(self.paths_tab_index, True)
-            self.tabs.setTabEnabled(self.system_tab_index, True)
-            self.add_row_btn.setEnabled(True)
-            self.remove_row_btn.setEnabled(True)
-            self.scan_btn.setEnabled(True)
-            self.save_btn.setEnabled(True)
-            self.preview_btn.setEnabled(True)
-            self.load_btn.setEnabled(True)
+        layout.addWidget(system_group)
+        layout.addStretch(1)
+        return widget
+
+    def _build_report_panel(self) -> QWidget:
+        """Expert controls for report page (minimal)."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.addWidget(QLabel("Report generation is complete. No additional expert controls are available."))
+        layout.addStretch(1)
+        return widget
+
+    def _apply_mode_restrictions(self) -> None:
+        """Hide or show advanced controls based on the active mode."""
+        is_expert = self.current_mode == "expert"
+        for attr in (
+            "mode_dry_run", "mode_io_priority", "mode_verify_level",
+            "mode_incremental", "mode_parallel", "mode_rollback",
+            "app_pkg_pref", "app_auto_wine", "app_scan_btn",
+            "app_save_btn", "app_add_row_btn", "app_remove_row_btn",
+            "data_conflict_strategy", "data_exclude_regex", "data_sanitize_names",
+            "backup_incremental", "backup_parallel",
+            "restore_rollback", "restore_incremental", "restore_parallel",
+        ):
+            widget = getattr(self, attr, None)
+            if widget is not None:
+                widget.setVisible(is_expert)
 
     def _set_distro(self, value: str) -> None:
         self.ui_state.target_distro = value
@@ -270,68 +624,169 @@ class ExpertPanel(QWidget):
         self.ui_state.selected_folders[key] = value
 
     def _add_mapping_row(self) -> None:
-        row = self.mapping_table.rowCount()
-        self.mapping_table.insertRow(row)
-        for col in range(self.mapping_table.columnCount()):
-            self.mapping_table.setItem(row, col, QTableWidgetItem(""))
+        layout_map = {
+            "application_mapping": getattr(self, "app_mappings_layout", None),
+            "review_recommendations": getattr(self, "review_mappings_layout", None),
+            "scan": getattr(self, "scan_mappings_layout", None),
+        }
+        target_layout = layout_map.get(self.current_page_key)
+        if target_layout is None:
+            return
+
+        last = target_layout.count() - 1
+        if last >= 0 and target_layout.itemAt(last).spacerItem():
+            target_layout.removeItem(target_layout.itemAt(last))
+
+        empty_item = {
+            "windows_name": "",
+            "linux_package": "",
+            "linux_display_name": "",
+            "migration_strategy": "manual",
+            "notes": "",
+        }
+        target_layout.addWidget(self._create_mapping_widget(empty_item))
+        target_layout.addStretch(1)
 
     def _remove_selected_mapping_rows(self) -> None:
-        selected_rows = sorted({idx.row() for idx in self.mapping_table.selectedIndexes()}, reverse=True)
-        for row in selected_rows:
-            self.mapping_table.removeRow(row)
-        self.mapping_status.setText(f"Removed {len(selected_rows)} row(s).")
+        layout_map = {
+            "application_mapping": getattr(self, "app_mappings_layout", None),
+            "review_recommendations": getattr(self, "review_mappings_layout", None),
+            "scan": getattr(self, "scan_mappings_layout", None),
+        }
+        target_layout = layout_map.get(self.current_page_key)
+        if target_layout is None:
+            return
+        for i in reversed(range(target_layout.count())):
+            item = target_layout.itemAt(i)
+            if item and item.widget() and hasattr(item.widget(), "windows_edit"):
+                w = item.widget()
+                target_layout.removeWidget(w)
+                w.deleteLater()
+                break
 
     def _load_mapping_overrides(self) -> None:
         overrides = self.profile_service.get_mapping_overrides()
-        self.mapping_table.blockSignals(True)
-        self.mapping_table.setRowCount(0)
+
+        # Clear existing mapping widgets
+        while self.app_mappings_layout.count():
+            child = self.app_mappings_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
         for item in overrides:
-            row = self.mapping_table.rowCount()
-            self.mapping_table.insertRow(row)
-            self.mapping_table.setItem(row, 0, QTableWidgetItem(item.get("windows_name", "")))
-            self.mapping_table.setItem(row, 1, QTableWidgetItem(item.get("linux_package", "")))
-            self.mapping_table.setItem(row, 2, QTableWidgetItem(item.get("linux_display_name", "")))
-            self.mapping_table.setItem(row, 3, QTableWidgetItem(item.get("migration_strategy", "manual")))
-            self.mapping_table.setItem(row, 4, QTableWidgetItem(item.get("notes", "")))
-        self.mapping_table.blockSignals(False)
-        self.mapping_status.setText(f"Loaded {len(overrides)} profile mapping override(s).")
+            mapping_widget = self._create_mapping_widget(item)
+            self.app_mappings_layout.addWidget(mapping_widget)
+
+        self.app_mappings_layout.addStretch(1)
         self._update_confidence_preview()
 
         profile = self.profile_service.load()
         self.ui_state.target_distro = profile.get("target_distro", self.ui_state.target_distro)
-        if hasattr(self, "distro_combo"):
-            self.distro_combo.setCurrentText(self.ui_state.target_distro)
-        selected = profile.get("selected_folders", {})
-        if isinstance(selected, dict) and hasattr(self, "folder_checks"):
-            for key, checkbox in self.folder_checks.items():
-                checkbox.setChecked(bool(selected.get(key, checkbox.isChecked())))
-        ops = profile.get("advanced_operations", {})
-        if isinstance(ops, dict) and hasattr(self, "incremental") and hasattr(self, "parallel") and hasattr(self, "rollback"):
-            self.incremental.setChecked(bool(ops.get("incremental_backup", self.incremental.isChecked())))
-            self.parallel.setChecked(bool(ops.get("parallel_hashing", self.parallel.isChecked())))
-            self.rollback.setChecked(bool(ops.get("create_rollback_point", self.rollback.isChecked())))
+        if hasattr(self, "mode_distro_combo"):
+            self.mode_distro_combo.setCurrentText(self.ui_state.target_distro)
+        if hasattr(self, "settings_distro_combo"):
+            self.settings_distro_combo.setCurrentText(self.ui_state.target_distro)
+
+    def _create_mapping_widget(self, item: dict[str, str]) -> QWidget:
+        """Create a vertical widget for a single mapping entry."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        # Windows app name
+        windows_layout = QHBoxLayout()
+        windows_layout.addWidget(QLabel("Windows:"))
+        windows_edit = QLineEdit(item.get("windows_name", ""))
+        windows_edit.setPlaceholderText("Windows application name")
+        windows_layout.addWidget(windows_edit)
+        layout.addLayout(windows_layout)
+
+        # Linux package
+        package_layout = QHBoxLayout()
+        package_layout.addWidget(QLabel("Package:"))
+        package_edit = QLineEdit(item.get("linux_package", ""))
+        package_edit.setPlaceholderText("Linux package name")
+        package_layout.addWidget(package_edit)
+        layout.addLayout(package_layout)
+
+        # Linux display name
+        name_layout = QHBoxLayout()
+        name_layout.addWidget(QLabel("Name:"))
+        name_edit = QLineEdit(item.get("linux_display_name", ""))
+        name_edit.setPlaceholderText("Display name")
+        name_layout.addWidget(name_edit)
+        layout.addLayout(name_layout)
+
+        # Migration strategy
+        strategy_layout = QHBoxLayout()
+        strategy_layout.addWidget(QLabel("Strategy:"))
+        strategy_combo = QComboBox()
+        strategy_combo.addItems(["manual", "auto", "wine", "flatpak", "snap"])
+        strategy_combo.setCurrentText(item.get("migration_strategy", "manual"))
+        strategy_layout.addWidget(strategy_combo)
+        layout.addLayout(strategy_layout)
+
+        # Notes
+        notes_layout = QHBoxLayout()
+        notes_layout.addWidget(QLabel("Notes:"))
+        notes_edit = QLineEdit(item.get("notes", ""))
+        notes_edit.setPlaceholderText("Additional notes")
+        notes_layout.addWidget(notes_edit)
+        layout.addLayout(notes_layout)
+
+        # Remove button
+        remove_layout = QHBoxLayout()
+        remove_layout.addStretch(1)
+        remove_btn = QPushButton("Remove")
+        remove_btn.clicked.connect(lambda: self._remove_mapping_widget(widget))
+        remove_layout.addWidget(remove_btn)
+        layout.addLayout(remove_layout)
+
+        # Store references for data collection
+        widget.windows_edit = windows_edit
+        widget.package_edit = package_edit
+        widget.name_edit = name_edit
+        widget.strategy_combo = strategy_combo
+        widget.notes_edit = notes_edit
+
+        # Add a separator line
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+
+        return widget
+
+    def _remove_mapping_widget(self, widget: QWidget) -> None:
+        """Remove a mapping widget from the layout."""
+        self.app_mappings_layout.removeWidget(widget)
+        widget.deleteLater()
 
     def _collect_mapping_overrides(self) -> list[dict[str, str]]:
         overrides: list[dict[str, str]] = []
-        for row in range(self.mapping_table.rowCount()):
-            windows_name = self._cell_value(row, 0)
-            linux_package = self._cell_value(row, 1)
-            linux_display_name = self._cell_value(row, 2)
-            strategy = self._cell_value(row, 3) or "manual"
-            notes = self._cell_value(row, 4)
+        for i in range(self.app_mappings_layout.count()):
+            item = self.app_mappings_layout.itemAt(i)
+            if item and item.widget() and hasattr(item.widget(), 'windows_edit'):
+                widget = item.widget()
+                windows_name = widget.windows_edit.text().strip()
+                linux_package = widget.package_edit.text().strip()
+                linux_display_name = widget.name_edit.text().strip()
+                strategy = widget.strategy_combo.currentText()
+                notes = widget.notes_edit.text().strip()
 
-            if not windows_name or not linux_package:
-                continue
+                if not windows_name or not linux_package:
+                    continue
 
-            overrides.append(
-                {
-                    "windows_name": windows_name,
-                    "linux_package": linux_package,
-                    "linux_display_name": linux_display_name or linux_package,
-                    "migration_strategy": strategy,
-                    "notes": notes,
-                }
-            )
+                overrides.append(
+                    {
+                        "windows_name": windows_name,
+                        "linux_package": linux_package,
+                        "linux_display_name": linux_display_name or linux_package,
+                        "migration_strategy": strategy,
+                        "notes": notes,
+                    }
+                )
         return overrides
 
     def _save_profile(self) -> None:
@@ -342,10 +797,7 @@ class ExpertPanel(QWidget):
         profile["advanced_operations"] = dict(self.ui_state.advanced_operations)
         profile["custom_paths"] = list(self.ui_state.custom_paths)
         profile["mapping_overrides"] = self._collect_mapping_overrides()
-        path = self.profile_service.save(profile)
-        self.mapping_status.setText(
-            f"Saved {len(profile['mapping_overrides'])} mapping override(s) to {path.name}."
-        )
+        self.profile_service.save(profile)
         self._update_confidence_preview()
 
     def _load_custom_paths(self) -> None:
@@ -353,127 +805,75 @@ class ExpertPanel(QWidget):
         custom = profile.get("custom_paths", self.ui_state.custom_paths)
         if isinstance(custom, list):
             self.ui_state.custom_paths = [str(p).strip() for p in custom if str(p).strip()]
-        self.custom_paths_list.clear()
-        for p in self.ui_state.custom_paths:
-            self.custom_paths_list.addItem(QListWidgetItem(p))
 
     def _add_custom_path(self) -> None:
-        path = self.custom_path_input.text().strip()
-        if not path:
+        input_field = None
+        list_widget = None
+
+        if self.current_page_key == "data_selection":
+            input_field = self.data_custom_path_input
+            list_widget = self.data_custom_paths_list
+        elif self.current_page_key == "backup_bundle":
+            input_field = self.backup_custom_path_input
+            list_widget = self.backup_custom_paths_list
+
+        if not input_field or not list_widget:
             return
-        if path in self.ui_state.custom_paths:
-            self.mapping_status.setText("Custom path already exists.")
+
+        path = input_field.text().strip()
+        if not path or path in self.ui_state.custom_paths:
             return
+
         self.ui_state.custom_paths.append(path)
-        self.custom_paths_list.addItem(QListWidgetItem(path))
-        self.custom_path_input.clear()
-        self.mapping_status.setText(f"Added custom path: {path}")
+        list_widget.addItem(QListWidgetItem(path))
+        input_field.clear()
 
     def _browse_custom_path(self) -> None:
-        selected = QFileDialog.getExistingDirectory(self, "Select Additional Custom Path")
+        selected = QFileDialog.getExistingDirectory(self, "Select Additional Path")
         if not selected:
             return
-        self.custom_path_input.setText(selected)
-        self._add_custom_path()
+
+        if self.current_page_key == "data_selection":
+            self.data_custom_path_input.setText(selected)
+        elif self.current_page_key == "backup_bundle":
+            self.backup_custom_path_input.setText(selected)
 
     def _remove_selected_custom_paths(self) -> None:
-        rows = sorted({idx.row() for idx in self.custom_paths_list.selectedIndexes()}, reverse=True)
-        if not rows:
+        list_widget = None
+        if self.current_page_key == "data_selection":
+            list_widget = self.data_custom_paths_list
+        elif self.current_page_key == "backup_bundle":
+            list_widget = self.backup_custom_paths_list
+
+        if not list_widget:
             return
-        for row in rows:
-            item = self.custom_paths_list.takeItem(row)
-            if item is not None and item.text() in self.ui_state.custom_paths:
-                self.ui_state.custom_paths.remove(item.text())
-        self.mapping_status.setText(f"Removed {len(rows)} custom path(s).")
+
+        selected_items = list_widget.selectedItems()
+        for item in selected_items:
+            path = item.text()
+            if path in self.ui_state.custom_paths:
+                self.ui_state.custom_paths.remove(path)
+            list_widget.takeItem(list_widget.row(item))
+
+    def _update_confidence_preview(self) -> None:
+        overrides = self._collect_mapping_overrides()
+        count = len(overrides)
+        label = getattr(self, "app_confidence_preview", None)
+        if label is not None:
+            label.setText(f"{count} mapping override(s) defined." if count else "No overrides — using default mappings.")
 
     def _scan_installed_apps(self) -> None:
-        inventory_path = self._resolve_software_inventory_path()
-        if inventory_path is None or not inventory_path.exists():
-            self.mapping_status.setText(
-                "No software inventory found. Run the Windows Scan step first to generate software_inventory.json."
-            )
-            return
-
+        status = getattr(self, "app_mapping_status", None)
+        if status:
+            status.setText("Scanning installed apps…")
         try:
-            data = json.loads(inventory_path.read_text(encoding="utf-8"))
+            import winapps
+            count = sum(1 for _ in winapps.list_installed())
+            if status:
+                status.setText(f"Found {count} installed app(s) on this system.")
+        except ImportError:
+            if status:
+                status.setText("App scanning is only available on Windows.")
         except Exception as exc:
-            self.mapping_status.setText(f"Failed to read inventory: {exc}")
-            return
-
-        entries = data.get("entries", []) if isinstance(data, dict) else []
-        names = []
-        for item in entries:
-            name = str(item.get("DisplayName", "")).strip()
-            if name:
-                names.append(name)
-
-        unique = sorted(set(names), key=lambda v: v.lower())
-        existing = {
-            self._cell_value(row, 0).strip().lower()
-            for row in range(self.mapping_table.rowCount())
-            if self._cell_value(row, 0).strip()
-        }
-
-        added = 0
-        self.mapping_table.blockSignals(True)
-        for app in unique:
-            if app.lower() in existing:
-                continue
-            row = self.mapping_table.rowCount()
-            self.mapping_table.insertRow(row)
-            self.mapping_table.setItem(row, 0, QTableWidgetItem(app))
-            self.mapping_table.setItem(row, 1, QTableWidgetItem(""))
-            self.mapping_table.setItem(row, 2, QTableWidgetItem(""))
-            self.mapping_table.setItem(row, 3, QTableWidgetItem("manual"))
-            self.mapping_table.setItem(row, 4, QTableWidgetItem("Detected from inventory"))
-            added += 1
-        self.mapping_table.blockSignals(False)
-        self._update_confidence_preview()
-        self.mapping_status.setText(
-            f"Scanned installed apps from {inventory_path.name}. Added {added} new mapping row(s)."
-        )
-
-    def _resolve_software_inventory_path(self) -> Path | None:
-        try:
-            cfg = load_default_config()
-            candidate = DATA_DIR / cfg.source_system.inventory_output_dir / "software_inventory.json"
-            if candidate.exists():
-                return candidate
-        except Exception:
-            pass
-
-        matches = list(DATA_DIR.rglob("software_inventory.json"))
-        if matches:
-            return matches[0]
-        return None
-
-    def _update_confidence_preview(self, _item: QTableWidgetItem | None = None) -> None:
-        overrides = self._collect_mapping_overrides()
-        if not overrides:
-            self.confidence_preview.setText(
-                "Confidence preview: no active overrides. Default dynamic mappings will be used."
-            )
-            return
-
-        high = 0
-        medium = 0
-        low = 0
-        for item in overrides:
-            strategy = item.get("migration_strategy", "manual").strip().lower()
-            if strategy in {"apt", "dnf", "pacman"}:
-                high += 1
-            elif strategy in {"install linux equivalent", "manual install"}:
-                medium += 1
-            else:
-                low += 1
-
-        total = len(overrides)
-        score = int(((high * 1.0) + (medium * 0.7) + (low * 0.4)) / total * 100)
-        self.confidence_preview.setText(
-            "Confidence preview: "
-            f"{score}% overall ({high} high, {medium} medium, {low} low confidence override(s))."
-        )
-
-    def _cell_value(self, row: int, col: int) -> str:
-        item = self.mapping_table.item(row, col)
-        return item.text().strip() if item else ""
+            if status:
+                status.setText(f"Scan failed: {exc}")

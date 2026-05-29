@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-04-22T11:00:34.830221",
+  "strategy": "online",
+  "selection_profile": "migrate_all",
+  "ranking_method": "deterministic",
+  "input_count": 65,
+  "recommended_count": 8,
+  "recommendations": [
+    {
+      "windows_app": "7-Zip 24.09 (x64)",
+      "linux_package": "p7zip-full",
+      "linux_display_name": "7-Zip",
+      "category": "Utility",
+      "migration_strategy": "apt",
+      "mapping_confidence": "high",
+      "notes": "Same compression formats",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "Microsoft 365 Apps for enterprise - en-us",
+      "linux_package": "libreoffice",
+      "linux_display_name": "LibreOffice",
+      "category": "Office",
+      "migration_strategy": "apt",
+      "mapping_confidence": "high",
+      "notes": "Full microsoft 365 suite replacement",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "TeamViewer",
+      "linux_package": "remmina",
+      "linux_display_name": "Remmina",
+      "category": "Remote Access",
+      "migration_strategy": "apt",
+      "mapping_confidence": "medium",
+      "notes": "RDP/VNC support",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "Microsoft Visual Studio Code",
+      "linux_package": "code",
+      "linux_display_name": "VS Code",
+      "category": "Development",
+      "migration_strategy": "external",
+      "mapping_confidence": "high",
+      "notes": "Microsoft repository",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "Google Chrome",
+      "linux_package": "google-chrome-stable",
+      "linux_display_name": "Google Chrome",
+      "category": "Browser",
+      "migration_strategy": "external",
+      "mapping_confidence": "high",
+      "notes": "Requires Google repo",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "Microsoft Edge",
+      "linux_package": "firefox",
+      "linux_display_name": "Firefox",
+      "category": "Browser",
+      "migration_strategy": "apt",
+      "mapping_confidence": "high",
+      "notes": "Recommended default browser",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "VLC media player",
+      "linux_package": "vlc",
+      "linux_display_name": "VLC Media Player",
+      "category": "Media",
+      "migration_strategy": "apt",
+      "mapping_confidence": "high",
+      "notes": "Direct equivalent",
+      "online_signal": "not_verified",
+      "source": "online"
+    },
+    {
+      "windows_app": "WinRAR 5.91 (32-bit)",
+      "linux_package": "p7zip-full",
+      "linux_display_name": "7-Zip",
+      "category": "Utility",
+      "migration_strategy": "apt",
+      "mapping_confidence": "high",
+      "notes": "CLI + GUI archive support",
+      "online_signal": "not_verified",
+      "source": "online"
+    }
+  ]
+}

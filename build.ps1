@@ -1,12 +1,15 @@
-# Set the current directory to where the script is located
 Set-Location -Path $PSScriptRoot
 
-# Run the PyInstaller command
 pyinstaller --noconfirm --onefile --windowed `
+    --name "MigrationWizard" `
     --add-data "configs;configs" `
-    --add-data "data;data" `
-    --name "WinApp" `
+    --add-data "src\qt_ui\theme.qss;src\qt_ui" `
+    --add-data "src\qt_ui\assets;src\qt_ui\assets" `
+    --hidden-import "PySide6.QtSvg" `
+    --hidden-import "PySide6.QtPrintSupport" `
     app.py
 
-Write-Host "Build Complete! Check the 'dist' folder." -ForegroundColor Green
+Write-Host ""
+Write-Host "Build complete." -ForegroundColor Green
+Write-Host "Output: dist\MigrationWizard.exe" -ForegroundColor Cyan
 Pause

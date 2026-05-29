@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "semi-auto-migration"
+version = "1.0.0"
+description = "Semi-automated Windows-to-Linux migration wizard with Qt UI and CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Japhet Kofi Appau Arthur" }]
+keywords = ["migration", "linux", "windows", "backup", "restore"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "PySide6==6.11.0",
+    "pyqtspinner==2.0.0",
+    "PyYAML==6.0.1",
+    "requests==2.33.1",
+    "psutil==7.2.2",
+    "rich==14.2.0",
+    "typer==0.20.0",
+    "winapps==0.2.0; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller==6.17.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.3.1",
+    "pytest-timeout>=2.1.0",
+    "pytest-mock>=3.11.1",
+]
+
+[project.scripts]
+semi-migrate = "src.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.setuptools.package-data]
+"src" = ["qt_ui/assets/**/*", "qt_ui/theme.qss"]
+"configs" = ["*.csv", "*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--tb=short -q"
+
+[tool.pyinstaller]
+name = "MigrationWizard"
+onefile = false
+windowed = true
+icon = "src/qt_ui/assets/app.png"
+add-data = [
+    "configs:configs",
+    "src/qt_ui/theme.qss:src/qt_ui",
+    "src/qt_ui/assets:src/qt_ui/assets",
+    "packaging:packaging",
+]

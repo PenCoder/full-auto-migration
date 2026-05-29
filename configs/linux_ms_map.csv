@@ -1,27 +1,150 @@
 windows_name,linux_package,linux_display_name,category,migration_strategy,confidence,notes
 Microsoft Office,libreoffice,LibreOffice,Office,apt,high,Full office suite replacement
 Microsoft 365,libreoffice,LibreOffice,Office,apt,high,Full microsoft 365 suite replacement
+Microsoft Word,libreoffice-writer,LibreOffice Writer,Office,apt,high,Direct document editing equivalent
+Microsoft Excel,libreoffice-calc,LibreOffice Calc,Office,apt,high,Spreadsheet equivalent with xlsx support
+Microsoft PowerPoint,libreoffice-impress,LibreOffice Impress,Office,apt,high,Presentation equivalent with pptx support
+Microsoft Outlook,thunderbird,Thunderbird,Email,apt,high,Full email and calendar client
+Microsoft Teams,teams-for-linux,Teams for Linux,Communication,external,high,Community-built Linux client
+Microsoft OneNote,joplin,Joplin,Productivity,external,medium,Markdown-based note-taking with sync
 Microsoft Edge,firefox,Firefox,Browser,apt,high,Recommended default browser
+Microsoft OneDrive,rclone,Rclone,Cloud,apt,medium,CLI-based sync solution
+Microsoft Whiteboard,xournalpp,Xournal++,Productivity,apt,medium,Digital whiteboard and annotation
+Microsoft Paint,kolourpaint,KolourPaint,Graphics,apt,high,Simple paint app direct equivalent
+Microsoft Snipping Tool,flameshot,Flameshot,Utility,apt,high,Screenshot with annotation support
+Microsoft Sticky Notes,xpad,Xpad,Productivity,apt,medium,Desktop sticky notes
+Windows Defender,clamav,ClamAV,Security,apt,medium,Open-source antivirus scanner
+Windows Firewall,gufw,GUFW,Security,apt,high,Graphical firewall manager
+Windows Media Player,vlc,VLC Media Player,Media,apt,high,Universal media player
+Windows Photo Viewer,eog,Eye of GNOME,Photos,apt,high,Default GNOME image viewer
+Windows Calculator,gnome-calculator,GNOME Calculator,Utility,apt,high,Full-featured calculator
+Windows Clock,gnome-clocks,GNOME Clocks,Utility,apt,high,World clock and timers
+Windows Maps,gnome-maps,GNOME Maps,Navigation,apt,medium,OpenStreetMap-based maps
+Windows Store,snap,Snap Store,Utility,apt,medium,Linux app store alternative
+Cortana,albert,Albert,Utility,apt,medium,Application launcher with plugins
 Google Chrome,google-chrome-stable,Google Chrome,Browser,external,high,Requires Google repo
+Mozilla Firefox,firefox,Firefox,Browser,apt,high,Direct equivalent already available
+Opera,opera-stable,Opera,Browser,external,high,Official Linux build available
+Brave,brave-browser,Brave Browser,Browser,external,high,Official Linux build available
 VLC Media Player,vlc,VLC Media Player,Media,apt,high,Direct equivalent
+Spotify,spotify-client,Spotify,Media,external,high,Official Linux client
+iTunes,rhythmbox,Rhythmbox,Media,apt,medium,Music player and library manager
+Windows Media Center,kodi,Kodi,Media,apt,high,Full home theatre application
+Audacity,audacity,Audacity,Media,apt,high,Direct equivalent available on Linux
+HandBrake,handbrake,HandBrake,Media,apt,high,Video transcoder direct equivalent
+Plex,plexmediaserver,Plex Media Server,Media,external,high,Official Linux server package
+OBS Studio,obs-studio,OBS Studio,Media,apt,high,Direct streaming equivalent
 Visual Studio Code,code,VS Code,Development,external,high,Microsoft repository
-Notepad++,notepad-plus-plus,Note++,Utility,apt,medium,Feature overlap but different UI
-Paint,gimp,GIMP,Graphics,apt,medium,More powerful but steeper learning curve
-Paint 3D,blender,Blender,Graphics,apt,low,Advanced 3D tool not beginner-friendly
-Adobe Photoshop,gimp,GIMP,Graphics,apt,medium,Feature-rich but different workflows
-Adobe Illustrator,inkscape,Inkscape,Graphics,apt,medium,Vector graphics equivalent
-Adobe Premiere Pro,kdenlive,Kdenlive,Media,apt,medium,Non-linear video editor
-Adobe After Effects,blender,Blender,Media,apt,low,Partial replacement via compositor
-WinRAR,p7zip-full,7-Zip,Utility,apt,high,CLI + GUI archive support
+Visual Studio,monodevelop,MonoDevelop,Development,apt,medium,Partial IDE replacement
+JetBrains IntelliJ,intellij-idea-community,IntelliJ IDEA,Development,external,high,Official Linux build
+JetBrains PyCharm,pycharm-community,PyCharm,Development,external,high,Official Linux build
+Android Studio,android-studio,Android Studio,Development,external,high,Official Linux build
+Git,git,Git,Development,apt,high,Direct equivalent
+GitHub Desktop,git,Git + CLI,Development,apt,medium,Use git CLI or GitKraken
+Notepad++,notepad-plus-plus,Notepad++,Development,apt,medium,Wine-based or use Gedit/Kate
+Sublime Text,sublime-text,Sublime Text,Development,external,high,Official Linux repo
+Atom,gedit,Gedit,Development,apt,medium,Atom discontinued; Gedit is an alternative
+Brackets,gedit,Gedit,Development,apt,low,Discontinued; use VS Code instead
+WinSCP,filezilla,FileZilla,Development,apt,high,SFTP and FTP client equivalent
+PuTTY,openssh-client,OpenSSH,Development,apt,high,Built-in SSH client
+FileZilla,filezilla,FileZilla,Development,apt,high,Direct equivalent available
+HeidiSQL,dbeaver-ce,DBeaver Community,Development,external,high,Universal database manager
+MySQL Workbench,mysql-workbench,MySQL Workbench,Development,external,high,Official Linux build
+DB Browser for SQLite,sqlitebrowser,DB Browser for SQLite,Development,apt,high,Direct equivalent
+Postman,postman,Postman,Development,external,high,Official Linux build
+Docker Desktop,docker.io,Docker Engine,Development,apt,high,Use Docker CE + Portainer
+VirtualBox,virtualbox,VirtualBox,System,external,high,Official Linux build available
+VMware Workstation,qemu-kvm,QEMU/KVM,System,apt,medium,Native Linux virtualisation
+Hyper-V,qemu-kvm,QEMU/KVM,System,apt,medium,Native Linux virtualisation
 7-Zip,p7zip-full,7-Zip,Utility,apt,high,Same compression formats
+WinRAR,p7zip-full,7-Zip,Utility,apt,high,CLI + GUI archive support
+WinZip,p7zip-full,7-Zip,Utility,apt,high,Open-source alternative
+PeaZip,peazip,PeaZip,Utility,apt,high,Direct equivalent with GUI
 File Explorer,nautilus,Files,Utility,apt,high,Default GNOME file manager
-PowerShell,powershell,PowerShell,Utility,external,medium,Cross-platform PowerShell Core
-Command Prompt,bash,Bash,Utility,apt,high,Standard Linux shell
-Task Manager,htop,htop,System,apt,medium,Terminal-based process viewer
-TeamViewer,remmina,Remmina,Remote Access,apt,medium,RDP/VNC support
+Total Commander,double-commander,Double Commander,Utility,apt,high,Dual-pane file manager
+FreeCommander,double-commander,Double Commander,Utility,apt,medium,Dual-pane file manager
+Everything,catfish,Catfish,Utility,apt,medium,Fast file search utility
+Agent Ransack,catfish,Catfish,Utility,apt,medium,File search with content search
+TreeSize,baobab,Baobab,Utility,apt,high,Disk usage analyser
+WinDirStat,baobab,Baobab,Utility,apt,high,Disk usage visualiser
+Speccy,hardinfo,HardInfo,System,apt,medium,System information and benchmarks
+CPU-Z,cpuid,CPUID,System,apt,medium,CPU and hardware information
+GPU-Z,glmark2,GLMark2,System,apt,low,Limited GPU info on Linux
+HWMonitor,psensor,Psensor,System,apt,medium,Hardware temperature monitoring
+Process Explorer,htop,htop,System,apt,medium,Terminal-based process viewer
+Task Manager,gnome-system-monitor,System Monitor,System,apt,high,GUI process and resource monitor
+MSI Afterburner,corectrl,CoreCtrl,System,apt,medium,GPU and CPU profile manager
+Rufus,balena-etcher,balenaEtcher,Utility,external,high,Flash ISO to USB drives
+Greenshot,flameshot,Flameshot,Utility,apt,high,Screenshot tool with annotations
+ShareX,flameshot,Flameshot,Utility,apt,medium,Feature-rich screenshot tool
+Lightshot,flameshot,Flameshot,Utility,apt,medium,Quick screenshot tool
+IrfanView,nomacs,Nomacs,Graphics,apt,high,Lightweight image viewer
+FastStone Image Viewer,nomacs,Nomacs,Graphics,apt,high,Image viewer and basic editor
+XnView,nomacs,Nomacs,Graphics,apt,medium,Image browser and converter
+GIMP,gimp,GIMP,Graphics,apt,high,Direct equivalent
+Inkscape,inkscape,Inkscape,Graphics,apt,high,Direct equivalent
+Krita,krita,Krita,Graphics,apt,high,Digital painting direct equivalent
+Blender,blender,Blender,Graphics,apt,high,Direct equivalent available
+DaVinci Resolve,davinci-resolve,DaVinci Resolve,Media,external,high,Official Linux build available
+Lightroom,darktable,Darktable,Graphics,apt,medium,Open-source photo processing
+Photoshop Elements,digikam,digiKam,Photos,apt,medium,Photo management and editing
+Paint.NET,krita,Krita,Graphics,apt,medium,Digital painting alternative
+Adobe Acrobat Reader,evince,Evince,Office,apt,high,PDF viewer and annotator
+Adobe Acrobat,okular,Okular,Office,apt,medium,PDF viewer with annotation
+Foxit Reader,evince,Evince,Office,apt,high,Lightweight PDF viewer
+SumatraPDF,evince,Evince,Office,apt,high,Lightweight PDF viewer
+PDF-XChange Editor,okular,Okular,Office,apt,medium,PDF viewer with markup
 Zoom,zoom,Zoom,Communication,external,high,Official Linux client
 Skype,skypeforlinux,Skype,Communication,external,high,Official Microsoft package
 Slack,slack-desktop,Slack,Communication,external,high,Official Linux build
 Discord,discord,Discord,Communication,external,high,Official Linux client
+Telegram,telegram-desktop,Telegram,Communication,apt,high,Direct equivalent
+WhatsApp Desktop,whatsapp-for-linux,WhatsApp for Linux,Communication,external,medium,Unofficial wrapper
+Signal,signal-desktop,Signal,Communication,external,high,Official Linux client
+Thunderbird,thunderbird,Thunderbird,Email,apt,high,Direct equivalent
+Evolution,evolution,Evolution,Email,apt,high,Full groupware email client
+TeamViewer,teamviewer,TeamViewer,Remote Access,external,high,Official Linux build
+AnyDesk,anydesk,AnyDesk,Remote Access,external,high,Official Linux build
+Remmina,remmina,Remmina,Remote Access,apt,high,Direct equivalent
+UltraVNC,tigervnc-viewer,TigerVNC,Remote Access,apt,medium,VNC viewer and server
+CCleaner,bleachbit,BleachBit,System,apt,high,System cleaner direct equivalent
+Defraggler,e4defrag,e4defrag,System,apt,low,Ext4 defragmentation utility
+Recuva,testdisk,TestDisk,System,apt,medium,File recovery utility
+Malwarebytes,clamav,ClamAV,Security,apt,medium,Open-source malware scanner
+Avast Antivirus,clamav,ClamAV,Security,apt,medium,Open-source antivirus alternative
+Bitwarden,bitwarden,Bitwarden,Security,external,high,Official Linux build
+KeePass,keepassxc,KeePassXC,Security,apt,high,Password manager direct equivalent
+LastPass,bitwarden,Bitwarden,Security,external,medium,Cloud password manager
+1Password,1password,1Password,Security,external,high,Official Linux build
 Dropbox,dropbox,Dropbox,Cloud,external,high,Official daemon + tray
-OneDrive,rclone,Rclone,Cloud,apt,medium,CLI-based sync solution
+Google Drive,rclone,Rclone,Cloud,apt,medium,CLI-based sync solution
+Google Backup and Sync,rclone,Rclone,Cloud,apt,medium,Use rclone for cloud sync
+Box,rclone,Rclone,Cloud,apt,medium,Use rclone for Box sync
+pCloud,pcloud,pCloud,Cloud,external,medium,Official Linux client available
+PowerShell,powershell,PowerShell,Utility,external,medium,Cross-platform PowerShell Core
+Command Prompt,bash,Bash,Utility,apt,high,Standard Linux shell
+Windows Terminal,gnome-terminal,GNOME Terminal,Utility,apt,high,Default terminal emulator
+Cmder,tilix,Tilix,Utility,apt,medium,Tiling terminal emulator
+ConEmu,tilix,Tilix,Utility,apt,medium,Tiling terminal emulator
+AutoHotkey,autokey-gtk,AutoKey,Utility,apt,medium,Desktop automation scripting
+Rainmeter,conky,Conky,Utility,apt,medium,Desktop system info widget
+Fences,cairo-dock,Cairo-Dock,Utility,apt,low,Different concept on Linux desktop
+Classic Shell,gnome-shell-extensions,GNOME Extensions,Utility,apt,medium,Taskbar and start menu tweaks
+f.lux,redshift,Redshift,Utility,apt,high,Blue light filter direct equivalent
+Ninite,flatpak,Flatpak,Utility,apt,medium,App installer for Linux
+Chocolatey,apt,APT,Utility,apt,high,Built-in system package manager
+Scoop,apt,APT,Utility,apt,high,Built-in system package manager
+WinGet,apt,APT,Utility,apt,high,Built-in system package manager
+qBittorrent,qbittorrent,qBittorrent,Utility,apt,high,Direct equivalent
+uTorrent,transmission,Transmission,Utility,apt,high,Lightweight torrent client
+Deluge,deluge,Deluge,Utility,apt,high,Direct equivalent
+Steam,steam,Steam,Games,external,high,Official Linux client with Proton
+Epic Games Launcher,heroic,Heroic Games Launcher,Games,external,medium,Open-source Epic/GOG launcher
+GOG Galaxy,heroic,Heroic Games Launcher,Games,external,medium,Open-source GOG support
+Parsec,parsec,Parsec,Games,external,high,Official Linux build
+OpenVPN,openvpn,OpenVPN,Network,apt,high,Direct equivalent
+NordVPN,nordvpn,NordVPN,Network,external,high,Official Linux client
+ProtonVPN,protonvpn,ProtonVPN,Network,external,high,Official Linux client
+Wireshark,wireshark,Wireshark,Network,apt,high,Direct equivalent
+Nmap,nmap,Nmap,Network,apt,high,Direct equivalent
+Fiddler,mitmproxy,mitmproxy,Network,apt,medium,CLI-based HTTP proxy and inspector

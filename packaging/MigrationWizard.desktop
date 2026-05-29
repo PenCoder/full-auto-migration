@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Migration Wizard
+GenericName=Windows to Linux Migration Tool
+Comment=Guided migration of files, apps, and settings from Windows 11 to Linux Mint
+Exec=MigrationWizard
+Icon=MigrationWizard
+Type=Application
+Categories=System;Utility;FileManager;
+Keywords=migration;windows;linux;backup;restore;
+StartupNotify=true

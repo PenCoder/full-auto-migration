@@ -1,39 +1,91 @@
+"""Application mapping page — auto-triggers analysis when the page becomes visible."""
+
 from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QThreadPool, Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
+from PySide6.QtCore import QThreadPool, QTimer, Qt
+from PySide6.QtWidgets import QLabel, QProgressBar, QRadioButton
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
 from src.qt_ui.workers import FunctionWorker
-from src.qt_ui.widgets.horizontal_stepper import HorizontalStepper
 
 
 class ApplicationMappingPage(BasePage):
-    def __init__(self, ui_state, run_analysis_cb: Callable[[], dict], current_step: int = 2, step_names: list[str] | None = None) -> None:
+    """Generate Linux application mapping guidance — fires automatically on page entry."""
+
+    def __init__(
+        self,
+        ui_state,
+        run_analysis_cb: Callable[[], dict],
+        current_step: int = 2,
+        step_names: list[str] | None = None,
+    ) -> None:
         super().__init__(ui_state)
         self.run_analysis_cb = run_analysis_cb
         self.current_step = current_step
         self.step_names = step_names or ["Scan", "Data Selection", "Application Mapping", "Backup"]
         self.thread_pool = QThreadPool.globalInstance()
-        self.is_running = False
         self._build_ui()
         self.refresh()
 
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
 
-        text = QLabel(
-            "Generate Linux migration recommendations from discovered Windows applications and hardware constraints."
-        )
-        text.setObjectName("HeroTitle")
-        text.setWordWrap(True)
-        text.setAlignment(Qt.AlignCenter)
-        root.addWidget(text)
+        root.addWidget(self.create_page_header(
+            "🗂️",
+            "Plan your app transition",
+            "We'll match each of your Windows apps to the best Linux alternative. "
+            "Most apps have a great equivalent — and we've already done the research.",
+        ))
 
-        self.status = QLabel("Run mapping to produce software_mapping.csv and compatibility advisories.")
+        question = "How would you like to handle your apps?"
+        info = (
+            "We have a database of over 150 app matches ready to go. "
+            "Choose how much you'd like to be involved in the selection."
+        )
+
+        self.migrate_all_radio = QRadioButton("Switch all my apps automatically — I trust your recommendations")
+        self.migrate_all_hint = self.hint_label(
+            "Best for most people. We pick the best Linux alternative for each of your apps and handle everything."
+        )
+
+        self.choose_from_recommendations_radio = QRadioButton("Show me the recommendations and let me pick")
+        self.choose_from_recommendations_hint = self.hint_label(
+            "We suggest alternatives for each app and you decide which ones to include."
+        )
+
+        self.manual_mapping_radio = QRadioButton("I'll configure the app matches myself")
+        self.manual_mapping_hint = self.hint_label(
+            "Full control — you specify exactly which Linux app replaces each Windows app."
+        )
+
+        self.migrate_all_radio.toggled.connect(
+            lambda checked: self._set_mapping_choice_mode("migrate_all_supported", checked)
+        )
+        self.choose_from_recommendations_radio.toggled.connect(
+            lambda checked: self._set_mapping_choice_mode("choose_from_recommendations", checked)
+        )
+        self.manual_mapping_radio.toggled.connect(
+            lambda checked: self._set_mapping_choice_mode("manual_mapping", checked)
+        )
+
+        mapping_questionnaire = self.create_guided_questionnaire(
+            question=question,
+            info=info,
+            options=[
+                self.migrate_all_radio,
+                self.migrate_all_hint,
+                self.choose_from_recommendations_radio,
+                self.choose_from_recommendations_hint,
+                self.manual_mapping_radio,
+                self.manual_mapping_hint,
+            ],
+        )
+        root.addWidget(mapping_questionnaire)
+
+        self.status = QLabel("Generating your personalised app transition plan…")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
@@ -44,35 +96,38 @@ class ApplicationMappingPage(BasePage):
         self.loading.setVisible(False)
         root.addWidget(self.loading)
 
-        row = QHBoxLayout()
-        self.move_supported_btn = QPushButton("Move All Supported")
-        self.move_supported_btn.setProperty("role", "primary")
-        self.move_supported_btn.setMinimumHeight(48)
-        self.move_supported_btn.setFixedWidth(220)
-        self.move_supported_btn.clicked.connect(self._run_mapping)
-        row.addWidget(self.move_supported_btn)
+        self._sync_radios_from_state()
 
-        self.configure_btn = QPushButton("Configure Mappings")
-        self.configure_btn.setProperty("role", "primary")
-        self.configure_btn.setMinimumHeight(48)
-        self.configure_btn.setFixedWidth(220)
-        self.configure_btn.clicked.connect(self._run_mapping)
-        row.addWidget(self.configure_btn)
-        root.addLayout(row)
+    # ── Auto-trigger ─────────────────────────────────────────────────────────
 
-        self.next_btn = QPushButton("Continue")
-        self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(200)
-        self.next_btn.clicked.connect(self.request_next.emit)
-        root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self.ui_state.analysis_completed and not self.is_processing:
+            QTimer.singleShot(300, self._run_mapping)
+
+    # ── Mapping ──────────────────────────────────────────────────────────────
+
+    def _sync_radios_from_state(self) -> None:
+        mode = self.ui_state.mapping_choice_mode
+        if mode == "choose_from_recommendations":
+            self.choose_from_recommendations_radio.setChecked(True)
+        elif mode == "manual_mapping":
+            self.manual_mapping_radio.setChecked(True)
+        else:
+            self.migrate_all_radio.setChecked(True)
+
+    def _set_mapping_choice_mode(self, mode: str, checked: bool) -> None:
+        if not checked:
+            return
+        self.ui_state.mapping_choice_mode = mode
+        self.refresh()
 
     def _run_mapping(self) -> None:
-        self.is_running = True
-        self.move_supported_btn.setEnabled(False)
-        self.configure_btn.setEnabled(False)
-        self.next_btn.setEnabled(False)
+        if self.is_processing:
+            return
         self.loading.setVisible(True)
-        self.status.setText("Generating hardware/software analysis and mapping recommendations...")
+        self.set_scanning(True)
+        self.status.setText("Generating hardware/software analysis and mapping recommendations…")
         worker = FunctionWorker(self.run_analysis_cb)
         worker.signals.result.connect(self._on_result)
         worker.signals.error.connect(self._on_error)
@@ -82,13 +137,12 @@ class ApplicationMappingPage(BasePage):
     def _on_result(self, result: object) -> None:
         if isinstance(result, dict):
             self.ui_state.analysis_completed = True
-            hw = len(result.get("hardware", []))
             mapped = len(result.get("software", []))
             self.status.setText(
-                f"Mapping completed. Generated {hw} hardware advisories and {mapped} software mapping rows."
+                f"✅  Done! We found Linux alternatives for {mapped} of your apps. You're ready to move on."
             )
         else:
-            self.status.setText("Mapping finished without results.")
+            self.status.setText("App matching finished — you can proceed to the next step.")
         self.refresh()
 
     def _on_error(self, error: str) -> None:
@@ -96,35 +150,58 @@ class ApplicationMappingPage(BasePage):
         self.status.setText(f"Mapping failed.\n{user_facing_error(error)}")
 
     def _on_finished(self) -> None:
-        self.is_running = False
         self.loading.setVisible(False)
+        self.set_scanning(False)
         self.refresh()
+
+    # ── Refresh ──────────────────────────────────────────────────────────────
 
     def refresh(self) -> None:
         mode = self.ui_state.mode
-        if mode == "guided":
-            self.status.setText(
-                "Guided mode uses default compatibility mapping. Run 'Move All Supported' to generate the recommended set."
-            )
-            self.configure_btn.setEnabled(False)
-            self.configure_btn.setVisible(False)
-            self.move_supported_btn.setEnabled(not self.is_running)
-            self.move_supported_btn.setVisible(True)
-        elif mode == "balanced":
-            self.status.setText(
-                "Balanced mode supports both default mapping and limited customization before generating recommendations."
-            )
-            self.configure_btn.setVisible(True)
-            self.configure_btn.setEnabled(not self.is_running)
-            self.move_supported_btn.setVisible(True)
-            self.move_supported_btn.setEnabled(not self.is_running)
-        else:
-            self.status.setText(
-                "Expert mode enables full mapping control, including profile overrides and advanced compatibility review."
-            )
-            self.configure_btn.setVisible(True)
-            self.configure_btn.setEnabled(not self.is_running)
-            self.move_supported_btn.setVisible(True)
-            self.move_supported_btn.setEnabled(not self.is_running)
+        mapping_mode = self.ui_state.mapping_choice_mode
 
-        self.next_btn.setEnabled(self.ui_state.analysis_completed or self.ui_state.mode == "expert")
+        if mode == "guided":
+            self.choose_from_recommendations_radio.setVisible(False)
+            self.manual_mapping_radio.setVisible(False)
+            self.choose_from_recommendations_hint.setVisible(False)
+            self.manual_mapping_hint.setVisible(False)
+            self.migrate_all_radio.setEnabled(not self.is_processing)
+            self.migrate_all_radio.setVisible(True)
+            self.migrate_all_hint.setVisible(True)
+            if mapping_mode != "migrate_all_supported":
+                self.ui_state.mapping_choice_mode = "migrate_all_supported"
+                self.migrate_all_radio.setChecked(True)
+            if not self.is_processing and not self.ui_state.analysis_completed:
+                self.status.setText(
+                    "We'll automatically find the best Linux app for each of your Windows apps."
+                )
+        elif mode == "balanced":
+            self.migrate_all_radio.setVisible(True)
+            self.migrate_all_hint.setVisible(True)
+            self.choose_from_recommendations_radio.setVisible(True)
+            self.choose_from_recommendations_hint.setVisible(True)
+            self.manual_mapping_radio.setVisible(False)
+            self.manual_mapping_hint.setVisible(False)
+            self.migrate_all_radio.setEnabled(not self.is_processing)
+            self.choose_from_recommendations_radio.setEnabled(not self.is_processing)
+            if mapping_mode == "manual_mapping":
+                self.ui_state.mapping_choice_mode = "choose_from_recommendations"
+                self.choose_from_recommendations_radio.setChecked(True)
+            if not self.is_processing and not self.ui_state.analysis_completed:
+                self.status.setText(
+                    "Generating the plan — we'll show you which Linux apps we recommend."
+                )
+        else:
+            self.migrate_all_radio.setVisible(True)
+            self.migrate_all_hint.setVisible(True)
+            self.choose_from_recommendations_radio.setVisible(True)
+            self.choose_from_recommendations_hint.setVisible(True)
+            self.manual_mapping_radio.setVisible(True)
+            self.manual_mapping_hint.setVisible(True)
+            self.migrate_all_radio.setEnabled(not self.is_processing)
+            self.choose_from_recommendations_radio.setEnabled(not self.is_processing)
+            self.manual_mapping_radio.setEnabled(not self.is_processing)
+            if not self.is_processing and not self.ui_state.analysis_completed:
+                self.status.setText(
+                    "All mapping options are available — generating recommendations now."
+                )

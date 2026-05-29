@@ -1,3 +1,5 @@
+"""Shared filesystem paths used across the migration application."""
+
 import sys
 from pathlib import Path
 

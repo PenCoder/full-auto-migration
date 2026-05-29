@@ -1,3 +1,5 @@
+"""Persistence helpers for workflow checkpoints and resume state."""
+
 from __future__ import annotations
 
 import json
@@ -12,6 +14,7 @@ from src.orchestration.errors import ERR_CHECKPOINT_IO, MigrationError
 
 @dataclass
 class CheckpointState:
+    """Serializable snapshot of a long-running migration workflow."""
     run_id: str
     phase: str = "init"
     status: str = "running"
@@ -20,13 +23,17 @@ class CheckpointState:
 
 
 class CheckpointManager:
+    """Read and write checkpoint state for resumable migration runs."""
+
     def __init__(self, run_id: str, checkpoint_dir: Path | None = None) -> None:
+        """Create a checkpoint manager for a single migration run."""
         self.run_id = run_id
         self.checkpoint_dir = checkpoint_dir or (DATA_DIR / "checkpoints")
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.checkpoint_dir / f"{run_id}.json"
 
     def load(self) -> CheckpointState | None:
+        """Load checkpoint state from disk if it exists."""
         if not self.path.exists():
             return None
         try:
@@ -42,6 +49,7 @@ class CheckpointManager:
         )
 
     def save(self, state: CheckpointState) -> None:
+        """Persist checkpoint state to disk."""
         state.updated_at = datetime.now(timezone.utc).isoformat()
         try:
             self.path.write_text(json.dumps(state.__dict__, indent=2), encoding="utf-8")
@@ -49,6 +57,7 @@ class CheckpointManager:
             raise MigrationError(ERR_CHECKPOINT_IO, str(exc)) from exc
 
     def mark_phase(self, phase: str, **step_data: Any) -> CheckpointState:
+        """Advance the checkpoint to a new workflow phase."""
         state = self.load() or CheckpointState(run_id=self.run_id)
         state.phase = phase
         state.step_data.update(step_data)
@@ -56,6 +65,7 @@ class CheckpointManager:
         return state
 
     def complete(self, **step_data: Any) -> CheckpointState:
+        """Mark the checkpoint as completed."""
         state = self.load() or CheckpointState(run_id=self.run_id)
         state.phase = "completed"
         state.status = "completed"

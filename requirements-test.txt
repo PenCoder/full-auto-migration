@@ -1,0 +1,39 @@
+# Test dependencies for Semi-AutoMigration project
+# Install with: pip install -r requirements-test.txt
+
+# Core testing framework
+pytest>=7.4.0
+pytest-cov>=4.1.0          # Coverage plugin
+pytest-xdist>=3.3.1        # Parallel execution
+pytest-timeout>=2.1.0      # Timeout support
+pytest-mock>=3.11.1        # Mocking utilities
+pytest-sugar>=0.9.7        # Better test output
+
+# Mocking and fixtures
+pytest-faker>=0.0.3        # Fake data generation
+responses>=0.23.0          # HTTP mocking
+freezegun>=1.2.2           # Time mocking
+
+# Code quality
+pytest-flake8>=1.1.1       # Flake8 integration
+pytest-pylint>=0.19.0      # Pylint integration
+pytest-mypy>=0.10.3        # MyPy integration
+coverage>=7.2.0            # Code coverage
+
+# Performance testing
+pytest-benchmark>=4.0.0    # Benchmarking
+memory-profiler>=0.61.0    # Memory profiling
+
+# Utilities
+pytest-asyncio>=0.21.1     # Async test support
+pytest-env>=0.5.2          # Environment variables
+pytest-repeat>=0.9.1       # Repeat tests
+pytest-randomly>=3.13.0    # Randomize test order
+
+# Documentation
+pytest-html>=3.2.0         # HTML reports
+allure-pytest>=2.13.2      # Allure reports
+
+# Optional Qt/PyQt5 testing
+# Uncomment if using Qt-based tests
+# pytest-qt>=4.2.0          # PyQt5 test support

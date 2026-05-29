@@ -19,13 +19,97 @@ source_system:
     - "AppData/Local/Cache"
   
   file_types:
-    ".pdf": True
-    ".docx": True
-    ".xlsx": True
-    ".pptx": True
-    ".jpg": True
-    ".png": True
-    ".zip": False
+    ".txt": true
+    ".md": true
+    ".rtf": true
+    ".pdf": true
+    ".doc": true
+    ".docx": true
+    ".odt": true
+    ".xls": true
+    ".xlsx": true
+    ".csv": true
+    ".ppt": true
+    ".pptx": true
+    ".odp": true
+    ".jpg": true
+    ".jpeg": true
+    ".png": true
+    ".gif": false
+    ".bmp": false
+    ".webp": false
+    ".svg": false
+    ".mp3": true
+    ".wav": false
+    ".flac": false
+    ".aac": false
+    ".mp4": true
+    ".mkv": false
+    ".mov": false
+    ".avi": false
+    ".zip": true
+    ".rar": false
+    ".7z": true
+    ".tar": false
+    ".gz": false
+    ".json": true
+    ".xml": true
+    ".yaml": true
+    ".yml": true
+    ".ini": true
+    ".log": false
+    ".py": true
+    ".js": true
+    ".ts": true
+    ".html": true
+    ".css": true
+    ".sql": true
+  file_type_labels:
+    ".txt": "Text files"
+    ".md": "Markdown files"
+    ".rtf": "Rich text files"
+    ".pdf": "PDF files"
+    ".doc": "Word document files"
+    ".docx": "Word document files"
+    ".odt": "OpenDocument text files"
+    ".xls": "Excel spreadsheet files"
+    ".xlsx": "Excel spreadsheet files"
+    ".csv": "CSV files"
+    ".ppt": "PowerPoint presentation files"
+    ".pptx": "PowerPoint presentation files"
+    ".odp": "OpenDocument presentation files"
+    ".jpg": "JPEG image files"
+    ".jpeg": "JPEG image files"
+    ".png": "PNG image files"
+    ".gif": "GIF image files"
+    ".bmp": "Bitmap image files"
+    ".webp": "WebP image files"
+    ".svg": "SVG image files"
+    ".mp3": "MP3 audio files"
+    ".wav": "WAV audio files"
+    ".flac": "FLAC audio files"
+    ".aac": "AAC audio files"
+    ".mp4": "MP4 video files"
+    ".mkv": "Matroska video files"
+    ".mov": "MOV video files"
+    ".avi": "AVI video files"
+    ".zip": "ZIP archive files"
+    ".rar": "RAR archive files"
+    ".7z": "7-Zip archive files"
+    ".tar": "TAR archive files"
+    ".gz": "GZip archive files"
+    ".json": "JSON files"
+    ".xml": "XML files"
+    ".yaml": "YAML files"
+    ".yml": "YAML files"
+    ".ini": "INI configuration files"
+    ".log": "Log files"
+    ".py": "Python files"
+    ".js": "JavaScript files"
+    ".ts": "TypeScript files"
+    ".html": "HTML files"
+    ".css": "CSS files"
+    ".sql": "SQL files"
 
 backup:
   compress: true
@@ -76,6 +160,15 @@ research:
   record_metrics: true
   anonymize_machine_id: true
   save_run_summary: "logs/run_summary.json"
+
+repology:
+  enabled: true                    # set to false to run fully offline
+  provider: "repology"
+  send_fields:
+    - "name"
+    - "version"
+    - "publisher"
+  redact_user_paths: true
 
 
 # ---------------------------------------

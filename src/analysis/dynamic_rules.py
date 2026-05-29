@@ -1,24 +1,33 @@
+"""Dynamic mapping helpers for Windows-to-Linux application selection."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 
+_CSV_CONFIDENCE_FLOOR: dict[str, float] = {"high": 0.90, "medium": 0.70, "low": 0.60}
+
+
 @dataclass
 class MappingDecision:
+    """Resolved Linux mapping choice for a single Windows application."""
     linux_package: str
     linux_display_name: str
     migration_strategy: str
     notes: str
     confidence_score: float
     recommendation_source: str
+    category: str = ""
 
 
 def _norm(value: str) -> str:
+    """Normalize text for simple matching operations."""
     return (value or "").strip().lower()
 
 
 def _similarity(a: str, b: str) -> float:
+    """Compute a lightweight similarity score between two names."""
     if not a or not b:
         return 0.0
     return SequenceMatcher(None, a, b).ratio()
@@ -29,6 +38,7 @@ def resolve_mapping(
     base_mappings: list[dict[str, str]],
     overrides: list[dict[str, str]] | None = None,
 ) -> MappingDecision | None:
+    """Resolve a Linux mapping using overrides and the base mapping set."""
     name = _norm(display_name)
     overrides = overrides or []
 
@@ -42,6 +52,7 @@ def resolve_mapping(
                 notes=item.get("notes", "Custom override mapping"),
                 confidence_score=0.98,
                 recommendation_source="user_override",
+                category=item.get("category", ""),
             )
 
     best: dict[str, str] | None = None
@@ -62,11 +73,18 @@ def resolve_mapping(
     if not best or best_score < 0.6:
         return None
 
+    # Honor expert-assigned CSV confidence as a floor so the fuzzy scorer
+    # never downgrades a manually curated high-confidence entry.
+    csv_confidence = _norm(best.get("confidence", ""))
+    floor = _CSV_CONFIDENCE_FLOOR.get(csv_confidence, 0.0)
+    final_score = round(max(best_score, floor), 2)
+
     return MappingDecision(
         linux_package=best.get("linux_package", ""),
         linux_display_name=best.get("linux_display_name", best.get("linux_package", "")),
         migration_strategy=best.get("migration_strategy", "manual"),
         notes=best.get("notes", ""),
-        confidence_score=round(best_score, 2),
+        confidence_score=final_score,
         recommendation_source="dynamic_base",
+        category=best.get("category", ""),
     )

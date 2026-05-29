@@ -1,224 +1,422 @@
+"""Scan page — inventory + compatibility analysis + app strategy, all in one step."""
+
 from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QThreadPool, Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QRadioButton, QVBoxLayout
+from PySide6.QtCore import QThreadPool, QTimer, Qt
+from PySide6.QtWidgets import QCheckBox, QLabel, QProgressBar, QRadioButton, QTextEdit
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
-from src.qt_ui.widgets.horizontal_stepper import HorizontalStepper
 from src.qt_ui.workers import FunctionWorker
+from src.services.settings_service import SettingsMigrationService
 
 
 class ScanPage(BasePage):
+    """Inventory → compatibility analysis → app-strategy choice, all in one step."""
+
     def __init__(
         self,
         ui_state,
         run_inventory_cb: Callable[[bool], dict],
-        run_recommendations_cb: Callable[[str], dict],
+        run_analysis_cb: Callable[[], dict] | None = None,
+        privacy_policy: dict[str, object] | None = None,
         current_step: int = 0,
         step_names: list[str] | None = None,
     ) -> None:
         super().__init__(ui_state)
         self.run_inventory_cb = run_inventory_cb
-        self.run_recommendations_cb = run_recommendations_cb
+        self.run_analysis_cb = run_analysis_cb
         self.current_step = current_step
-        self.step_names = step_names or ["Scan", "Data Selection", "Application Mapping", "Backup"]
+        self.step_names = step_names or ["Scan", "Data Selection", "Review", "Backup"]
+        self.privacy_policy = privacy_policy or {}
         self.thread_pool = QThreadPool.globalInstance()
-        self.is_running = False
+        self.last_scan_result: dict[str, object] = {}
+        self.last_analysis_result: dict[str, object] = {}
+        self._analysis_running = False
+        self.settings_service = SettingsMigrationService()
         self._build_ui()
         self.refresh()
 
     def _build_ui(self) -> None:
         root = self.create_center_card_layout()
-       
-        question = "Would you want to migrate all supported applications or prioritize customizing which applications to migrate?"
-        info = ("• You can choose to move all supported applications or customize which ones to prioritize. <br>" +
-                "• We recommend prioritizing applications you use daily or that are critical for work to ensure a smooth transition.")
-        
-        migrate_all_radio = QRadioButton("Migrate All Supported Applications")
-        prioritize_radio = QRadioButton("Prioritize Custom Selection")
-        prioritize_radio.toggled.connect
 
-        guided_panel = self.create_guided_questionnaire(
-            question,
-            info,
-            options=[migrate_all_radio, prioritize_radio]
+        root.addWidget(self.create_page_header(
+            "🔍",
+            "Scan & Plan Your App Transition",
+            "We'll inventory your hardware and apps, then match each one to a Linux alternative. "
+            "Choose how much say you want in the process — we handle the rest.",
+        ))
+
+        root.addWidget(
+            self.create_trust_banner(
+                "🔒  Your files are never read or sent anywhere — "
+                "only app names and hardware details are used."
+            )
         )
-        root.addWidget(guided_panel)
 
-        self.status = QLabel("Run Quick Scan to collect hardware_inventory.json and software_inventory.json.")
+        # Deep scan toggle — balanced/expert only.
+        self.deep_toggle = QCheckBox(
+            "Thorough scan — finds apps installed via package managers, the Store, and PATH"
+        )
+        self.deep_toggle.setChecked(False)
+        root.addWidget(self.deep_toggle, alignment=Qt.AlignHCenter)
+
+        report_title = QLabel("What we found")
+        report_title.setObjectName("SectionTitle")
+        root.addWidget(report_title)
+
+        self.scan_report_view = QTextEdit()
+        self.scan_report_view.setObjectName("ReportView")
+        self.scan_report_view.setReadOnly(True)
+        self.scan_report_view.setMinimumHeight(200)
+        self.scan_report_view.setMaximumHeight(280)
+        self.scan_report_view.setPlaceholderText(
+            "Scan results will appear here automatically when the page loads."
+        )
+        root.addWidget(self.scan_report_view)
+
+        # App strategy question.
+        self.migrate_all_radio = QRadioButton(
+            "Switch all my apps automatically — I trust your recommendations"
+        )
+        self.migrate_all_hint = self.hint_label(
+            "Best for most people. We match every app and include all high-confidence alternatives."
+        )
+        self.choose_from_recommendations_radio = QRadioButton(
+            "Show me the recommendations and let me pick which ones to use"
+        )
+        self.choose_from_recommendations_hint = self.hint_label(
+            "We suggest alternatives for each app and you decide which ones to include."
+        )
+        self.manual_mapping_radio = QRadioButton(
+            "I'll decide which Linux app replaces each Windows app"
+        )
+        self.manual_mapping_hint = self.hint_label(
+            "Full control — specify exactly which Linux app replaces each Windows app."
+        )
+
+        self.migrate_all_radio.toggled.connect(
+            lambda checked: self._set_mapping_choice("migrate_all_supported", checked)
+        )
+        self.choose_from_recommendations_radio.toggled.connect(
+            lambda checked: self._set_mapping_choice("choose_from_recommendations", checked)
+        )
+        self.manual_mapping_radio.toggled.connect(
+            lambda checked: self._set_mapping_choice("manual_mapping", checked)
+        )
+
+        self.strategy_panel = self.create_guided_questionnaire(
+            question="How would you like to handle your apps on Linux?",
+            info=(
+                "Once we know what's installed, you decide how much involvement you want:<br>"
+                "• <b>Automatic</b> — we pick the best Linux alternative for every app.<br>"
+                "• <b>Let me choose</b> — we suggest alternatives and you decide which to include.<br>"
+                "• <b>Manual</b> — you specify exactly which Linux app replaces each Windows app."
+            ),
+            options=[
+                self.migrate_all_radio,
+                self.migrate_all_hint,
+                self.choose_from_recommendations_radio,
+                self.choose_from_recommendations_hint,
+                self.manual_mapping_radio,
+                self.manual_mapping_hint,
+            ],
+        )
+        root.addWidget(self.strategy_panel)
+
+        self.status = QLabel("Scanning your computer — just a moment…")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
         root.addWidget(self.status)
 
-        self.loading = QProgressBar()
-        self.loading.setRange(0, 0)
-        self.loading.setVisible(False)
-        root.addWidget(self.loading)
+        self.privacy_banner = QLabel("")
+        self.privacy_banner.setObjectName("TrustLabel")
+        self.privacy_banner.setWordWrap(True)
+        self.privacy_banner.setAlignment(Qt.AlignCenter)
+        root.addWidget(self.privacy_banner)
 
-        scan_row = QHBoxLayout()
-        scan_row.setSpacing(10)
+        self.deep_toggle.toggled.connect(self._on_deep_toggle_changed)
+        self._sync_radios_from_state()
 
-        self.quick_scan_btn = QPushButton("Quick Scan")
-        self.quick_scan_btn.setProperty("role", "primary")
-        self.quick_scan_btn.setFixedWidth(200)
-        self.quick_scan_btn.clicked.connect(lambda: self._run_scan(deep_scan=False))
-        scan_row.addWidget(self.quick_scan_btn)
+    # ── Auto-trigger ─────────────────────────────────────────────────────────
 
-        self.deep_scan_btn = QPushButton("Deep Scan")
-        self.deep_scan_btn.setProperty("role", "primary")
-        self.deep_scan_btn.setFixedWidth(200)
-        self.deep_scan_btn.clicked.connect(lambda: self._run_scan(deep_scan=True))
-        scan_row.addWidget(self.deep_scan_btn)
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self.ui_state.inventory_completed and not self.is_processing:
+            QTimer.singleShot(300, lambda: self._run_scan(deep_scan=self.deep_toggle.isChecked()))
 
-        root.addLayout(scan_row)
+    # ── Radio handlers ───────────────────────────────────────────────────────
 
-        rec_row = QHBoxLayout()
-        rec_row.setSpacing(10)
-
-        self.online_rec_btn = QPushButton("Recommend (Online)")
-        self.online_rec_btn.setProperty("role", "badge")
-        self.online_rec_btn.setMinimumHeight(42)
-        self.online_rec_btn.setFixedWidth(200)
-        self.online_rec_btn.clicked.connect(lambda: self._run_recommendations("online"))
-        rec_row.addWidget(self.online_rec_btn)
-
-        self.agent_rec_btn = QPushButton("Recommend (Agent)")
-        self.agent_rec_btn.setProperty("role", "badge")
-        self.agent_rec_btn.setMinimumHeight(42)
-        self.agent_rec_btn.setFixedWidth(200)
-        self.agent_rec_btn.clicked.connect(lambda: self._run_recommendations("agent"))
-        rec_row.addWidget(self.agent_rec_btn)
-
-        root.addLayout(rec_row)
-
-        # self.next_btn = QPushButton("Continue")
-        # self.next_btn.setProperty("role", "cta")
-        # self.next_btn.setFixedWidth(200)
-        # self.next_btn.clicked.connect(self.request_next.emit)
-        # root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
-
-    def _on_priority_toggled(self, checked: bool) -> None:
-        if checked:
-            self.ui_state.recommendation_strategy = "prioritize"
+    def _sync_radios_from_state(self) -> None:
+        mode = self.ui_state.mapping_choice_mode
+        if mode == "choose_from_recommendations":
+            self.choose_from_recommendations_radio.setChecked(True)
+        elif mode == "manual_mapping":
+            self.manual_mapping_radio.setChecked(True)
         else:
-            self.ui_state.recommendation_strategy = "migrate_all"
+            self.migrate_all_radio.setChecked(True)
+
+    def _set_mapping_choice(self, mode: str, checked: bool) -> None:
+        if not checked:
+            return
+        self.ui_state.mapping_choice_mode = mode
         self.refresh()
 
-    def _set_running_state(self, running: bool) -> None:
-        self.is_running = running
-        self.quick_scan_btn.setEnabled(not running)
-        self.deep_scan_btn.setEnabled(not running)
-        self.online_rec_btn.setEnabled(not running)
-        self.agent_rec_btn.setEnabled(not running)
-        # self.next_btn.setEnabled(False)
+    def _on_deep_toggle_changed(self, checked: bool) -> None:
+        if not self.is_processing:
+            self._run_scan(deep_scan=checked)
+
+    # ── Scanning pipeline ────────────────────────────────────────────────────
 
     def _run_scan(self, deep_scan: bool) -> None:
-        self._set_running_state(True)
-        self.loading.setVisible(True)
-        if deep_scan:
-            self.status.setText("Running deep scan: registry, package managers, AppX, and startup inventory...")
-            worker = FunctionWorker(lambda: self.run_inventory_cb(True))
-        else:
-            self.status.setText("Running quick scan: hardware and software inventory...")
-            worker = FunctionWorker(lambda: self.run_inventory_cb(False))
+        if self.is_processing:
+            return
+        self.set_scanning(True)
+        self.ui_state.is_scanning = True
+        self.status.setText(
+            "Running a thorough scan — finding apps installed through all methods…"
+            if deep_scan else
+            "Scanning your hardware and installed apps — this takes just a few seconds…"
+        )
+        worker = FunctionWorker(lambda: self.run_inventory_cb(deep_scan))
         worker.signals.result.connect(self._on_scan_result)
-        worker.signals.error.connect(self._on_error)
-        worker.signals.finished.connect(self._on_finished)
-        self.thread_pool.start(worker)
-
-    def _run_recommendations(self, strategy: str) -> None:
-        self._set_running_state(True)
-        self.loading.setVisible(True)
-        if strategy == "agent":
-            self.status.setText("Agent recommendation mode: scoring Linux package alternatives...")
-        else:
-            self.status.setText("Online recommendation mode: validating package signals...")
-        worker = FunctionWorker(lambda: self.run_recommendations_cb(strategy))
-        worker.signals.result.connect(self._on_recommendation_result)
-        worker.signals.error.connect(self._on_error)
-        worker.signals.finished.connect(self._on_finished)
+        worker.signals.error.connect(self._on_scan_error)
+        worker.signals.finished.connect(self._on_scan_finished)
         self.thread_pool.start(worker)
 
     def _on_scan_result(self, result: object) -> None:
         if isinstance(result, dict):
+            self.last_scan_result = result
             self.ui_state.inventory_completed = True
+            settings = result.get("settings", {}) if isinstance(result.get("settings", {}), dict) else {}
+            self.ui_state.settings_completed = bool(settings)
+            self.ui_state.settings_inventory = settings
+            self.ui_state.settings_migration_plan = (
+                self.settings_service.build_plan(
+                    settings,
+                    self.ui_state.mode,
+                    selections=self.ui_state.settings_selected_items,
+                    migrate_enabled=self.ui_state.settings_migration_enabled,
+                )
+                if settings
+                else {}
+            )
             hw = len(result.get("hardware", {}).keys())
             sw = len(result.get("software", {}).get("entries", []))
-            scan_depth = result.get("software", {}).get("scan_depth", "quick")
-            if scan_depth == "deep":
-                deep = result.get("software", {}).get("deep_scan_summary", {})
-                self.status.setText(
-                    "Deep scan completed. "
-                    f"Hardware categories: {hw}, registry apps: {sw}, "
-                    f"package manager entries: {deep.get('package_manager_entries', 0)}, "
-                    f"AppX entries: {deep.get('appx_entries', 0)}."
-                )
-            else:
-                self.status.setText(
-                    f"Quick scan completed. Captured {hw} hardware categories and {sw} software entries."
-                )
-        else:
-            self.status.setText("Scan finished but no results were returned.")
-        self.refresh()
-
-    def _on_recommendation_result(self, result: object) -> None:
-        if isinstance(result, dict):
-            count = int(result.get("recommended_count", 0))
-            total = int(result.get("input_count", 0))
-            strategy = str(result.get("strategy", "local"))
             self.status.setText(
-                f"{strategy.capitalize()} recommendations generated: {count}/{total} matched. "
-                f"Report: {result.get('markdown_path', '')}"
+                f"Scan complete — {hw} hardware categories, {sw} apps found. "
+                "Matching Linux alternatives…"
             )
+            # Chain: immediately run compatibility analysis.
+            if self.run_analysis_cb:
+                self._analysis_running = True
+                self._run_analysis()
         else:
-            self.status.setText("Recommendation generation finished but returned no result.")
+            self.status.setText("Scan finished but returned no results — you can still continue.")
+        self._render_scan_report()
+
+    def _run_analysis(self) -> None:
+        worker = FunctionWorker(self.run_analysis_cb)
+        worker.signals.result.connect(self._on_analysis_result)
+        worker.signals.error.connect(self._on_analysis_error)
+        worker.signals.finished.connect(self._on_analysis_finished)
+        self.thread_pool.start(worker)
+
+    def _on_analysis_result(self, result: object) -> None:
+        if isinstance(result, dict):
+            self.last_analysis_result = result
+            self.ui_state.analysis_completed = True
+            matched = len(result.get("software", []))
+            self.status.setText(
+                f"✅  All done — Linux alternatives found for {matched} of your apps. "
+                "Choose your preferred approach below, then click 'Next'."
+            )
+        self._render_scan_report()
+
+    def _on_analysis_error(self, error: str) -> None:
+        self.status.setText(
+            "App matching ran into an issue — you can still continue to the next step."
+        )
+        self._render_scan_report()
+
+    def _on_analysis_finished(self) -> None:
+        self._analysis_running = False
+        self.ui_state.is_scanning = False
+        self.set_scanning(False)
         self.refresh()
 
-    def _on_error(self, error: str) -> None:
+    def _on_scan_error(self, error: str) -> None:
         self.ui_state.last_error = error
-        self.status.setText(f"Scan failed.\n{user_facing_error(error)}")
-        self.refresh()
+        self.status.setText(f"Scan ran into a problem.\n{user_facing_error(error)}")
+        self._render_scan_report()
 
-    def _on_finished(self) -> None:
-        self.is_running = False
-        self.loading.setVisible(False)
-        self.refresh()
+    def _on_scan_finished(self) -> None:
+        # Hold the lock until analysis completes — they share the same processing state.
+        if not self._analysis_running:
+            self.ui_state.is_scanning = False
+            self.set_scanning(False)
+            self.refresh()
+
+    # ── Report rendering ─────────────────────────────────────────────────────
+
+    def _render_scan_report(self) -> None:
+        mode = self.ui_state.mode.capitalize()
+        inv_done = self.ui_state.inventory_completed
+        analysis_done = bool(self.last_analysis_result)
+
+        inv_pill = (
+            self.html_pill("Done", "#1B5E20", "#E8F5E9") if inv_done else
+            self.html_pill("Scanning…", "#E65100", "#FFF3E0")
+        )
+        match_pill = (
+            self.html_pill("Done", "#1B5E20", "#E8F5E9") if analysis_done else (
+                self.html_pill("Matching…", "#E65100", "#FFF3E0") if inv_done else
+                self.html_pill("Pending", "#546E7A", "#ECEFF1")
+            )
+        )
+        mode_pill = self.html_pill(mode, "#1565C0", "#E3F2FD")
+
+        header = (
+            f'<table style="width:100%;margin-bottom:14px;"><tr>'
+            f'<td style="font-size:13px;color:#546E7A;">Mode&nbsp;{mode_pill}</td>'
+            f'<td style="font-size:13px;color:#546E7A;text-align:center;">Scan&nbsp;{inv_pill}</td>'
+            f'<td style="font-size:13px;color:#546E7A;text-align:right;">'
+            f'App&nbsp;matching&nbsp;{match_pill}</td>'
+            f'</tr></table>'
+        )
+
+        sections: list[str] = []
+
+        if self.last_scan_result:
+            hw = len(self.last_scan_result.get("hardware", {}).keys())
+            sw = len(self.last_scan_result.get("software", {}).get("entries", []))
+            depth = self.last_scan_result.get("software", {}).get("scan_depth", "quick")
+            settings = (
+                self.last_scan_result.get("settings", {})
+                if isinstance(self.last_scan_result.get("settings", {}), dict)
+                else {}
+            )
+            rows = (
+                self.html_row("Scan depth", depth.capitalize())
+                + self.html_row("Hardware categories", str(hw))
+                + self.html_row("Software entries", str(sw))
+            )
+            if depth == "deep":
+                deep = self.last_scan_result.get("software", {}).get("deep_scan_summary", {})
+                rows += self.html_row("Via package manager", str(deep.get("package_manager_entries", 0)))
+                rows += self.html_row("Via AppX / Store", str(deep.get("appx_entries", 0)))
+            if settings:
+                desktop = settings.get("desktop", {}) if isinstance(settings.get("desktop", {}), dict) else {}
+                appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance", {}), dict) else {}
+                rows += self.html_row("Wallpaper captured", "Yes" if desktop.get("wallpaper_path") else "No")
+                rows += self.html_row("Theme captured", "Yes" if appearance.get("current_theme") else "No")
+            sections.append(self.html_section("🖥", "Scan Results", f'<table style="width:100%;">{rows}</table>'))
+        else:
+            sections.append(self.html_section("🖥", "Scan Results",
+                self.html_empty("Scanning your computer — results will appear here shortly.")))
+
+        if self.last_analysis_result:
+            matched = len(self.last_analysis_result.get("software", []))
+            hw_rows_count = len(self.last_analysis_result.get("hardware", []))
+            rows = (
+                self.html_row("Apps with Linux alternatives", str(matched))
+                + self.html_row("Hardware advisories", str(hw_rows_count))
+            )
+            sections.append(self.html_section("📦", "App Matching", f'<table style="width:100%;">{rows}</table>'))
+            recs = self.last_analysis_result.get("software", [])
+            if recs:
+                preview_rows = ""
+                for rec in recs[:5]:
+                    win = str(rec.get("windows_app", "") or rec.get("name", ""))
+                    linux = str(rec.get("linux_package", "") or rec.get("linux_alternative", ""))
+                    conf = str(rec.get("mapping_confidence", "") or rec.get("confidence", ""))
+                    conf_color = {"high": "#1B5E20", "medium": "#E65100", "low": "#546E7A"}.get(conf, "#546E7A")
+                    conf_bg = {"high": "#E8F5E9", "medium": "#FFF3E0", "low": "#ECEFF1"}.get(conf, "#ECEFF1")
+                    preview_rows += (
+                        f'<tr>'
+                        f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#0D1929;">{win}</td>'
+                        f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#1565C0;">{linux}</td>'
+                        f'<td>{self.html_pill(conf, conf_color, conf_bg)}</td>'
+                        f'</tr>'
+                    )
+                if len(recs) > 5:
+                    preview_rows += (
+                        f'<tr><td colspan="3" style="color:#90A4AE;font-size:12px;padding-top:4px;">'
+                        f'+ {len(recs) - 5} more — full list on the Review page</td></tr>'
+                    )
+                sections.append(self.html_section("✅", "Top Matches",
+                    f'<table style="width:100%;">{preview_rows}</table>'))
+        elif self.ui_state.inventory_completed:
+            sections.append(self.html_section("📦", "App Matching",
+                self.html_empty("Matching your apps to Linux alternatives…")))
+
+        if self.ui_state.last_error:
+            err_body = (
+                f'<div style="background:#FFF3E0;border-left:3px solid #E65100;'
+                f'padding:8px 10px;border-radius:4px;font-size:13px;color:#BF360C;">'
+                f'{self.ui_state.last_error}</div>'
+            )
+            sections.append(self.html_section("⚠", "Last Error", err_body))
+
+        self.scan_report_view.setHtml(self.html_wrap(header + "".join(sections)))
+
+    # ── Navigation guard ─────────────────────────────────────────────────────
+
+    def can_proceed(self) -> bool:
+        return self.ui_state.inventory_completed
+
+    # ── Refresh ──────────────────────────────────────────────────────────────
 
     def refresh(self) -> None:
         mode = self.ui_state.mode
-        if mode == "guided":
-            self.deep_scan_btn.setVisible(False)
-            self.online_rec_btn.setVisible(False)
-            self.agent_rec_btn.setVisible(False)
-            if not self.is_running:
-                self.quick_scan_btn.setEnabled(True)
-            self.status.setText(
-                "Guided mode uses quick inventory only. Switch to Expert for deep scan and recommendation engines."
-                if not self.ui_state.inventory_completed
-                else self.status.text()
-            )
-        elif mode == "balanced":
-            self.deep_scan_btn.setVisible(False)
-            self.online_rec_btn.setVisible(False)
-            self.agent_rec_btn.setVisible(False)
-            if not self.is_running:
-                self.quick_scan_btn.setEnabled(True)
-            if not self.ui_state.inventory_completed:
-                self.status.setText(
-                    "Balanced mode enables quick inventory with advanced features disabled for safer operation."
-                )
-        else:
-            self.deep_scan_btn.setVisible(True)
-            self.online_rec_btn.setVisible(True)
-            self.agent_rec_btn.setVisible(True)
-            if not self.is_running:
-                self.quick_scan_btn.setEnabled(True)
-                self.deep_scan_btn.setEnabled(True)
-                self.online_rec_btn.setEnabled(self.ui_state.inventory_completed)
-                self.agent_rec_btn.setEnabled(self.ui_state.inventory_completed)
+        mapping_mode = self.ui_state.mapping_choice_mode
 
-        # self.next_btn.setEnabled(self.ui_state.inventory_completed or self.ui_state.mode == "expert")
+        software_online_enabled = bool(self.privacy_policy.get("software_online_lookup_enabled", True))
+        self.privacy_banner.setText(
+            "Privacy: only software metadata is used for package matching — file content stays local."
+            if software_online_enabled else
+            "Privacy: online lookup is disabled — all processing is local."
+        )
+
+        self.deep_toggle.setVisible(mode != "guided")
+
+        # Mode-filtered strategy options.
+        if mode == "guided":
+            self.choose_from_recommendations_radio.setVisible(False)
+            self.choose_from_recommendations_hint.setVisible(False)
+            self.manual_mapping_radio.setVisible(False)
+            self.manual_mapping_hint.setVisible(False)
+            self.migrate_all_radio.setEnabled(not self.is_processing)
+            if mapping_mode != "migrate_all_supported":
+                self.ui_state.mapping_choice_mode = "migrate_all_supported"
+                self.migrate_all_radio.setChecked(True)
+        elif mode == "balanced":
+            self.choose_from_recommendations_radio.setVisible(True)
+            self.choose_from_recommendations_hint.setVisible(True)
+            self.manual_mapping_radio.setVisible(False)
+            self.manual_mapping_hint.setVisible(False)
+            self.migrate_all_radio.setEnabled(not self.is_processing)
+            self.choose_from_recommendations_radio.setEnabled(not self.is_processing)
+            if mapping_mode == "manual_mapping":
+                self.ui_state.mapping_choice_mode = "choose_from_recommendations"
+                self.choose_from_recommendations_radio.setChecked(True)
+        else:
+            self.choose_from_recommendations_radio.setVisible(True)
+            self.choose_from_recommendations_hint.setVisible(True)
+            self.manual_mapping_radio.setVisible(True)
+            self.manual_mapping_hint.setVisible(True)
+            self.migrate_all_radio.setEnabled(not self.is_processing)
+            self.choose_from_recommendations_radio.setEnabled(not self.is_processing)
+            self.manual_mapping_radio.setEnabled(not self.is_processing)
+
+        if self.ui_state.inventory_completed and not self.is_processing:
+            self.status.setText(
+                "Scan complete — choose how to handle your apps below, then click 'Next'."
+                if mode != "guided" else
+                "Scan complete — click 'Next' to continue."
+            )
+
+        self._render_scan_report()
