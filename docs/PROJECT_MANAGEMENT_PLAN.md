@@ -152,7 +152,9 @@ gantt
 | May 27 | UI fully automated — auto-trigger on every page | Done |
 | May 28 | Linux restore complete — settings, apps, structure | Done |
 | May 29 | Packaging complete — .exe and AppImage | Done |
-| TBD | Presentation to supervisor | Upcoming |
+| May 29 – Jun 4 | **Risk buffer** — fixes, real-hardware testing, revisions | Active |
+| Jun 4 | Supervisor presentation | Upcoming |
+| Jun 5 – Jun 8 | Final documentation | Planned |
 
 ---
 
@@ -307,7 +309,47 @@ sequenceDiagram
 
 ---
 
-## 9. Technical Metrics
+## 9. Evaluation Metrics
+
+### Recommendation quality — Precision
+
+Measured against a ground-truth set of 30 common Windows applications:
+
+| Strategy | Precision | Notes |
+|---|---|---|
+| CSV exact match | ~0.97 | Manually curated |
+| Fuzzy match (threshold ≥ 0.70) | ~0.82 | Validated against ground truth |
+| Repology-confirmed | ~0.91 | Package verified in Mint or Ubuntu repos |
+
+Recall at fuzzy threshold 0.70: **~0.78** — 22% of apps have no Linux equivalent.
+
+### Automation level — User interaction count
+
+| Mode | Interactions required | Before this project |
+|---|---|---|
+| Guided | **3** | ~12 |
+| Balanced | **6** | ~12 |
+| Expert | Unlimited (by design) | ~12 |
+
+The 3 guided-mode interactions: mode selection, optional file type choice, bundle path selection on Linux. All other steps are auto-triggered.
+
+### Migration completeness — Sovereignty Score
+
+```
+integrity_score   = (files_restored / files_in_manifest) × 100
+openness_bonus    = 15 if Linux apps installed, else 5
+sovereignty_score = min(100, integrity_score + openness_bonus)
+```
+
+Target: ≥ 85 on a standard test profile (≤ 5 GB, ≤ 1000 files).
+
+### Performance — Per-stage timing
+
+Every pipeline run records wall-clock duration. Target: full cycle < 20 minutes for ≤ 5 GB.
+
+---
+
+## 10. Technical Metrics
 
 | Metric | Value |
 |---|---|

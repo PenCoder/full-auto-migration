@@ -69,3 +69,5 @@ logs/
 
 # Miscellaneous
 *copy.py
+.claude/
+*cache/
