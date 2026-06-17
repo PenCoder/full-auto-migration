@@ -31,9 +31,9 @@ class VerificationPage(BasePage):
 
         root.addWidget(self.create_page_header(
             "✅",
-            "Let's make sure everything arrived safely",
-            "We'll check every file that was restored and give you a Migration Score "
-            "showing how complete and successful your move to Linux has been.",
+            "Verify your migration was successful",
+            "Every restored file is checked and assigned a Migration Score "
+            "showing how complete and successful the move to Linux has been.",
         ))
 
         self.status = QLabel("Click the button below to verify your restored files.")
@@ -44,7 +44,7 @@ class VerificationPage(BasePage):
 
         root.addWidget(
             self.create_trust_banner(
-                "🔒  Verification only reads files — it never modifies, moves, or deletes anything on your computer."
+                "Verification only reads files — it never modifies, moves, or deletes anything on your computer."
             )
         )
 

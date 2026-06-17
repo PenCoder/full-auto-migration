@@ -50,13 +50,70 @@ class BasePage(QWidget):
         """Return True if the user is allowed to navigate forward from this page."""
         return True
 
-    def create_trust_banner(self, text: str) -> QWidget:
-        """Create a centered informational trust banner."""
-        banner = QLabel(text)
-        banner.setObjectName("TrustBanner")
-        banner.setWordWrap(True)
-        banner.setAlignment(Qt.AlignCenter)
-        return banner
+    def blocked_reason(self) -> str:
+        """Message shown when the user tries to continue but can_proceed() is False."""
+        return "Please complete this step before continuing."
+
+    def _make_info_panel(self, text: str) -> tuple[QFrame, QLabel]:
+        """Light blue information panel with an ℹ icon. Returns (panel, inner_label)."""
+        panel = QFrame()
+        panel.setStyleSheet(
+            "QFrame#InfoPanel { background-color: #E3F2FD; border: 1px solid #90CAF9; border-radius: 5px; }"
+            " QLabel { background: transparent; border: none; }"
+        )
+        panel.setObjectName("InfoPanel")
+        row = QHBoxLayout(panel)
+        row.setContentsMargins(12, 7, 12, 7)
+        row.setSpacing(10)
+
+        icon = QLabel("ℹ")
+        icon.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        icon.setFixedWidth(16)
+        icon.setStyleSheet("color: #1565C0; font-size: 14px; font-weight: bold;")
+        row.addWidget(icon)
+
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("color: #1565C0; font-size: 12px;")
+        row.addWidget(lbl, stretch=1)
+
+        return panel, lbl
+
+    def create_trust_banner(self, text: str) -> QFrame:
+        """Create an informational light-blue panel with an info icon."""
+        panel, _ = self._make_info_panel(text)
+        return panel
+
+    def create_success_banner(self, text: str) -> tuple[QFrame, QLabel]:
+        """Create a green success panel with a rounded checkmark icon.
+
+        Returns (panel, label) so the caller can update the message later.
+        """
+        panel = QFrame()
+        panel.setObjectName("SuccessPanel")
+        panel.setStyleSheet(
+            "QFrame#SuccessPanel { background-color: #E8F5E9; border: 1px solid #A5D6A7; border-radius: 5px; }"
+            " QLabel { background: transparent; border: none; }"
+        )
+        row = QHBoxLayout(panel)
+        row.setContentsMargins(12, 7, 12, 7)
+        row.setSpacing(10)
+
+        icon = QLabel("✓")
+        icon.setFixedSize(20, 20)
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setStyleSheet(
+            "background-color: #2E7D32; color: white; font-size: 12px; font-weight: bold;"
+            " border-radius: 10px;"
+        )
+        row.addWidget(icon, alignment=Qt.AlignTop)
+
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("color: #1B5E20; font-size: 12px; font-weight: 600;")
+        row.addWidget(lbl, stretch=1)
+
+        return panel, lbl
     
     def create_guided_panel(self, title: str, description: str | list[str]) -> QFrame:
         """Create a styled guidance card with a title and bullet content."""

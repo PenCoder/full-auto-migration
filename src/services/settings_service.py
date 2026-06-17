@@ -19,6 +19,7 @@ class SettingsMigrationService:
         mode: str,
         selections: dict[str, bool] | None = None,
         migrate_enabled: bool = True,
+        shortcuts_inventory: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Translate a settings inventory into auto/suggest/manual migration actions."""
         desktop = inventory.get("desktop", {}) if isinstance(inventory, dict) else {}
@@ -98,14 +99,27 @@ class SettingsMigrationService:
                 )
             )
 
+        shortcuts_count = 0
+        if isinstance(shortcuts_inventory, dict):
+            counts = shortcuts_inventory.get("counts", {})
+            if isinstance(counts, dict):
+                shortcuts_count = int(counts.get("matched", 0))
+
+        items.append(
+            self._make_item(
+                name="App Shortcuts",
+                source_value=f"{shortcuts_count} matched shortcut(s)" if shortcuts_count else "Desktop / Start Menu / Taskbar",
+                mode=normalized_mode,
+                selected=selected_items.get("taskbar_layout", True),
+                auto_modes={"guided", "balanced", "expert"},
+                suggest_modes=set(),
+                notes="Recreates Desktop icons and Start Menu / taskbar launchers for apps with a matched Linux package.",
+            )
+        )
+
         if normalized_mode == "expert":
             items.extend(
                 [
-                    self._manual_item(
-                        "Taskbar / Panel Layout",
-                        "Not directly detected from registry settings.",
-                        selected=selected_items.get("taskbar_layout", False),
-                    ),
                     self._manual_item(
                         "Keyboard Shortcuts",
                         "Requires user review and environment-specific mapping.",

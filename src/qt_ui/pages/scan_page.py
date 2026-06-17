@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import QThreadPool, QTimer, Qt
-from PySide6.QtWidgets import QCheckBox, QLabel, QProgressBar, QRadioButton, QTextEdit
+from PySide6.QtWidgets import QLabel, QProgressBar, QRadioButton, QTextEdit
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
@@ -45,25 +45,18 @@ class ScanPage(BasePage):
         root.addWidget(self.create_page_header(
             "🔍",
             "Scan & Plan Your App Transition",
-            "We'll inventory your hardware and apps, then match each one to a Linux alternative. "
-            "Choose how much say you want in the process — we handle the rest.",
+            "An inventory of your hardware and installed apps is collected, then each app is matched "
+            "to a Linux alternative. Choose how much involvement you want in the process.",
         ))
 
         root.addWidget(
             self.create_trust_banner(
-                "🔒  Your files are never read or sent anywhere — "
+                "Your files are never read or sent anywhere — "
                 "only app names and hardware details are used."
             )
         )
 
-        # Deep scan toggle — balanced/expert only.
-        self.deep_toggle = QCheckBox(
-            "Thorough scan — finds apps installed via package managers, the Store, and PATH"
-        )
-        self.deep_toggle.setChecked(False)
-        root.addWidget(self.deep_toggle, alignment=Qt.AlignHCenter)
-
-        report_title = QLabel("What we found")
+        report_title = QLabel("Scan results")
         report_title.setObjectName("SectionTitle")
         root.addWidget(report_title)
 
@@ -79,19 +72,19 @@ class ScanPage(BasePage):
 
         # App strategy question.
         self.migrate_all_radio = QRadioButton(
-            "Switch all my apps automatically — I trust your recommendations"
+            "Switch all apps automatically — use the recommended alternatives"
         )
         self.migrate_all_hint = self.hint_label(
-            "Best for most people. We match every app and include all high-confidence alternatives."
+            "Best for most people. Every app is matched and all high-confidence alternatives are included."
         )
         self.choose_from_recommendations_radio = QRadioButton(
-            "Show me the recommendations and let me pick which ones to use"
+            "Show the recommendations and allow manual selection"
         )
         self.choose_from_recommendations_hint = self.hint_label(
-            "We suggest alternatives for each app and you decide which ones to include."
+            "Alternatives are suggested for each app and you decide which ones to include."
         )
         self.manual_mapping_radio = QRadioButton(
-            "I'll decide which Linux app replaces each Windows app"
+            "Manually specify which Linux app replaces each Windows app"
         )
         self.manual_mapping_hint = self.hint_label(
             "Full control — specify exactly which Linux app replaces each Windows app."
@@ -109,12 +102,7 @@ class ScanPage(BasePage):
 
         self.strategy_panel = self.create_guided_questionnaire(
             question="How would you like to handle your apps on Linux?",
-            info=(
-                "Once we know what's installed, you decide how much involvement you want:<br>"
-                "• <b>Automatic</b> — we pick the best Linux alternative for every app.<br>"
-                "• <b>Let me choose</b> — we suggest alternatives and you decide which to include.<br>"
-                "• <b>Manual</b> — you specify exactly which Linux app replaces each Windows app."
-            ),
+            info=None,
             options=[
                 self.migrate_all_radio,
                 self.migrate_all_hint,
@@ -132,13 +120,9 @@ class ScanPage(BasePage):
         self.status.setAlignment(Qt.AlignCenter)
         root.addWidget(self.status)
 
-        self.privacy_banner = QLabel("")
-        self.privacy_banner.setObjectName("TrustLabel")
-        self.privacy_banner.setWordWrap(True)
-        self.privacy_banner.setAlignment(Qt.AlignCenter)
-        root.addWidget(self.privacy_banner)
+        _privacy_panel, self._privacy_label = self._make_info_panel("")
+        root.addWidget(_privacy_panel)
 
-        self.deep_toggle.toggled.connect(self._on_deep_toggle_changed)
         self._sync_radios_from_state()
 
     # ── Auto-trigger ─────────────────────────────────────────────────────────
@@ -146,7 +130,7 @@ class ScanPage(BasePage):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         if not self.ui_state.inventory_completed and not self.is_processing:
-            QTimer.singleShot(300, lambda: self._run_scan(deep_scan=self.deep_toggle.isChecked()))
+            QTimer.singleShot(300, lambda: self._run_scan())
 
     # ── Radio handlers ───────────────────────────────────────────────────────
 
@@ -165,23 +149,15 @@ class ScanPage(BasePage):
         self.ui_state.mapping_choice_mode = mode
         self.refresh()
 
-    def _on_deep_toggle_changed(self, checked: bool) -> None:
-        if not self.is_processing:
-            self._run_scan(deep_scan=checked)
-
     # ── Scanning pipeline ────────────────────────────────────────────────────
 
-    def _run_scan(self, deep_scan: bool) -> None:
+    def _run_scan(self) -> None:
         if self.is_processing:
             return
         self.set_scanning(True)
         self.ui_state.is_scanning = True
-        self.status.setText(
-            "Running a thorough scan — finding apps installed through all methods…"
-            if deep_scan else
-            "Scanning your hardware and installed apps — this takes just a few seconds…"
-        )
-        worker = FunctionWorker(lambda: self.run_inventory_cb(deep_scan))
+        self.status.setText("Scanning your hardware and installed apps — this takes just a few seconds…")
+        worker = FunctionWorker(lambda: self.run_inventory_cb(False))
         worker.signals.result.connect(self._on_scan_result)
         worker.signals.error.connect(self._on_scan_error)
         worker.signals.finished.connect(self._on_scan_finished)
@@ -194,12 +170,15 @@ class ScanPage(BasePage):
             settings = result.get("settings", {}) if isinstance(result.get("settings", {}), dict) else {}
             self.ui_state.settings_completed = bool(settings)
             self.ui_state.settings_inventory = settings
+            shortcuts = result.get("shortcuts", {}) if isinstance(result.get("shortcuts", {}), dict) else {}
+            self.ui_state.shortcuts_inventory = shortcuts
             self.ui_state.settings_migration_plan = (
                 self.settings_service.build_plan(
                     settings,
                     self.ui_state.mode,
                     selections=self.ui_state.settings_selected_items,
                     migrate_enabled=self.ui_state.settings_migration_enabled,
+                    shortcuts_inventory=shortcuts,
                 )
                 if settings
                 else {}
@@ -368,6 +347,9 @@ class ScanPage(BasePage):
     def can_proceed(self) -> bool:
         return self.ui_state.inventory_completed
 
+    def blocked_reason(self) -> str:
+        return "The scan needs to finish before you can continue — please wait a moment."
+
     # ── Refresh ──────────────────────────────────────────────────────────────
 
     def refresh(self) -> None:
@@ -375,21 +357,18 @@ class ScanPage(BasePage):
         mapping_mode = self.ui_state.mapping_choice_mode
 
         software_online_enabled = bool(self.privacy_policy.get("software_online_lookup_enabled", True))
-        self.privacy_banner.setText(
-            "Privacy: only software metadata is used for package matching — file content stays local."
+        self._privacy_label.setText(
+            "Only software metadata is used for package matching — file content stays local."
             if software_online_enabled else
-            "Privacy: online lookup is disabled — all processing is local."
+            "Online lookup is disabled — all processing is local."
         )
 
-        self.deep_toggle.setVisible(mode != "guided")
-
-        # Mode-filtered strategy options.
+        # Mode-filtered strategy options — hide unavailable choices rather than disabling.
         if mode == "guided":
             self.choose_from_recommendations_radio.setVisible(False)
             self.choose_from_recommendations_hint.setVisible(False)
             self.manual_mapping_radio.setVisible(False)
             self.manual_mapping_hint.setVisible(False)
-            self.migrate_all_radio.setEnabled(not self.is_processing)
             if mapping_mode != "migrate_all_supported":
                 self.ui_state.mapping_choice_mode = "migrate_all_supported"
                 self.migrate_all_radio.setChecked(True)
@@ -398,8 +377,6 @@ class ScanPage(BasePage):
             self.choose_from_recommendations_hint.setVisible(True)
             self.manual_mapping_radio.setVisible(False)
             self.manual_mapping_hint.setVisible(False)
-            self.migrate_all_radio.setEnabled(not self.is_processing)
-            self.choose_from_recommendations_radio.setEnabled(not self.is_processing)
             if mapping_mode == "manual_mapping":
                 self.ui_state.mapping_choice_mode = "choose_from_recommendations"
                 self.choose_from_recommendations_radio.setChecked(True)
@@ -408,15 +385,11 @@ class ScanPage(BasePage):
             self.choose_from_recommendations_hint.setVisible(True)
             self.manual_mapping_radio.setVisible(True)
             self.manual_mapping_hint.setVisible(True)
-            self.migrate_all_radio.setEnabled(not self.is_processing)
-            self.choose_from_recommendations_radio.setEnabled(not self.is_processing)
-            self.manual_mapping_radio.setEnabled(not self.is_processing)
 
         if self.ui_state.inventory_completed and not self.is_processing:
-            self.status.setText(
-                "Scan complete — choose how to handle your apps below, then click 'Next'."
-                if mode != "guided" else
-                "Scan complete — click 'Next' to continue."
-            )
+            if mode == "guided":
+                self.status.setText("Scan complete — click 'Next' to continue.")
+            else:
+                self.status.setText("Scan complete — choose how to handle your apps below, then click 'Next'.")
 
         self._render_scan_report()

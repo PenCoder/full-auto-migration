@@ -62,9 +62,7 @@ class MigrationState:
     target_distro: str = "Linux Mint"
     advanced_operations: dict[str, bool] = field(
         default_factory=lambda: {
-            "incremental_backup": True,
-            "parallel_hashing": True,
-            "create_rollback_point": False,
+            "dry_run": False,
         }
     )
 

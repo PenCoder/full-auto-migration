@@ -6,16 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QThreadPool, QTimer, Qt, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QMessageBox
+
 from PySide6.QtWidgets import (
-    QCheckBox,
     QDockWidget,
     QFrame,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QPushButton,
     QProgressBar,
@@ -28,9 +25,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.constants import RESTORE_REPORT
+from src.constants import RESTORE_DIR, RESTORE_REPORT
 from src.config import MigrationConfigRoot
 from src.qt_ui.pages.backup_bundle_page import BackupBundlePage
+from src.qt_ui.pages.bundle_report_page import BundleReportPage
 from src.qt_ui.pages.data_selection_page import DataSelectionPage
 from src.qt_ui.pages.report_page import ReportPage
 from src.qt_ui.pages.restore_page import RestorePage
@@ -42,6 +40,7 @@ from src.qt_ui.pages.verification_page import VerificationPage
 from src.qt_ui.pages.welcome_page import WelcomePage
 from src.qt_ui.state import QtUiState
 from src.qt_ui.workers import FunctionWorker
+from src.qt_ui.widgets.automation_overlay import AutomationOverlay
 from src.qt_ui.widgets.expert_panel import ExpertPanel
 from src.qt_ui.widgets.stepper_sidebar import StepperSidebar
 from src.qt_ui.controllers import ActivityLogController, AutomationCoordinator, NavigationController, ModeController, OperationsController
@@ -59,6 +58,8 @@ class QtMigrationWindow(QMainWindow):
     """Coordinate page navigation, background tasks, and migration state."""
 
     activity_event = Signal(str, str, str)
+    automation_phase = Signal(str)
+    automation_step_done = Signal(str)
 
     def __init__(self, config: MigrationConfigRoot, runtime_mode: str) -> None:
         """Build the main window and wire the runtime services."""
@@ -86,6 +87,8 @@ class QtMigrationWindow(QMainWindow):
         self.recommendation_service = RecommendationService()
         self.file_recommendation_service = FileRecommendationService()
         self.activity_event.connect(self._on_activity_event)
+        self.automation_phase.connect(self._on_automation_phase)
+        self.automation_step_done.connect(self._on_automation_step_done)
 
         self.setWindowTitle("Sovereignty Migration Platform (Qt)")
         self.resize(1360, 820)
@@ -108,6 +111,7 @@ class QtMigrationWindow(QMainWindow):
         """Construct the window layout, page stack, and activity console."""
         root = QWidget(self)
         root.setObjectName("RootSurface")
+        self._root_widget = root
         root_layout = QVBoxLayout(root)
         root_layout.setContentsMargins(18, 14, 18, 12)
         root_layout.setSpacing(12)
@@ -148,7 +152,7 @@ class QtMigrationWindow(QMainWindow):
         control_bar.addWidget(self.balanced_radio)
         control_bar.addWidget(self.expert_radio)
 
-        self.expert_toggle_btn = QPushButton("Advanced Controls")
+        self.expert_toggle_btn = QPushButton("Customize")
         self.expert_toggle_btn.setProperty("role", "badge")
         self.expert_toggle_btn.clicked.connect(self._toggle_expert_panel)
         control_bar.addWidget(self.expert_toggle_btn)
@@ -179,15 +183,13 @@ class QtMigrationWindow(QMainWindow):
         if self.runtime_mode == "windows":
             self.stepper = StepperSidebar(
                 title="Windows 11 → Linux Mint",
-                subtitle="Follow the steps below to prepare your complete migration bundle.",
+                subtitle="Five steps to prepare your complete migration bundle.",
                 steps=[
-                    "Welcome\nGet oriented before you begin",
-                    "Mode Selection\nChoose your interaction mode",
-                    "Windows Scan\nInventory + app recommendations",
-                    "Settings Migration\nDesktop preferences & themes",
-                    "Data Selection\nChoose your files & folders",
-                    "Review & Customize\nFinalise recommendations",
-                    "Create Backup Bundle\nPack and export your data",
+                    "Get Started\nChoose your migration mode",
+                    "System Scan\nDiscover apps, hardware and settings",
+                    "Configure\nFiles, settings and recommendations",
+                    "Bundle\nPack and export your migration data",
+                    "Report\nReview everything before moving to Linux",
                 ],
             )
 
@@ -210,8 +212,10 @@ class QtMigrationWindow(QMainWindow):
                 self.ui_state,
                 run_app_recommendations_cb=self._run_app_recommendations,
                 run_file_recommendations_cb=self._run_file_recommendations,
+                on_selection_changed=lambda recs: self.runtime_data.update({"review_app_recommendations": recs}),
             )
             self.backup_page = BackupBundlePage(self.ui_state, run_backup_cb=self._run_backup)
+            self.bundle_report_page = BundleReportPage(self.ui_state, get_bundle_data_cb=self._get_bundle_data)
 
             self.welcome_page.request_next.connect(self.next_page)
             self.mode_page.request_next.connect(self.next_page)
@@ -220,6 +224,7 @@ class QtMigrationWindow(QMainWindow):
             self.data_page.request_next.connect(self.next_page)
             self.review_page.request_next.connect(self.next_page)
             self.backup_page.request_next.connect(self.next_page)
+            self.bundle_report_page.request_next.connect(self.next_page)
 
             self.guided_radio.toggled.connect(self.mode_page.guided_radio.setChecked)
             self.balanced_radio.toggled.connect(self.mode_page.balanced_radio.setChecked)
@@ -229,7 +234,7 @@ class QtMigrationWindow(QMainWindow):
             self.mode_page.balanced_radio.toggled.connect(lambda checked: self.balanced_radio.setChecked(checked))
             self.mode_page.expert_radio.toggled.connect(lambda checked: self.expert_radio.setChecked(checked))
 
-            # Order: Welcome → Mode → Scan (inventory + analysis + strategy) → Settings → Data → Review → Backup
+            # Order: Welcome → Mode → Scan → Settings → Data → Review → Backup → Bundle Report
             self.stack.addWidget(self.welcome_page)
             self.stack.addWidget(self.mode_page)
             self.stack.addWidget(self.scan_page)
@@ -237,11 +242,12 @@ class QtMigrationWindow(QMainWindow):
             self.stack.addWidget(self.data_page)
             self.stack.addWidget(self.review_page)
             self.stack.addWidget(self.backup_page)
+            self.stack.addWidget(self.bundle_report_page)
 
             # Connect each page's processing_changed → sync_nav so nav buttons update in real-time.
             for _p in [
                 self.welcome_page, self.mode_page, self.scan_page, self.settings_page,
-                self.data_page, self.review_page, self.backup_page,
+                self.data_page, self.review_page, self.backup_page, self.bundle_report_page,
             ]:
                 _p.processing_changed.connect(self._sync_nav)
                 _p.processing_changed.connect(self._on_any_page_processing_changed)
@@ -301,97 +307,6 @@ class QtMigrationWindow(QMainWindow):
         content_row.addWidget(content_splitter, stretch=1)
         root_layout.addLayout(content_row, stretch=1)
 
-        # Live operation console (collapsible).
-        self.activity_group = QGroupBox()
-        self.activity_group.setObjectName("ActivityGroup")
-        activity_layout = QVBoxLayout(self.activity_group)
-        activity_layout.setContentsMargins(12, 10, 12, 12)
-        activity_layout.setSpacing(8)
-
-        # Header row: status label + collapse toggle
-        header_row = QHBoxLayout()
-        header_row.setSpacing(8)
-
-        self.activity_status = QLabel("Pipeline idle. Start a step to see detailed runtime events.")
-        self.activity_status.setObjectName("ActivityStatus")
-        self.activity_status.setWordWrap(True)
-        header_row.addWidget(self.activity_status, stretch=1)
-
-        self.collapse_activity_btn = QPushButton("▼  Hide")
-        self.collapse_activity_btn.setProperty("role", "badge")
-        self.collapse_activity_btn.setToolTip("Collapse activity panel")
-        self.collapse_activity_btn.clicked.connect(self._toggle_activity_collapse)
-        header_row.addWidget(self.collapse_activity_btn)
-
-        activity_layout.addLayout(header_row)
-
-        # Collapsible body
-        self._activity_collapsed = False
-        self.activity_body = QWidget()
-        body_layout = QVBoxLayout(self.activity_body)
-        body_layout.setContentsMargins(0, 4, 0, 0)
-        body_layout.setSpacing(8)
-
-        self.pipeline_progress = QProgressBar()
-        self.pipeline_progress.setRange(0, 100)
-        self.pipeline_progress.setValue(0)
-        self.pipeline_progress.setFormat("Overall Progress: %p%")
-        self.pipeline_progress.setTextVisible(True)
-        body_layout.addWidget(self.pipeline_progress)
-
-        filter_row = QHBoxLayout()
-        self.toggle_filters_btn = QPushButton("Show Log Filters")
-        self.toggle_filters_btn.setProperty("role", "badge")
-        self.toggle_filters_btn.clicked.connect(self._toggle_log_filters)
-        filter_row.addWidget(self.toggle_filters_btn)
-
-        self.export_log_btn = QPushButton("Export Session Log")
-        self.export_log_btn.setProperty("role", "badge")
-        self.export_log_btn.clicked.connect(self._export_session_log)
-        filter_row.addWidget(self.export_log_btn)
-        filter_row.addStretch(1)
-        body_layout.addLayout(filter_row)
-
-        self.log_filters_panel = QWidget()
-        self.log_filters_panel.setObjectName("LogFiltersPanel")
-        filters_layout = QHBoxLayout(self.log_filters_panel)
-        filters_layout.setContentsMargins(8, 6, 8, 6)
-        filters_layout.setSpacing(12)
-
-        self.info_filter = QCheckBox("Info")
-        self.info_filter.setChecked(True)
-        self.info_filter.toggled.connect(lambda v: self._set_log_filter("info", v))
-        filters_layout.addWidget(self.info_filter)
-
-        self.done_filter = QCheckBox("Done")
-        self.done_filter.setChecked(True)
-        self.done_filter.toggled.connect(lambda v: self._set_log_filter("done", v))
-        filters_layout.addWidget(self.done_filter)
-
-        self.warn_filter = QCheckBox("Warn")
-        self.warn_filter.setChecked(True)
-        self.warn_filter.toggled.connect(lambda v: self._set_log_filter("warn", v))
-        filters_layout.addWidget(self.warn_filter)
-
-        self.fail_filter = QCheckBox("Fail")
-        self.fail_filter.setChecked(True)
-        self.fail_filter.toggled.connect(lambda v: self._set_log_filter("fail", v))
-        filters_layout.addWidget(self.fail_filter)
-        filters_layout.addStretch(1)
-
-        self.log_filters_panel.setVisible(False)
-        body_layout.addWidget(self.log_filters_panel)
-
-        self.activity_list = QListWidget()
-        self.activity_list.setObjectName("ActivityLog")
-        self.activity_list.setMinimumHeight(92)
-        self.activity_list.setMaximumHeight(136)
-        body_layout.addWidget(self.activity_list)
-
-        activity_layout.addWidget(self.activity_body)
-
-        root_layout.addWidget(self.activity_group)
-
         # Bottom navigation.
         nav = QHBoxLayout()
         nav.setSpacing(10)
@@ -422,10 +337,13 @@ class QtMigrationWindow(QMainWindow):
         nav.addWidget(center_status, alignment=Qt.AlignCenter)
         nav.addStretch(1)
 
-        self.complete_all_btn = QPushButton("Complete All Phases")
+        self.complete_all_btn = QPushButton("Run Automatically")
         self.complete_all_btn.setProperty("role", "cta")
+        self.complete_all_btn.setToolTip(
+            "Run the full migration pipeline with default settings — no page-by-page steps needed."
+        )
         self.complete_all_btn.clicked.connect(self._run_full_automation)
-        self.complete_all_btn.setEnabled(False)
+        self.complete_all_btn.setEnabled(True)
         nav.addWidget(self.complete_all_btn, alignment=Qt.AlignRight)
 
         self.next_btn = QPushButton("Next")
@@ -442,6 +360,8 @@ class QtMigrationWindow(QMainWindow):
             clear_error_banner=self._clear_error_banner,
             is_auto_running=lambda: self.auto_running,
             is_busy=self._is_busy,
+            page_to_step=self._PAGE_TO_STEP if self.runtime_mode == "windows" else None,
+            show_blocked_message=self._show_blocked_message,
         )
 
         self.stepper.step_clicked.connect(self._on_stepper_step_clicked)
@@ -449,13 +369,15 @@ class QtMigrationWindow(QMainWindow):
         self.setCentralWidget(root)
 
         # Right expert panel (dock).
-        self.expert_dock = QDockWidget("Expert Overrides", self)
+        self.expert_dock = QDockWidget("Customize", self)
         self.expert_dock.setAllowedAreas(Qt.RightDockWidgetArea)
         self.expert_dock.setFeatures(QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetMovable)
         profile_path = Path(self.config.automation.active_profile_path)
         if not profile_path.is_absolute():
             profile_path = Path(__file__).resolve().parents[2] / profile_path
         self.expert_panel = ExpertPanel(self.ui_state, profile_path=profile_path)
+        if hasattr(self, "settings_page"):
+            self.expert_panel.on_settings_changed = self.settings_page._sync_selections
         self.expert_panel.setMaximumWidth(460)
         self.expert_dock.setMinimumWidth(360)
         self.expert_dock.setMaximumWidth(460)
@@ -483,6 +405,9 @@ class QtMigrationWindow(QMainWindow):
         )
 
         self._log_activity("system", "Application initialized. Waiting for action.")
+
+        # Overlay must be created last so it sits on top of all other children.
+        self.overlay = AutomationOverlay(root)
 
     def _on_mode_change(self, value: str) -> None:
         if self.mode_controller is not None:
@@ -513,24 +438,116 @@ class QtMigrationWindow(QMainWindow):
 
     def _set_automation_running(self, running: bool) -> None:
         self.auto_running = running
-        self.complete_all_btn.setEnabled(not running and self.ui_state.mode != "guided")
+        self.complete_all_btn.setEnabled(not running)
         self.expert_toggle_btn.setEnabled(not running and self.ui_state.mode != "guided")
-        self._sync_nav()
         if running:
-            self.activity_status.setText("Automation is running. Follow step-by-step events below.")
+            self.overlay.set_phase("Starting…")
+            self.overlay.show()
+            self.overlay.raise_()
+        else:
+            self.overlay.hide()
+        self._sync_nav()
 
     def _run_full_automation(self) -> None:
         if self.auto_running:
             return
 
-        self._log_activity("pipeline", "Full automation requested.")
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Run Migration Automatically")
+        dialog.setText("<b>Run the full pipeline with default settings?</b>")
+        dialog.setInformativeText(
+            "The following defaults will be applied:<br><br>"
+            "&nbsp;&nbsp;<b>Files:</b> Documents, Desktop, Downloads, Pictures (all types)<br>"
+            "&nbsp;&nbsp;<b>Appearance:</b> Wallpaper, Theme, Light/Dark mode, Accent colour<br>"
+            "&nbsp;&nbsp;<b>Apps:</b> Automatically match all supported apps<br>"
+            "&nbsp;&nbsp;<b>Target distro:</b> Linux Mint<br><br>"
+            "The pipeline runs in the background — progress is shown on the button. "
+            "You can also step through the pages manually to customise any of the above."
+        )
+        dialog.setStandardButtons(QMessageBox.Cancel | QMessageBox.Ok)
+        dialog.button(QMessageBox.Ok).setText("Run with Defaults")
+        dialog.setDefaultButton(QMessageBox.Ok)
+        if dialog.exec() != QMessageBox.Ok:
+            return
+
+        self._apply_default_config()
+        self._log_activity("pipeline", "Automatic migration started with default configuration.")
         self._set_automation_running(True)
-        self.complete_all_btn.setText("Running...")
+        self.complete_all_btn.setText("Starting…")
         worker = FunctionWorker(self._complete_full_flow)
         worker.signals.result.connect(self._on_automation_result)
         worker.signals.error.connect(self._on_automation_error)
         worker.signals.finished.connect(self._on_automation_finished)
         self.thread_pool.start(worker)
+
+    def _apply_default_config(self) -> None:
+        self.ui_state.settings_migration_enabled = True
+        self.ui_state.settings_selected_items = {
+            "wallpaper": True,
+            "theme": True,
+            "light_dark": True,
+            "accent_color": True,
+            "taskbar_layout": False,
+            "keyboard_shortcuts": False,
+            "file_associations": False,
+        }
+        self.ui_state.data_choice_mode = "all_files"
+        self.ui_state.selected_folders = {
+            "Documents": True,
+            "Desktop": True,
+            "Downloads": True,
+            "Pictures": True,
+        }
+        self.ui_state.mapping_choice_mode = "migrate_all_supported"
+        self.ui_state.target_distro = "Linux Mint"
+
+    def _on_automation_phase(self, phase: str) -> None:
+        self.complete_all_btn.setText(phase)
+        if phase == "Done":
+            self.overlay.hide()
+        else:
+            self.overlay.set_phase(phase)
+
+    # ── Page↔Step mappings (Windows 8 pages → 5 stepper steps) ──────────────
+    #   Page indices:  0=Welcome 1=Mode 2=Scan 3=Settings 4=Data 5=Review 6=Backup 7=Report
+    #   Step indices:  0=GetStarted  1=Scan  2=Configure  3=Bundle  4=Report
+    _PAGE_TO_STEP: dict[int, int] = {
+        0: 0,  # Welcome      → Get Started
+        1: 0,  # Mode         → Get Started
+        2: 1,  # Scan         → System Scan
+        3: 2,  # Settings     → Configure
+        4: 2,  # Data         → Configure
+        5: 2,  # Review       → Configure
+        6: 3,  # Backup       → Bundle
+        7: 4,  # BundleReport → Report
+    }
+    _STEP_TO_FIRST_PAGE: dict[int, int] = {
+        0: 0,  # Get Started  → Welcome
+        1: 2,  # System Scan  → Scan
+        2: 3,  # Configure    → Settings
+        3: 6,  # Bundle       → Backup
+        4: 7,  # Report       → BundleReport
+    }
+
+    # Automation step-name → stepper step index
+    _WIN_STEP_MAP: dict[str, int] = {
+        "scan": 1,
+        "settings": 2,
+        "data": 2,
+        "review": 2,
+        "backup": 3,
+    }
+    _LIN_STEP_MAP: dict[str, int] = {
+        "restore": 0,
+        "verification": 1,
+        "report": 2,
+    }
+
+    def _on_automation_step_done(self, step_name: str) -> None:
+        step_map = self._WIN_STEP_MAP if self.runtime_mode == "windows" else self._LIN_STEP_MAP
+        idx = step_map.get(step_name)
+        if idx is not None and hasattr(self, "stepper"):
+            self.stepper.mark_step_done(idx)
 
     def _complete_full_flow(self) -> dict:
         return self.automation.run(
@@ -545,6 +562,8 @@ class QtMigrationWindow(QMainWindow):
             run_restore=self._run_restore,
             run_validation=self._run_validation,
             generate_final_report=self._generate_final_report,
+            on_phase=self.automation_phase.emit,
+            on_step_done=self.automation_step_done.emit,
         )
 
     def _resolve_restore_bundle_dir(self) -> Path:
@@ -578,12 +597,13 @@ class QtMigrationWindow(QMainWindow):
 
     def _on_automation_finished(self) -> None:
         self._set_automation_running(False)
-        self.complete_all_btn.setText("Complete All Phases")
+        self.complete_all_btn.setText("Run Automatically")
         self._sync_nav()
 
     def _on_stepper_step_clicked(self, index: int) -> None:
         if self.navigation is not None:
-            self.navigation.go_to_page(index)
+            page_idx = self._STEP_TO_FIRST_PAGE.get(index, index) if self.runtime_mode == "windows" else index
+            self.navigation.go_to_page(page_idx)
         self._sync_expert_page_context()
 
     def next_page(self) -> None:
@@ -600,14 +620,15 @@ class QtMigrationWindow(QMainWindow):
             self.navigation.prev_page()
         self._sync_expert_page_context()
 
+    def _show_blocked_message(self, message: str) -> None:
+        QMessageBox.information(self, "Can't continue yet", message)
+
     def _sync_nav(self) -> None:
         if self.navigation is not None:
             self.navigation.sync_nav()
         self._sync_expert_page_context()
 
     def _sync_expert_page_context(self) -> None:
-        if hasattr(self, "activity_group"):
-            self.activity_group.setVisible(self.stack.currentIndex() > 0)
         if not hasattr(self, "expert_panel"):
             return
         current = self.stack.currentWidget()
@@ -626,6 +647,8 @@ class QtMigrationWindow(QMainWindow):
             page_key = "scan"
         elif isinstance(current, BackupBundlePage):
             page_key = "backup_bundle"
+        elif isinstance(current, BundleReportPage):
+            page_key = "bundle_report"
         elif isinstance(current, RestorePage):
             page_key = "restore"
         elif isinstance(current, VerificationPage):
@@ -635,75 +658,11 @@ class QtMigrationWindow(QMainWindow):
 
         self.expert_panel.set_page_context(page_key)
 
-    def _toggle_activity_collapse(self) -> None:
-        self._activity_collapsed = not self._activity_collapsed
-        self.activity_body.setVisible(not self._activity_collapsed)
-        if self._activity_collapsed:
-            self.collapse_activity_btn.setText("▶  Show")
-            self.collapse_activity_btn.setToolTip("Expand activity panel")
-        else:
-            self.collapse_activity_btn.setText("▼  Hide")
-            self.collapse_activity_btn.setToolTip("Collapse activity panel")
-
-    def _toggle_log_filters(self) -> None:
-        if self.ui_state.mode == "guided":
-            return
-        new_state = not self.log_filters_panel.isVisible()
-        self.log_filters_panel.setVisible(new_state)
-        self.toggle_filters_btn.setText("Hide Log Filters" if new_state else "Show Log Filters")
-
-    def _set_log_filter(self, key: str, enabled: bool) -> None:
-        self.activity_log.set_filter(key, enabled)
-        self._refresh_activity_log()
-
-
-    def _badge_color(self, badge: str) -> QColor:
-        return {
-            "DONE": QColor("#70e0a1"),
-            "WARN": QColor("#ffd96d"),
-            "FAIL": QColor("#ff9090"),
-            "INFO": QColor("#9ad7f7"),
-        }.get(badge, QColor("#9ad7f7"))
-
-    def _refresh_activity_log(self) -> None:
-        self.activity_list.clear()
-        for entry in self.activity_log.iter_visible_entries():
-            badge = entry.get("badge", "INFO")
-            item = QListWidgetItem(
-                f"[{entry.get('time', '--:--:--')}] [{badge}] [{entry.get('icon', 'LOG')}] {entry.get('phase', '').upper()}: {entry.get('message', '')}"
-            )
-            item.setForeground(self._badge_color(badge))
-            self.activity_list.addItem(item)
-
-        while self.activity_list.count() > 220:
-            self.activity_list.takeItem(self.activity_list.count() - 1)
-
-    def _export_session_log(self) -> None:
-        if self.ui_state.mode == "guided":
-            self._log_activity("report", "Session log export is available in Balanced and Expert modes.", level="warn")
-            return
-
-        reports_dir = Path(__file__).resolve().parents[2] / "docs" / "reports"
-        try:
-            _, md_path = self.activity_log.export_session_log(
-                reports_dir=reports_dir,
-                runtime_mode=self.runtime_mode,
-            )
-            self._log_activity("report", f"Session log exported to {md_path}", level="success")
-        except Exception as exc:
-            self._log_activity("report", f"Session log export failed: {exc}", level="error")
-
     def _log_activity(self, phase: str, message: str, level: str = "info") -> None:
         self.activity_event.emit(phase, message, level)
 
     def _on_activity_event(self, phase: str, message: str, level: str) -> None:
         self.activity_log.append(phase=phase, message=message, level=level)
-        # Late events can arrive while the window is being destroyed.
-        try:
-            self._refresh_activity_log()
-            self.activity_status.setText(message)
-        except RuntimeError:
-            return
 
     def closeEvent(self, event) -> None:
         """Disconnect transient signals before Qt destroys child widgets."""
@@ -715,8 +674,6 @@ class QtMigrationWindow(QMainWindow):
 
     def _mark_action_done(self, action_key: str) -> None:
         self.completed_actions.add(action_key)
-        progress = int((len(self.completed_actions) / max(1, self.total_actions)) * 100)
-        self.pipeline_progress.setValue(progress)
 
     def _run_inventory(self, deep_scan: bool = False) -> dict:
         return self.operations.run_inventory(
@@ -794,7 +751,15 @@ class QtMigrationWindow(QMainWindow):
         if hasattr(current, "_refresh_usage_recommendations"):
             current._refresh_usage_recommendations()
 
-    def _run_backup(self) -> dict | None:
+    def _get_bundle_data(self) -> dict:
+        return {
+            "manifest": self.runtime_data.get("backup") or {},
+            "app_recs": self.runtime_data.get("review_app_recommendations") or {},
+            "local_bundle_path": str(RESTORE_DIR),
+            "usb_path": self.ui_state.backup_usb_path,
+        }
+
+    def _run_backup(self, cancel_event=None) -> dict | None:
         selected_folders = self.operations.resolve_selected_folders(self.ui_state, self.config)
         return self.operations.run_backup(
             runtime_mode=self.runtime_mode,
@@ -806,6 +771,7 @@ class QtMigrationWindow(QMainWindow):
             mark_action_done=self._mark_action_done,
             clear_error_banner=self._clear_error_banner,
             selected_folders=selected_folders,
+            cancel_event=cancel_event,
         )
 
     def _run_restore(self, bundle_dir: Path) -> dict:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -124,12 +125,32 @@ class ReportService:
                 lines.append(f"- `{item.get('relative_path', item.get('expected_destination', 'unknown'))}`")
             lines.append("")
 
+        apps_installed: list[dict[str, Any]] = restore_report.get("applications_installed", [])
+        if apps_installed:
+            lines += ["## Application Map", "", "| Windows App | Linux Package | Confidence |", "|---|---|---|"]
+            for app in apps_installed:
+                lines.append(
+                    f"| {app.get('windows_app', 'unknown')} | {app.get('linux_package', 'unknown')} "
+                    f"| {app.get('mapping_confidence', '')} |"
+                )
+            lines.append("")
+
+        shortcuts_restored: list[dict[str, Any]] = restore_report.get("shortcuts_restored", [])
+        if shortcuts_restored:
+            lines += ["## Shortcuts & Launchers", "", "| Shortcut | Category | Status |", "|---|---|---|"]
+            for sc in shortcuts_restored:
+                lines.append(
+                    f"| {sc.get('name', 'unknown')} | {sc.get('category', '')} | {sc.get('status', '')} |"
+                )
+            lines.append("")
+
         lines += ["## Restore Details", ""]
         all_files = restore_report.get("files_restored", [])
         if all_files:
             for item in all_files:
                 lines.append(
-                    f"- {item.get('relative_path', 'unknown')} -> {item.get('verification_status', 'unknown')}"
+                    f"- {item.get('relative_path', 'unknown')} -> {item.get('destination', 'unknown')} "
+                    f"[{item.get('verification_status', 'unknown')}]"
                 )
         else:
             lines.append("- No file restoration entries available.")
@@ -155,6 +176,18 @@ class ReportService:
         ])
         return "\n".join(lines)
 
+    @staticmethod
+    def _icon_data_uri(icon_path: str) -> str:
+        """Read a bundled icon PNG (relative to RESTORE_DIR) and return a base64 data URI."""
+        if not icon_path:
+            return ""
+        full_path = RESTORE_DIR / icon_path
+        try:
+            data = full_path.read_bytes()
+        except OSError:
+            return ""
+        return f"data:image/png;base64,{base64.b64encode(data).decode('ascii')}"
+
     def _build_html(self, report: dict[str, Any], restore_report: dict[str, Any]) -> str:
         """Render the final report as a standalone HTML page."""
         validation = report["validation"]
@@ -166,9 +199,41 @@ class ReportService:
         all_files = restore_report.get("files_restored", [])
         file_rows = "".join(
             f"<tr><td>{_esc(item.get('relative_path', 'unknown'))}</td>"
+            f"<td>{_esc(item.get('destination', 'unknown'))}</td>"
             f"<td>{_esc(item.get('verification_status', 'unknown'))}</td></tr>"
             for item in all_files
-        ) or "<tr><td colspan='2'>No restoration entries available.</td></tr>"
+        ) or "<tr><td colspan='3'>No restoration entries available.</td></tr>"
+
+        apps_installed: list[dict[str, Any]] = restore_report.get("applications_installed", [])
+        app_rows = "".join(
+            f"<tr><td>"
+            + (f"<img class='app-icon' src='{self._icon_data_uri(app.get('icon_path', ''))}' alt=''/>"
+               if self._icon_data_uri(app.get("icon_path", "")) else "<span class='app-icon-placeholder'></span>")
+            + f"{_esc(str(app.get('windows_app', 'unknown')))}</td>"
+            f"<td>{_esc(str(app.get('linux_package', 'unknown')))}</td>"
+            f"<td>{_esc(str(app.get('mapping_confidence', '')))}</td></tr>"
+            for app in apps_installed
+        )
+        app_map_section = (
+            f"<div class='card'><h2>Application Map ({len(apps_installed)})</h2>"
+            f"<table><tr><th>Windows App</th><th>Linux Package</th><th>Confidence</th></tr>{app_rows}</table></div>"
+            if apps_installed
+            else ""
+        )
+
+        shortcuts_restored: list[dict[str, Any]] = restore_report.get("shortcuts_restored", [])
+        shortcuts_rows = "".join(
+            f"<tr><td>{_esc(str(sc.get('name', 'unknown')))}</td>"
+            f"<td>{_esc(str(sc.get('category', '')))}</td>"
+            f"<td>{_esc(str(sc.get('status', '')))}</td></tr>"
+            for sc in shortcuts_restored
+        )
+        shortcuts_section = (
+            f"<div class='card'><h2>Shortcuts &amp; Launchers ({len(shortcuts_restored)})</h2>"
+            f"<table><tr><th>Shortcut</th><th>Category</th><th>Status</th></tr>{shortcuts_rows}</table></div>"
+            if shortcuts_restored
+            else ""
+        )
 
         failed_files: list[dict[str, Any]] = validation.get("failed_files", [])
         failed_rows = "".join(
@@ -227,6 +292,8 @@ class ReportService:
     .ts {{ color: #6b8fa3; margin-right: 6px; }}
     .stage {{ color: #1e6b46; font-weight: 600; margin-right: 4px; }}
     h1, h2 {{ margin-top: 0; }}
+    .app-icon {{ width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; border-radius: 4px; }}
+    .app-icon-placeholder {{ display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }}
   </style>
 </head>
 <body>
@@ -258,10 +325,12 @@ class ReportService:
   </div>
   {failed_section}
   {missing_section}
+  {app_map_section}
+  {shortcuts_section}
   <div class="card">
     <h2>Restore Details ({len(all_files)} files)</h2>
     <table>
-      <tr><th>Relative Path</th><th>Status</th></tr>
+      <tr><th>Relative Path</th><th>Destination</th><th>Status</th></tr>
       {file_rows}
     </table>
   </div>

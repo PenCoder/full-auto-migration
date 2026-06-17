@@ -36,24 +36,24 @@ class ApplicationMappingPage(BasePage):
         root.addWidget(self.create_page_header(
             "🗂️",
             "Plan your app transition",
-            "We'll match each of your Windows apps to the best Linux alternative. "
-            "Most apps have a great equivalent — and we've already done the research.",
+            "Each Windows app is matched to the best Linux alternative. "
+            "Most have a great equivalent already in the database.",
         ))
 
         question = "How would you like to handle your apps?"
         info = (
-            "We have a database of over 150 app matches ready to go. "
+            "A database of over 150 app matches is ready to go. "
             "Choose how much you'd like to be involved in the selection."
         )
 
         self.migrate_all_radio = QRadioButton("Switch all my apps automatically — I trust your recommendations")
         self.migrate_all_hint = self.hint_label(
-            "Best for most people. We pick the best Linux alternative for each of your apps and handle everything."
+            "Best for most people. The best Linux alternative is selected for each of your apps automatically."
         )
 
         self.choose_from_recommendations_radio = QRadioButton("Show me the recommendations and let me pick")
         self.choose_from_recommendations_hint = self.hint_label(
-            "We suggest alternatives for each app and you decide which ones to include."
+            "Alternatives are listed for each app — choose which ones to include."
         )
 
         self.manual_mapping_radio = QRadioButton("I'll configure the app matches myself")
@@ -139,7 +139,7 @@ class ApplicationMappingPage(BasePage):
             self.ui_state.analysis_completed = True
             mapped = len(result.get("software", []))
             self.status.setText(
-                f"✅  Done! We found Linux alternatives for {mapped} of your apps. You're ready to move on."
+                f"✅  Done! Linux alternatives found for {mapped} of your apps. Ready to move on."
             )
         else:
             self.status.setText("App matching finished — you can proceed to the next step.")
@@ -173,7 +173,7 @@ class ApplicationMappingPage(BasePage):
                 self.migrate_all_radio.setChecked(True)
             if not self.is_processing and not self.ui_state.analysis_completed:
                 self.status.setText(
-                    "We'll automatically find the best Linux app for each of your Windows apps."
+                    "The best Linux app for each of your Windows apps will be selected automatically."
                 )
         elif mode == "balanced":
             self.migrate_all_radio.setVisible(True)
@@ -189,7 +189,7 @@ class ApplicationMappingPage(BasePage):
                 self.choose_from_recommendations_radio.setChecked(True)
             if not self.is_processing and not self.ui_state.analysis_completed:
                 self.status.setText(
-                    "Generating the plan — we'll show you which Linux apps we recommend."
+                    "Generating the plan — Linux alternatives for your apps will appear here."
                 )
         else:
             self.migrate_all_radio.setVisible(True)

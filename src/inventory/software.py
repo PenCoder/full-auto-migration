@@ -28,6 +28,11 @@ try:
 except ImportError:
     _winapps = None  # type: ignore[assignment]
 
+try:
+    import winreg as _winreg
+except ImportError:
+    _winreg = None  # type: ignore[assignment]
+
 from src.constants import BASE_DIR, DATA_DIR
 from src.loggers import get_logger
 from src.config import load_default_config, load_config, MigrationConfigRoot
@@ -111,11 +116,57 @@ def _run_powershell_json(command: str) -> Any:
 # Software inventory collection
 # ---------------------------------------------------------------------------
 
+_UNINSTALL_KEY_ROOTS: List[tuple] = []
+if _winreg is not None:
+    _UNINSTALL_KEY_ROOTS = [
+        (_winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (_winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (_winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+    ]
+
+
+def _collect_display_icons() -> Dict[str, str]:
+    """Read DisplayIcon values from the uninstall registry keys, keyed by DisplayName.
+
+    Used to find a representative icon (.exe or .ico path, possibly with a
+    ",N" resource-index suffix) for each installed application.
+    """
+    if _winreg is None:
+        return {}
+
+    icons: Dict[str, str] = {}
+    for hive, subkey in _UNINSTALL_KEY_ROOTS:
+        try:
+            root = _winreg.OpenKey(hive, subkey)
+        except OSError:
+            continue
+        try:
+            count = _winreg.QueryInfoKey(root)[0]
+            for i in range(count):
+                try:
+                    name = _winreg.EnumKey(root, i)
+                    with _winreg.OpenKey(root, name) as app_key:
+                        display_name = _winreg.QueryValueEx(app_key, "DisplayName")[0]
+                        try:
+                            display_icon = _winreg.QueryValueEx(app_key, "DisplayIcon")[0]
+                        except OSError:
+                            display_icon = ""
+                        if display_name and display_icon:
+                            icons[display_name] = display_icon
+                except OSError:
+                    continue
+        finally:
+            root.Close()
+    return icons
+
+
 def _collect_software_from_registry() -> List[Dict[str, Any]]:
     """Return installed Windows applications via winapps, or an empty list on non-Windows."""
     if _winapps is None:
         logger.warning("winapps is not available on this platform — returning empty software list.")
         return []
+
+    icons = _collect_display_icons()
 
     data: list[dict[str, Any]] = []
     for app in _winapps.list_installed():
@@ -124,6 +175,7 @@ def _collect_software_from_registry() -> List[Dict[str, Any]]:
             "DisplayVersion": app.version,
             "Publisher": app.publisher,
             "InstallDate": None,
+            "DisplayIcon": icons.get(app.name, ""),
         })
     return data
 

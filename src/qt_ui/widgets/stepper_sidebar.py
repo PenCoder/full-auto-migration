@@ -138,6 +138,25 @@ class StepperSidebar(QWidget):
             meta.setProperty("state", state)
             self._repolish(meta)
 
+    def mark_step_done(self, index: int) -> None:
+        """Mark a single step as done (✓) without affecting surrounding steps.
+
+        Safe to call repeatedly or out of order — only updates the given index.
+        """
+        if index < 0 or index >= len(self.dot_labels):
+            return
+        if self._step_states[index] == "done":
+            return
+
+        dot = self.dot_labels[index]
+        dot.setText("✓")
+        self._step_states[index] = "done"
+        self._row_widgets[index].set_clickable(True)
+
+        for widget in (dot, self.title_labels[index], self.meta_labels[index]):
+            widget.setProperty("state", "done")
+            self._repolish(widget)
+
     @staticmethod
     def _repolish(widget: QWidget) -> None:
         style = widget.style()

@@ -44,16 +44,15 @@ class ModeController:
             if self.expert_dock.isVisible():
                 self.expert_dock.hide()
             self.ui_state.expert_panel_visible = False
-            self.expert_toggle_btn.setText("Show Expert Overrides")
+            self.expert_toggle_btn.setText("Show Customize")
             self.expert_toggle_btn.setEnabled(False)
-            self.complete_all_btn.setEnabled(False)
             return
 
         if mode == "expert":
             if not self.expert_dock.isVisible():
                 self.expert_dock.show()
             self.ui_state.expert_panel_visible = True
-            self.expert_toggle_btn.setText("Hide Expert Overrides")
+            self.expert_toggle_btn.setText("Hide Customize")
             self.expert_toggle_btn.setEnabled(True)
             self.complete_all_btn.setEnabled(True)
             return
@@ -63,7 +62,7 @@ class ModeController:
             self.expert_dock.hide()
         self.expert_toggle_btn.setEnabled(True)
         self.complete_all_btn.setEnabled(True)
-        self.expert_toggle_btn.setText("Hide Expert Overrides" if self.expert_dock.isVisible() else "Show Expert Overrides")
+        self.expert_toggle_btn.setText("Hide Customize" if self.expert_dock.isVisible() else "Show Customize")
 
     def toggle_expert_panel(self) -> None:
         if self.ui_state.mode == "guided":
@@ -71,8 +70,8 @@ class ModeController:
         if self.expert_dock.isVisible():
             self.expert_dock.hide()
             self.ui_state.expert_panel_visible = False
-            self.expert_toggle_btn.setText("Show Expert Overrides")
+            self.expert_toggle_btn.setText("Show Customize")
         else:
             self.expert_dock.show()
             self.ui_state.expert_panel_visible = True
-            self.expert_toggle_btn.setText("Hide Expert Overrides")
+            self.expert_toggle_btn.setText("Hide Customize")
