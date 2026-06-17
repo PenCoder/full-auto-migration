@@ -329,6 +329,7 @@ class OperationsController:
         mark_action_done,
         clear_error_banner,
         selected_folders: list[str],
+        cancel_event=None,
     ) -> dict | None:
         if runtime_mode != "windows":
             raise RuntimeError("Backup is only available in Windows pre-migration mode.")
@@ -353,9 +354,11 @@ class OperationsController:
             selected_file_types = default_types
 
         config.source_system.file_types = selected_file_types
+        dry_run = bool(ui_state.advanced_operations.get("dry_run", False))
         log_activity(
             "backup",
-            f"Creating bundle from {len(selected_folders)} folder scope(s) and selected file filters...",
+            f"{'[DRY RUN] Simulating' if dry_run else 'Creating'} bundle"
+            f" from {len(selected_folders)} folder scope(s) and selected file filters...",
         )
         # Pull app recommendations from runtime_data — prefer the review-page result,
         # fall back to any earlier scan-page result.
@@ -372,15 +375,28 @@ class OperationsController:
             selected_file_types,
             settings_inventory=ui_state.settings_inventory or None,
             settings_plan=ui_state.settings_migration_plan or None,
+            shortcuts_inventory=ui_state.shortcuts_inventory or None,
             app_recommendations=app_recommendations,
+            dry_run=dry_run,
+            cancel_event=cancel_event,
         )
         runtime_data["backup"] = result
         files = int(result.get("total_files", 0)) if isinstance(result, dict) else 0
-        log_activity(
-            "backup",
-            f"Backup bundle completed. Manifest entries: {files}.",
-            level="success",
-        )
+        if isinstance(result, dict) and result.get("cancelled"):
+            log_activity("backup", "Backup cancelled by user.", level="warning")
+            return result
+        if dry_run:
+            log_activity(
+                "backup",
+                f"Dry run complete — {files} files would be backed up. No data written to disk.",
+                level="success",
+            )
+        else:
+            log_activity(
+                "backup",
+                f"Backup bundle completed. Manifest entries: {files}.",
+                level="success",
+            )
         mark_action_done("backup")
         return result
 

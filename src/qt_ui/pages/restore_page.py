@@ -29,13 +29,13 @@ class RestorePage(BasePage):
 
         root.addWidget(self.create_page_header(
             "🚀",
-            "Welcome to Linux — let's bring your data over!",
-            "Point us to the migration bundle you created on Windows "
-            "and we'll restore your files and app list automatically.",
+            "Welcome to Linux — restore your data",
+            "Point to the migration bundle you created on Windows "
+            "and your files and app list will be restored automatically.",
         ))
 
         info = self.create_trust_banner(
-            "✅  Nothing is overwritten without your confirmation. "
+            "Nothing is overwritten without your confirmation. "
             "Your bundle contains only copies — your Windows files are still safe."
         )
         root.addWidget(info)

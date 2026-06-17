@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import os
+import re
 import shutil
 import subprocess
 import zipfile
@@ -94,12 +95,14 @@ class RestoreService:
         self.settings_inv_path = bundle_dir / "settings_inventory.json"
         self.settings_plan_path = bundle_dir / "settings_migration_plan.json"
         self.settings_assets_dir = bundle_dir / "settings_assets"
+        self.shortcuts_path = bundle_dir / "shortcuts_inventory.json"
 
         self.restored_files: list[dict] = []
         self.installed_apps: list[dict] = []
         self.settings_applied: list[str] = []
         self.settings_guidance_path: str = ""
         self.apps_to_install: list[dict] = []
+        self.shortcuts_restored: list[dict] = []
         self.report_path = RESTORE_REPORT
 
     def _progress(self, percent: int, msg: str) -> None:
@@ -129,6 +132,10 @@ class RestoreService:
         if self.apps_path.exists():
             self._progress(90, "Installing applications…")
             self._install_applications()
+
+        if self.shortcuts_path.exists():
+            self._progress(96, "Recreating shortcuts and launchers…")
+            self._restore_shortcuts()
 
         self._write_restore_report()
         self._progress(100, "Restore complete.")
@@ -475,6 +482,131 @@ class RestoreService:
         self.installed_apps = self.apps_to_install
         self.logger.info("Package installation complete. Output: %s", result.stdout)
 
+    # ── Shortcut / launcher recreation ──────────────────────────────────────────
+
+    @staticmethod
+    def _safe_filename(name: str) -> str:
+        safe = re.sub(r"[^a-zA-Z0-9_-]+", "_", name).strip("_")
+        return safe or "app"
+
+    def _write_desktop_entry(self, name: str, exec_cmd: str, icon_name: str) -> Path:
+        apps_dir = Path.home() / ".local" / "share" / "applications"
+        apps_dir.mkdir(parents=True, exist_ok=True)
+        desktop_path = apps_dir / f"{self._safe_filename(name)}.desktop"
+        content = (
+            "[Desktop Entry]\n"
+            "Type=Application\n"
+            f"Name={name}\n"
+            f"Exec={exec_cmd}\n"
+            f"Icon={icon_name}\n"
+            "Terminal=false\n"
+            "Categories=Utility;\n"
+        )
+        desktop_path.write_text(content, encoding="utf-8")
+        os.chmod(desktop_path, 0o755)
+        return desktop_path
+
+    def _try_pin_cinnamon(self, desktop_id: str) -> bool:
+        """Best-effort taskbar pin via Cinnamon's panel-launchers applet."""
+        try:
+            result = self._run_cmd_capture(["gsettings", "get", "org.cinnamon", "panel-launchers"])
+            if result is None:
+                return False
+            current = result.strip()
+            if desktop_id in current:
+                return True
+            if current.startswith("[") and current.endswith("]"):
+                inner = current[1:-1].strip()
+                new_value = f"[{inner}, '{desktop_id}']" if inner else f"['{desktop_id}']"
+            else:
+                new_value = f"['{desktop_id}']"
+            return self._run_cmd(["gsettings", "set", "org.cinnamon", "panel-launchers", new_value])
+        except Exception as exc:
+            self.logger.debug("Cinnamon panel pin failed for %s: %s", desktop_id, exc)
+            return False
+
+    def _run_cmd_capture(self, cmd: list[str]) -> str | None:
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            return result.stdout if result.returncode == 0 else None
+        except Exception as exc:
+            self.logger.debug("Command %s failed: %s", cmd, exc)
+            return None
+
+    def _restore_shortcuts(self) -> None:
+        """Recreate Desktop icons and Start Menu / taskbar launchers from shortcuts_inventory.json.
+
+        Only shortcuts that were matched (during inventory) to an app that
+        ended up installed on this machine get a launcher recreated.
+        """
+        try:
+            inventory = json.loads(self.shortcuts_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            self.logger.warning("Could not read shortcuts inventory: %s", exc)
+            return
+
+        entries = inventory.get("entries", []) if isinstance(inventory, dict) else []
+        if not entries:
+            return
+
+        installed_by_windows_app = {
+            str(app.get("windows_app", "")): app
+            for app in self.apps_to_install
+            if app.get("windows_app")
+        }
+
+        de = self._detect_desktop_env()
+        desktop_dir = Path.home() / "Desktop"
+
+        for shortcut in entries:
+            matched_app = str(shortcut.get("matched_app", ""))
+            name = str(shortcut.get("name", "")) or matched_app
+            category = str(shortcut.get("category", ""))
+
+            app = installed_by_windows_app.get(matched_app) if matched_app else None
+            if not app:
+                self.shortcuts_restored.append({
+                    "name": name,
+                    "category": category,
+                    "status": "skipped_no_match",
+                })
+                continue
+
+            linux_package = str(app.get("linux_package", ""))
+            try:
+                desktop_path = self._write_desktop_entry(name, linux_package, linux_package)
+                status = "desktop_entry_created"
+
+                if category == "desktop":
+                    desktop_dir.mkdir(parents=True, exist_ok=True)
+                    dest = desktop_dir / desktop_path.name
+                    shutil.copy2(desktop_path, dest)
+                    os.chmod(dest, 0o755)
+                    status = "desktop_icon_created"
+                elif category == "taskbar":
+                    if de == "cinnamon" and self._try_pin_cinnamon(desktop_path.name):
+                        status = "pinned_to_taskbar"
+                    else:
+                        status = "added_to_menu_manual_pin_needed"
+
+                self.shortcuts_restored.append({
+                    "name": name,
+                    "category": category,
+                    "linux_package": linux_package,
+                    "status": status,
+                })
+            except Exception as exc:
+                self.logger.warning("Could not recreate shortcut '%s': %s", name, exc)
+                self.shortcuts_restored.append({
+                    "name": name,
+                    "category": category,
+                    "status": "failed",
+                })
+
+        created = sum(1 for s in self.shortcuts_restored if s["status"] != "skipped_no_match" and s["status"] != "failed")
+        self.logger.info("Shortcuts restore: %d recreated, %d skipped (no installed match)",
+                          created, len(self.shortcuts_restored) - created)
+
     # ── Restore report ────────────────────────────────────────────────────────
 
     def _write_restore_report(self) -> None:
@@ -483,6 +615,7 @@ class RestoreService:
             "applications_installed": self.installed_apps,
             "settings_applied": self.settings_applied,
             "settings_guidance": self.settings_guidance_path,
+            "shortcuts_restored": self.shortcuts_restored,
         }
         self.report_path.parent.mkdir(parents=True, exist_ok=True)
         with self.report_path.open("w", encoding="utf-8") as f:

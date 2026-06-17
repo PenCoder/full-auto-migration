@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import threading
 from datetime import datetime, timezone
@@ -16,9 +17,11 @@ from src.constants import BASE_DIR, RESTORE_DIR
 from src.inventory.hardware import collect_hardware_inventory, write_hardware_inventory
 from src.inventory.settings import collect_settings_inventory, write_settings_inventory
 from src.inventory.software import collect_software_inventory, write_software_inventory
+from src.inventory.shortcuts import collect_shortcuts_inventory, write_shortcuts_inventory
 from src.loggers import get_logger
 from src.orchestration.checkpoints import CheckpointManager
 from src.orchestration.errors import ERR_BACKUP_FAILED, MigrationError
+from src.services.icon_extractor import extract_icon_png
 
 
 class MigrationService:
@@ -65,14 +68,20 @@ class MigrationService:
             settings_out = write_settings_inventory(self.config, settings)
             self.logger.info("Settings inventory written to %s", settings_out)
 
+            self.logger.info("Collecting Desktop / Start Menu / Taskbar shortcuts...")
+            shortcuts = collect_shortcuts_inventory(sw.get("entries", []))
+            shortcuts_out = write_shortcuts_inventory(self.config, shortcuts)
+            self.logger.info("Shortcuts inventory written to %s", shortcuts_out)
+
             self.checkpoints.mark_phase(
                 "inventory_completed",
                 hardware_output=str(hw_out),
                 software_output=str(sw_out),
                 settings_output=str(settings_out),
+                shortcuts_output=str(shortcuts_out),
                 scan_depth="deep" if deep_scan else "quick",
             )
-            return {"hardware": hw, "software": sw, "settings": settings}
+            return {"hardware": hw, "software": sw, "settings": settings, "shortcuts": shortcuts}
         except Exception as exc:
             self.checkpoints.mark_phase("inventory_failed", error=str(exc))
             raise
@@ -109,12 +118,23 @@ class MigrationService:
             self.checkpoints.mark_phase("analysis_failed", error=str(exc))
             raise
 
-    def run_backup(self, selected_folders, selected_file_types, logger=None, settings_inventory=None, settings_plan=None, app_recommendations=None):
+    def run_backup(
+        self,
+        selected_folders,
+        selected_file_types,
+        logger=None,
+        settings_inventory=None,
+        settings_plan=None,
+        shortcuts_inventory=None,
+        app_recommendations=None,
+        dry_run=False,
+        cancel_event: threading.Event | None = None,
+    ):
         """Create the backup manifest, copy selected files, and bundle settings and app data."""
         if logger is not None:
             self.logger = logger
 
-        self.logger.info("Starting backup manifest generation...")
+        self.logger.info("Starting backup manifest generation%s...", " (dry run)" if dry_run else "")
         self.checkpoints.mark_phase("backup_started", selected_folders=selected_folders)
 
         try:
@@ -122,12 +142,33 @@ class MigrationService:
             self.config.source_system.file_types = selected_file_types
             manifest = generate_manifest(self.config)
 
+            if dry_run:
+                self.logger.info(
+                    "DRY RUN: %d files would be backed up. Skipping all disk writes.",
+                    manifest.get("total_files", 0),
+                )
+                manifest["dry_run"] = True
+                self.checkpoints.complete(manifest_entries=manifest.get("total_files", 0), archive_enabled=False)
+                return manifest
+
+            if cancel_event is not None and cancel_event.is_set():
+                self.logger.info("Backup cancelled by user before file copy began.")
+                self.checkpoints.mark_phase("backup_cancelled")
+                manifest["cancelled"] = True
+                return manifest
+
             out_file = write_manifest(self.config, manifest)
             self.logger.info("Backup manifest written to %s", out_file)
-            copy_backup_files(manifest, self.config)
+            completed = copy_backup_files(manifest, self.config, cancel_event=cancel_event)
+            if not completed:
+                self.logger.info("Backup cancelled by user during file copy.")
+                self.checkpoints.mark_phase("backup_cancelled")
+                manifest["cancelled"] = True
+                return manifest
 
             # Bundle settings and app recommendations for the Linux restore side.
             self._bundle_settings(settings_inventory, settings_plan)
+            self._bundle_shortcuts(shortcuts_inventory, settings_plan)
             self._bundle_apps(app_recommendations)
 
             if self.config.backup.compress:
@@ -178,6 +219,25 @@ class MigrationService:
             plan_path.write_text(json.dumps(settings_plan, indent=2), encoding="utf-8")
             self.logger.info("Settings migration plan bundled at %s", plan_path)
 
+    def _bundle_shortcuts(self, shortcuts_inventory: dict | None, settings_plan: dict | None) -> None:
+        """Write shortcuts_inventory.json into RESTORE_DIR unless the plan excludes it."""
+        if not shortcuts_inventory or not shortcuts_inventory.get("entries"):
+            return
+
+        plan_items = {
+            item.get("name"): item.get("action")
+            for item in (settings_plan or {}).get("items", [])
+            if isinstance(item, dict)
+        }
+        if plan_items.get("App Shortcuts") == "exclude":
+            self.logger.info("App Shortcuts excluded by settings plan — skipping shortcuts bundle.")
+            return
+
+        RESTORE_DIR.mkdir(parents=True, exist_ok=True)
+        shortcuts_path = RESTORE_DIR / "shortcuts_inventory.json"
+        shortcuts_path.write_text(json.dumps(shortcuts_inventory, indent=2), encoding="utf-8")
+        self.logger.info("Shortcuts inventory bundled at %s", shortcuts_path)
+
     def _bundle_apps(self, app_recommendations: dict | None) -> None:
         """Write apps_to_install.json into RESTORE_DIR so the Linux restore can install packages.
 
@@ -193,6 +253,7 @@ class MigrationService:
 
         RESTORE_DIR.mkdir(parents=True, exist_ok=True)
 
+        icons_dir = RESTORE_DIR / "icons"
         seen: set[str] = set()
         installable: list[dict] = []
         for rec in recs:
@@ -201,12 +262,22 @@ class MigrationService:
             if not pkg or pkg in seen:
                 continue
             seen.add(pkg)
+
+            icon_path = ""
+            icon_source = str(rec.get("icon_source", "")).strip()
+            if icon_source:
+                safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", pkg).strip("_") or "app"
+                dest = icons_dir / f"{safe_name}.png"
+                if extract_icon_png(icon_source, dest):
+                    icon_path = f"icons/{dest.name}"
+
             installable.append({
                 "windows_app": str(rec.get("windows_app", "")),
                 "linux_package": pkg,
                 "migration_strategy": strategy,
                 "mapping_confidence": str(rec.get("mapping_confidence", "")),
                 "category": str(rec.get("category", "")),
+                "icon_path": icon_path,
             })
 
         apps_path = RESTORE_DIR / "apps_to_install.json"

@@ -40,7 +40,7 @@ class ReportPage(BasePage):
 
         root.addWidget(
             self.create_trust_banner(
-                "✅  This report is generated entirely on your computer. "
+                "This report is generated entirely on your computer. "
                 "No data is uploaded or shared unless you choose to share the file."
             )
         )

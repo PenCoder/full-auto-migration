@@ -288,18 +288,26 @@ def write_manifest(config: MigrationConfigRoot, manifest: Dict[str, Any]) -> Pat
     return out_path
 
 
-def copy_backup_files(manifest: dict, cfg: MigrationConfigRoot) -> None:
+def copy_backup_files(manifest: dict, cfg: MigrationConfigRoot, cancel_event=None) -> bool:
     """
     Copy all files referenced in manifest['entries'] into files_dir,
     preserving relative paths.
+
+    Checks ``cancel_event`` (a threading.Event) between each file so a
+    user-requested cancellation stops further copying. Returns False if
+    cancelled before completion, True otherwise.
     """
     backup_root = DATA_DIR / cfg.source_system.backup_output_dir
     files_dir = backup_root / "files"
     if files_dir.exists():
         shutil.rmtree(files_dir)
     files_dir.mkdir(parents=True, exist_ok=True)
-    
+
     for entry in manifest["entries"]:
+        if cancel_event is not None and cancel_event.is_set():
+            logger.info("Backup file copy cancelled by user.")
+            return False
+
         src = Path(entry["source_path"])
         dest = files_dir / entry["relative_path"]
 
@@ -311,6 +319,7 @@ def copy_backup_files(manifest: dict, cfg: MigrationConfigRoot) -> None:
             print(f"[WARN] Could not copy {src}: {e}")
 
     logger.info("Copied backup files to: %s", files_dir)
+    return True
 
 
 def create_backup_archive(source_dir: Path, archive_path: Path):

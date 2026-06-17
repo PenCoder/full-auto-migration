@@ -43,6 +43,7 @@ class ExpertPanel(QWidget):
         self.current_mode = ui_state.mode
         self.current_page_key = "mode_selection"
         self.page_widgets: dict[str, QWidget] = {}
+        self.on_settings_changed = None  # set by main_window to trigger settings page refresh
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -78,7 +79,7 @@ class ExpertPanel(QWidget):
         self.page_widgets["report"] = self._build_report_panel()
 
         # Add all pages to stacked widget
-        for page_key, widget in self.page_widgets.items():
+        for widget in self.page_widgets.values():
             self.stacked_widget.addWidget(widget)
 
         root.addStretch(1)
@@ -156,43 +157,27 @@ class ExpertPanel(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(10)
 
-        # --- System Intelligence Group ---
-        sys_group = QGroupBox("System Intelligence")
-        sys_form = QFormLayout(sys_group)
-        sys_form.setSpacing(10)
+        self.mode_sim_group = QGroupBox("Simulation")
+        sim_group = self.mode_sim_group
+        sim_form = QFormLayout(sim_group)
+        sim_form.setSpacing(10)
 
         self.mode_dry_run = QCheckBox("Simulation Mode (Dry Run)")
         self.mode_dry_run.setToolTip("Test migration without writing any data to disk.")
-        
-        self.mode_io_priority = QComboBox()
-        self.mode_io_priority.addItems(["Low (Background)", "Normal", "High (Focus)"])
-        
-        self.mode_verify_level = QComboBox()
-        self.mode_verify_level.addItems(["Size Only", "MD5 Hash", "SHA-256 (Paranoid)"])
+        self.mode_dry_run.setChecked(self.ui_state.advanced_operations.get("dry_run", False))
+        self.mode_dry_run.toggled.connect(lambda v: self._set_op("dry_run", v))
 
-        sys_form.addRow(self.mode_dry_run)
-        sys_form.addRow("I/O Priority:", self.mode_io_priority)
-        sys_form.addRow("Verification:", self.mode_verify_level)
-        layout.addWidget(sys_group)
+        dry_run_info = QLabel(
+            "When enabled, the tool scans your files and generates a full manifest "
+            "showing exactly what would be backed up — but nothing is written to disk. "
+            "Use this to preview the migration before committing."
+        )
+        dry_run_info.setWordWrap(True)
+        dry_run_info.setStyleSheet("color: #546E7A; font-size: 11px;")
 
-        advanced_group = QGroupBox("Advanced Operations")
-        advanced_layout = QVBoxLayout(advanced_group)
-        self.mode_incremental = QCheckBox("Incremental Backup")
-        self.mode_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.mode_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
-        advanced_layout.addWidget(self.mode_incremental)
-
-        self.mode_parallel = QCheckBox("Parallel Hashing")
-        self.mode_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.mode_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
-        advanced_layout.addWidget(self.mode_parallel)
-
-        self.mode_rollback = QCheckBox("Create Rollback Point")
-        self.mode_rollback.setChecked(self.ui_state.advanced_operations.get("create_rollback_point", False))
-        self.mode_rollback.toggled.connect(lambda v: self._set_op("create_rollback_point", v))
-        advanced_layout.addWidget(self.mode_rollback)
-
-        layout.addWidget(advanced_group)
+        sim_form.addRow(self.mode_dry_run)
+        sim_form.addRow(dry_run_info)
+        layout.addWidget(sim_group)
         layout.addStretch(1)
         return widget
 
@@ -206,25 +191,43 @@ class ExpertPanel(QWidget):
         distro_group = QGroupBox("Target Distro")
         distro_layout = QVBoxLayout(distro_group)
         self.settings_distro_combo = QComboBox()
-        self.settings_distro_combo.addItems(["Linux Mint", "Ubuntu", "Fedora", "Debian"])
+        self.settings_distro_combo.addItems(["Linux Mint"])
         self.settings_distro_combo.setCurrentText(self.ui_state.target_distro)
         self.settings_distro_combo.currentTextChanged.connect(self._set_distro)
+        self.settings_distro_combo.setEnabled(False)
         distro_layout.addWidget(self.settings_distro_combo)
         layout.addWidget(distro_group)
 
-        advanced_group = QGroupBox("Advanced Operations")
-        advanced_layout = QVBoxLayout(advanced_group)
-        self.settings_incremental = QCheckBox("Incremental Backup")
-        self.settings_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.settings_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
-        advanced_layout.addWidget(self.settings_incremental)
+        appearance_group = QGroupBox("Appearance Items")
+        appearance_form = QFormLayout(appearance_group)
+        appearance_form.setSpacing(8)
 
-        self.settings_parallel = QCheckBox("Parallel Hashing")
-        self.settings_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.settings_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
-        advanced_layout.addWidget(self.settings_parallel)
+        self.settings_appearance_checkboxes: dict[str, QCheckBox] = {}
+        _base_items = [
+            ("wallpaper", "Wallpaper"),
+            ("theme", "Theme file"),
+            ("light_dark", "Light / Dark preference"),
+            ("accent_color", "Accent color"),
+        ]
+        _expert_only_items = [
+            ("taskbar_layout", "App shortcuts (Desktop, Start Menu, Taskbar)"),
+            ("keyboard_shortcuts", "Keyboard shortcuts"),
+            ("file_associations", "File associations"),
+        ]
+        for key, label in _base_items + _expert_only_items:
+            cb = QCheckBox(label)
+            cb.setChecked(self.ui_state.settings_selected_items.get(key, False))
+            cb.toggled.connect(lambda v, k=key: self._set_appearance(k, v))
+            appearance_form.addRow(cb)
+            self.settings_appearance_checkboxes[key] = cb
 
-        layout.addWidget(advanced_group)
+        layout.addWidget(appearance_group)
+
+        self.settings_expert_checks = [
+            self.settings_appearance_checkboxes[k]
+            for k in ("taskbar_layout", "keyboard_shortcuts", "file_associations")
+        ]
+
         layout.addStretch(1)
         return widget
 
@@ -414,22 +417,6 @@ class ExpertPanel(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(10)
 
-        hardware_group = QGroupBox("Hardware Advisories")
-        hw_form = QFormLayout(hardware_group)
-        for name, confidence in [
-            ("NVIDIA GPU", "88%"),
-            ("Intel Wi-Fi", "92%"),
-            ("Intel BT", "92%"),
-        ]:
-            row = QWidget()
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.addWidget(QLabel(confidence))
-            toggle = QCheckBox("Override")
-            row_layout.addWidget(toggle)
-            hw_form.addRow(QLabel(name), row)
-        layout.addWidget(hardware_group)
-
         mapping_group = QGroupBox("Mapping Overrides")
         mapping_layout = QVBoxLayout(mapping_group)
 
@@ -458,19 +445,6 @@ class ExpertPanel(QWidget):
         mapping_layout.addLayout(actions_row)
         layout.addWidget(mapping_group)
 
-        system_group = QGroupBox("System Operations")
-        system_layout = QVBoxLayout(system_group)
-        self.scan_incremental = QCheckBox("Incremental Backup")
-        self.scan_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.scan_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
-        system_layout.addWidget(self.scan_incremental)
-
-        self.scan_parallel = QCheckBox("Parallel Hashing")
-        self.scan_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.scan_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
-        system_layout.addWidget(self.scan_parallel)
-
-        layout.addWidget(system_group)
         layout.addStretch(1)
         return widget
 
@@ -513,19 +487,6 @@ class ExpertPanel(QWidget):
         custom_layout.addWidget(remove_custom_btn)
         layout.addWidget(custom_group)
 
-        advanced_group = QGroupBox("Advanced Operations")
-        advanced_layout = QVBoxLayout(advanced_group)
-        self.backup_incremental = QCheckBox("Incremental Backup")
-        self.backup_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.backup_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
-        advanced_layout.addWidget(self.backup_incremental)
-
-        self.backup_parallel = QCheckBox("Parallel Hashing")
-        self.backup_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.backup_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
-        advanced_layout.addWidget(self.backup_parallel)
-
-        layout.addWidget(advanced_group)
         layout.addStretch(1)
         return widget
 
@@ -539,30 +500,13 @@ class ExpertPanel(QWidget):
         distro_group = QGroupBox("Target Distro")
         distro_layout = QVBoxLayout(distro_group)
         self.restore_distro_combo = QComboBox()
-        self.restore_distro_combo.addItems(["Linux Mint", "Ubuntu", "Fedora", "Debian"])
+        self.restore_distro_combo.addItems(["Linux Mint"])
         self.restore_distro_combo.setCurrentText(self.ui_state.target_distro)
         self.restore_distro_combo.currentTextChanged.connect(self._set_distro)
+        self.restore_distro_combo.setEnabled(False)
         distro_layout.addWidget(self.restore_distro_combo)
         layout.addWidget(distro_group)
 
-        advanced_group = QGroupBox("Advanced Operations")
-        advanced_layout = QVBoxLayout(advanced_group)
-        self.restore_incremental = QCheckBox("Incremental Backup")
-        self.restore_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.restore_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
-        advanced_layout.addWidget(self.restore_incremental)
-
-        self.restore_parallel = QCheckBox("Parallel Hashing")
-        self.restore_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.restore_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
-        advanced_layout.addWidget(self.restore_parallel)
-
-        self.restore_rollback = QCheckBox("Create Rollback Point")
-        self.restore_rollback.setChecked(self.ui_state.advanced_operations.get("create_rollback_point", False))
-        self.restore_rollback.toggled.connect(lambda v: self._set_op("create_rollback_point", v))
-        advanced_layout.addWidget(self.restore_rollback)
-
-        layout.addWidget(advanced_group)
         layout.addStretch(1)
         return widget
 
@@ -573,19 +517,7 @@ class ExpertPanel(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(10)
 
-        system_group = QGroupBox("System Operations")
-        system_layout = QVBoxLayout(system_group)
-        self.verify_incremental = QCheckBox("Incremental Backup")
-        self.verify_incremental.setChecked(self.ui_state.advanced_operations.get("incremental_backup", False))
-        self.verify_incremental.toggled.connect(lambda v: self._set_op("incremental_backup", v))
-        system_layout.addWidget(self.verify_incremental)
-
-        self.verify_parallel = QCheckBox("Parallel Hashing")
-        self.verify_parallel.setChecked(self.ui_state.advanced_operations.get("parallel_hashing", False))
-        self.verify_parallel.toggled.connect(lambda v: self._set_op("parallel_hashing", v))
-        system_layout.addWidget(self.verify_parallel)
-
-        layout.addWidget(system_group)
+        layout.addWidget(QLabel("No additional expert controls for verification."))
         layout.addStretch(1)
         return widget
 
@@ -602,23 +534,27 @@ class ExpertPanel(QWidget):
         """Hide or show advanced controls based on the active mode."""
         is_expert = self.current_mode == "expert"
         for attr in (
-            "mode_dry_run", "mode_io_priority", "mode_verify_level",
-            "mode_incremental", "mode_parallel", "mode_rollback",
+            "mode_dry_run", "mode_sim_group",
             "app_pkg_pref", "app_auto_wine", "app_scan_btn",
             "app_save_btn", "app_add_row_btn", "app_remove_row_btn",
             "data_conflict_strategy", "data_exclude_regex", "data_sanitize_names",
-            "backup_incremental", "backup_parallel",
-            "restore_rollback", "restore_incremental", "restore_parallel",
         ):
             widget = getattr(self, attr, None)
             if widget is not None:
                 widget.setVisible(is_expert)
+        for cb in getattr(self, "settings_expert_checks", []):
+            cb.setVisible(is_expert)
 
     def _set_distro(self, value: str) -> None:
         self.ui_state.target_distro = value
 
     def _set_op(self, key: str, value: bool) -> None:
         self.ui_state.advanced_operations[key] = value
+
+    def _set_appearance(self, key: str, value: bool) -> None:
+        self.ui_state.settings_selected_items[key] = value
+        if self.on_settings_changed is not None:
+            self.on_settings_changed()
 
     def _set_folder(self, key: str, value: bool) -> None:
         self.ui_state.selected_folders[key] = value

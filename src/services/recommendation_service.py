@@ -196,6 +196,7 @@ class RecommendationService:
                 "notes": decision.notes,
                 "online_signal": online_signal,
                 "source": strategy,
+                "icon_source": str(item.get("DisplayIcon") or ""),
             }
 
             if strategy == "online":

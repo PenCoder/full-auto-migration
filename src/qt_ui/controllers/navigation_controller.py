@@ -17,6 +17,8 @@ class NavigationController:
         clear_error_banner,
         is_auto_running,
         is_busy: Callable[[], bool] | None = None,
+        page_to_step: dict[int, int] | None = None,
+        show_blocked_message: Callable[[str], None] | None = None,
     ):
         self.stack = stack
         self.stepper = stepper
@@ -25,6 +27,8 @@ class NavigationController:
         self.clear_error_banner = clear_error_banner
         self.is_auto_running = is_auto_running
         self.is_busy = is_busy or (lambda: False)
+        self.page_to_step: dict[int, int] = page_to_step or {}
+        self.show_blocked_message = show_blocked_message or (lambda msg: None)
 
     def _page_is_blocked(self) -> bool:
         """Return True if the current page has a background task running."""
@@ -40,8 +44,22 @@ class NavigationController:
     def _globally_blocked(self) -> bool:
         return self.is_auto_running() or self.is_busy() or self._page_is_blocked()
 
+    def _blocked_reason(self) -> str:
+        if self.is_auto_running():
+            return "Automatic migration is running — please wait for it to finish before navigating."
+        if self.is_busy() or self._page_is_blocked():
+            return "This step is still processing — please wait until it finishes."
+        return "You can't continue right now — please wait."
+
     def next_page(self) -> None:
-        if self._globally_blocked() or not self._page_can_proceed():
+        if self._globally_blocked():
+            self.show_blocked_message(self._blocked_reason())
+            return
+        if not self._page_can_proceed():
+            page = self.stack.currentWidget()
+            reason_fn = getattr(page, "blocked_reason", None)
+            reason = reason_fn() if callable(reason_fn) else "Please complete this step before continuing."
+            self.show_blocked_message(reason)
             return
         self.clear_error_banner()
         current = self.stack.currentIndex()
@@ -55,6 +73,7 @@ class NavigationController:
 
     def prev_page(self) -> None:
         if self._globally_blocked():
+            self.show_blocked_message(self._blocked_reason())
             return
         self.clear_error_banner()
         current = self.stack.currentIndex()
@@ -65,6 +84,7 @@ class NavigationController:
     def go_to_page(self, index: int) -> None:
         """Navigate directly to a completed page (index must be before the current page)."""
         if self._globally_blocked():
+            self.show_blocked_message(self._blocked_reason())
             return
         current = self.stack.currentIndex()
         if index < 0 or index >= current:
@@ -84,7 +104,8 @@ class NavigationController:
         self.next_btn.setEnabled(
             not blocked and current < self.stack.count() - 1 and self._page_can_proceed()
         )
-        self.stepper.set_active_index(current)
+        step_idx = self.page_to_step.get(current, current)
+        self.stepper.set_active_index(step_idx)
         if current == self.stack.count() - 1:
             self.next_btn.setText("Done")
         else:

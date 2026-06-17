@@ -34,6 +34,7 @@ class WelcomePage(BasePage):
         # ------------------------------------------------------------------ #
         hero = QWidget()
         hero.setObjectName("WelcomeHero")
+        hero.setMinimumHeight(230)
         hero.setStyleSheet("""
             QWidget#WelcomeHero {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -43,7 +44,6 @@ class WelcomePage(BasePage):
         hero_layout = QVBoxLayout(hero)
         hero_layout.setContentsMargins(48, 36, 48, 36)
         hero_layout.setSpacing(14)
-        hero_layout.setAlignment(Qt.AlignCenter)
 
         # OS migration label row
         badge_row = QHBoxLayout()
@@ -81,8 +81,8 @@ class WelcomePage(BasePage):
         hero_layout.addWidget(hero_title)
 
         hero_sub = QLabel(
-            "Your complete, intelligent companion for a smooth Windows 11 → Linux Mint migration.\n"
-            "Scan, backup, restore, validate — all in one place, all under your control."
+            "Move your files, apps, and settings from Windows 11 to Linux Mint —"
+            " step by step, all under your control."
         )
         hero_sub.setStyleSheet(
             "color: rgba(255,255,255,0.88); font-size: 14px; background: transparent;"
@@ -109,9 +109,9 @@ class WelcomePage(BasePage):
         feature_data = [
             (
                 "🔍",
-                "Intelligent Scanning",
-                "Automatically discovers your installed apps, hardware specs, and"
-                " personalization settings — so nothing gets left behind.",
+                "Automated Discovery",
+                "Scans your installed apps, desktop settings, and hardware to build"
+                " a complete migration plan — and flags any drivers you will need on Linux Mint.",
             ),
             (
                 "📦",
@@ -129,7 +129,7 @@ class WelcomePage(BasePage):
                 "🚀",
                 "Three Migration Modes",
                 "Guided keeps it simple for newcomers. Balanced gives intermediate"
-                " control. Expert unlocks AI-powered recommendations and full config.",
+                " control. Expert unlocks online package verification and full manual overrides.",
             ),
         ]
 
@@ -182,20 +182,15 @@ class WelcomePage(BasePage):
         stats_row.addStretch(1)
         body_layout.addLayout(stats_row)
 
-        # Privacy trust banner
-        privacy = QLabel(
-            "🔒  Privacy-first: your personal files and application data never leave"
+        body_layout.addWidget(self.create_trust_banner(
+            "Privacy-first: your personal files and application data never leave"
             " your machine during scanning, backup, or any other step of this tool."
-        )
-        privacy.setObjectName("TrustBanner")
-        privacy.setAlignment(Qt.AlignCenter)
-        privacy.setWordWrap(True)
-        body_layout.addWidget(privacy)
+        ))
 
         # CTA button
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        self.start_btn = QPushButton("Get Started  →")
+        self.start_btn = QPushButton("Start")
         self.start_btn.setProperty("role", "cta")
         self.start_btn.setMinimumHeight(46)
         self.start_btn.setMinimumWidth(200)

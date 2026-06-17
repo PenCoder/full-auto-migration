@@ -33,7 +33,7 @@ class ModePage(BasePage):
             "You can change your mind at any step.",
         ))
 
-        self.guided_radio = QRadioButton("Take me through it step by step  (Guided)")
+        self.guided_radio = QRadioButton("Guided")
         self.guided_radio.setToolTip("The tool makes sensible choices for you and explains what it's doing.")
         self.guided_radio.toggled.connect(lambda: self._set_mode("guided"))
         guided_hint = self.hint_label(
@@ -41,14 +41,14 @@ class ModePage(BasePage):
             "No technical knowledge needed."
         )
 
-        self.balanced_radio = QRadioButton("I'd like some control over the key decisions  (Balanced)")
+        self.balanced_radio = QRadioButton("Balanced")
         self.balanced_radio.setToolTip("You get smart recommendations but can adjust the important choices.")
         self.balanced_radio.toggled.connect(lambda: self._set_mode("balanced"))
         balanced_hint = self.hint_label(
             "Great if you're comfortable with computers and want to decide things like which files and apps to bring across."
         )
 
-        self.expert_radio = QRadioButton("I want full control over everything  (Expert)")
+        self.expert_radio = QRadioButton("Expert")
         self.expert_radio.setToolTip("All options and advanced settings are available upfront.")
         self.expert_radio.toggled.connect(lambda: self._set_mode("expert"))
         expert_hint = self.hint_label(

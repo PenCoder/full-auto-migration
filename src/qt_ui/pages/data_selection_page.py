@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton, QWidget
+from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QWidget
 from src.qt_ui.pages.base_page import BasePage
 
 
@@ -88,86 +88,32 @@ class DataSelectionPage(BasePage):
         label = self.file_type_labels.get(ext) or self._humanize_file_type_label(ext)
         return f"{label} ({ext})"
 
-    def _build_ui(self) -> None:
-        root = self.create_center_card_layout()
+    def _build_collapsible_section(self, title: str, body: QWidget) -> QWidget:
+        """Wrap a widget in a collapsible section with a toggle button, collapsed by default."""
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
 
-        root.addWidget(self.create_page_header(
-            "📁",
-            "Which files should come with you?",
-            "Choose what to bring — documents, photos, music, videos, and more. "
-            "You can always adjust this later if you're not sure.",
-        ))
+        toggle_btn = QPushButton(f"▶  {title}")
+        toggle_btn.setProperty("role", "badge")
+        toggle_btn.setCheckable(True)
+        toggle_btn.setChecked(False)
+        body.setVisible(False)
 
-        question = "How would you like to handle your personal files?"
-        info = (
-            "• <b>Bring everything</b> — all your documents, photos, music, and other files will be copied across.<br>"
-            "• <b>Let me choose file types</b> — pick exactly which kinds of files to include (e.g. PDFs, photos, music).<br>"
-            "• <b>Recommend based on usage</b> — we look at which files you use most and suggest what to bring.<br>"
-            "• <b>Skip for now</b> — move files manually once you're on Linux."
-        )
+        def _on_toggle(checked: bool) -> None:
+            body.setVisible(checked)
+            toggle_btn.setText(f"{'▼' if checked else '▶'}  {title}")
 
-        self.migrate_all_radio = QRadioButton("Bring all my files across")
-        self.select_file_types_radio = QRadioButton("Let me choose which types of files to bring (e.g. PDFs, photos, music)")
-        self.recommendations_radio = QRadioButton("Recommend what to bring based on how I use my computer")
-        self.manual_radio = QRadioButton("I'll move my files myself after the migration")
+        toggle_btn.toggled.connect(_on_toggle)
+        layout.addWidget(toggle_btn)
+        layout.addWidget(body)
+        return container
 
-        guided_panel = self.create_guided_questionnaire(
-            question,
-            info,
-            options=[
-                self.migrate_all_radio,
-                self.select_file_types_radio,
-                self.recommendations_radio,
-                self.manual_radio,
-            ]
-        )
-        root.addWidget(guided_panel)
-
-        self.file_types_panel = self._build_file_types_panel()
-        root.addWidget(self.file_types_panel)
-
-        self.usage_panel = self._build_usage_panel()
-        root.addWidget(self.usage_panel)
-
-        self._sync_radios_from_state()
-
-        self.trust_banner = QLabel()
-        self.trust_banner.setObjectName("TrustLabel")
-        self.trust_banner.setWordWrap(True)
-        self.trust_banner.setAlignment(Qt.AlignCenter)
-        root.addWidget(self.trust_banner)
-
-        self.choice_summary = QLabel("")
-        self.choice_summary.setObjectName("BodyText")
-        self.choice_summary.setWordWrap(True)
-        self.choice_summary.setAlignment(Qt.AlignCenter)
-        root.addWidget(self.choice_summary)
-
-        row = QHBoxLayout()
-
-        root.addLayout(row)
-
-        self.next_btn = QPushButton("Continue")
-        self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(200)
-        self.next_btn.clicked.connect(self.request_next.emit)
-        root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
-
-        self.migrate_all_radio.toggled.connect(lambda checked: self._set_choice_mode("all_files", checked))
-        self.select_file_types_radio.toggled.connect(lambda checked: self._set_choice_mode("selected_types", checked))
-        self.recommendations_radio.toggled.connect(lambda checked: self._set_choice_mode("ai_recommended", checked))
-        self.manual_radio.toggled.connect(lambda checked: self._set_choice_mode("manual", checked))
-
-    def _build_file_types_panel(self) -> QWidget:
-        panel = self.create_guided_questionnaire(
-            "Select file types",
-            "Choose the file extensions to include when migrating data files.",
-            options=[],
-        )
-
+    def _build_file_types_body(self) -> QWidget:
         container = QWidget()
         grid = QGridLayout(container)
-        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setContentsMargins(8, 6, 0, 4)
         grid.setHorizontalSpacing(16)
         grid.setVerticalSpacing(6)
 
@@ -183,31 +129,94 @@ class DataSelectionPage(BasePage):
             checkbox = QCheckBox(self._format_file_type_label(ext))
             checkbox.setChecked(bool(self.ui_state.selected_file_types.get(ext, True)))
             checkbox.toggled.connect(lambda checked, key=ext: self._on_file_type_toggled(key, checked))
-            row = idx // columns
-            col = idx % columns
-            grid.addWidget(checkbox, row, col)
+            row_idx = idx // columns
+            col_idx = idx % columns
+            grid.addWidget(checkbox, row_idx, col_idx)
             self.file_type_checkboxes[ext] = checkbox
 
-        panel.layout().addWidget(container)
-        return panel
+        return container
 
-    def _build_usage_panel(self) -> QWidget:
-        panel = self.create_guided_questionnaire(
-            "Usage-based recommendations",
-            "Recommendations are computed from observed file usage signals on this system (counts and recency). "
-            "Loading automatically — results appear below.",
-            options=[],
-        )
+    def _build_usage_body(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(8, 6, 0, 4)
+        layout.setSpacing(6)
 
         self.usage_summary = QLabel("Analysing your file usage patterns…")
         self.usage_summary.setObjectName("BodyText")
         self.usage_summary.setWordWrap(True)
-        panel.layout().addWidget(self.usage_summary)
+        layout.addWidget(self.usage_summary)
 
         self.activity_view_list = self.activit_list()
-        panel.layout().addWidget(self.activity_view_list)
+        layout.addWidget(self.activity_view_list)
 
-        return panel
+        return container
+
+    def _build_ui(self) -> None:
+        root = self.create_center_card_layout()
+
+        root.addWidget(self.create_page_header(
+            "📁",
+            "Which files should come with you?",
+            "Choose what to bring — documents, photos, music, videos, and more. "
+            "You can always adjust this later if you're not sure.",
+        ))
+
+        self.migrate_all_radio = QRadioButton("Bring all my files across")
+        self.select_file_types_radio = QRadioButton("Let me choose which types of files to bring")
+        self.recommendations_radio = QRadioButton("Recommend what to bring based on how I use my computer")
+        self.manual_radio = QRadioButton("I'll move my files myself after the migration")
+
+        self.radio_panel = self.create_guided_questionnaire(
+            "How would you like to handle your personal files?",
+            None,
+            options=[
+                self.migrate_all_radio,
+                self.select_file_types_radio,
+                self.recommendations_radio,
+                self.manual_radio,
+            ],
+        )
+        root.addWidget(self.radio_panel)
+
+        self.file_types_section = self._build_collapsible_section(
+            "Select file types",
+            self._build_file_types_body(),
+        )
+        self.file_types_section.setVisible(False)
+        root.addWidget(self.file_types_section)
+
+        self.usage_section = self._build_collapsible_section(
+            "Usage analysis details",
+            self._build_usage_body(),
+        )
+        self.usage_section.setVisible(False)
+        root.addWidget(self.usage_section)
+
+        self._sync_radios_from_state()
+
+        _trust_panel, self._trust_label = self._make_info_panel("")
+        root.addWidget(_trust_panel)
+
+        self.choice_summary = QLabel("")
+        self.choice_summary.setObjectName("BodyText")
+        self.choice_summary.setWordWrap(True)
+        self.choice_summary.setAlignment(Qt.AlignCenter)
+        root.addWidget(self.choice_summary)
+
+        row = QHBoxLayout()
+        root.addLayout(row)
+
+        self.next_btn = QPushButton("Continue")
+        self.next_btn.setProperty("role", "cta")
+        self.next_btn.setFixedWidth(200)
+        self.next_btn.clicked.connect(self.request_next.emit)
+        root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
+
+        self.migrate_all_radio.toggled.connect(lambda checked: self._set_choice_mode("all_files", checked))
+        self.select_file_types_radio.toggled.connect(lambda checked: self._set_choice_mode("selected_types", checked))
+        self.recommendations_radio.toggled.connect(lambda checked: self._set_choice_mode("ai_recommended", checked))
+        self.manual_radio.toggled.connect(lambda checked: self._set_choice_mode("manual", checked))
 
     def _set_strategy(self, strategy: str) -> None:
         self.ui_state.data_strategy = strategy
@@ -288,41 +297,37 @@ class DataSelectionPage(BasePage):
             self.ui_state.data_choice_mode = "all_files"
             self.migrate_all_radio.setChecked(True)
 
-        strategy = self.ui_state.data_strategy
         choice_mode = self.ui_state.data_choice_mode
+        is_guided = mode == "guided"
 
-        if mode == "guided":
-            self.select_file_types_radio.setEnabled(False)
-            self.recommendations_radio.setEnabled(False)
-            self.manual_radio.setEnabled(False)
-            self.trust_banner.setText(
-                "🔒  Guided mode: we'll bring all your files across safely. Nothing is deleted from your Windows machine."
+        # Hide options that don't apply to guided mode; show them otherwise.
+        self.select_file_types_radio.setVisible(not is_guided)
+        self.recommendations_radio.setVisible(not is_guided)
+        self.manual_radio.setVisible(not is_guided)
+
+        if is_guided:
+            self._trust_label.setText(
+                "Guided mode: all your files will be copied across safely. Nothing is deleted from Windows."
             )
         elif mode == "balanced":
-            self.select_file_types_radio.setEnabled(True)
-            self.recommendations_radio.setEnabled(True)
-            self.manual_radio.setEnabled(True)
-            self.trust_banner.setText(
-                "🔒  Your files are only copied — never moved or deleted. You can always bring more across later."
+            self._trust_label.setText(
+                "Your files are only copied — never moved or deleted. You can always bring more across later."
             )
         else:
-            self.select_file_types_radio.setEnabled(True)
-            self.recommendations_radio.setEnabled(True)
-            self.manual_radio.setEnabled(True)
-            self.trust_banner.setText(
-                "🔒  Expert mode: full control over which file types are included in your migration bundle."
+            self._trust_label.setText(
+                "Expert mode: full control over which file types are included in your migration bundle."
             )
 
         summary_map = {
             "all_files": "Current choice: Migrate all files from supported applications.",
-            "selected_types": "Current choice: Migrate selected file types. Configure exact types in Expert Overrides.",
+            "selected_types": "Current choice: Migrate selected file types. Configure exact types in the Customize panel.",
             "ai_recommended": "Current choice: Usage-recommended file migration scope based on local activity signals.",
             "manual": "Current choice: Skip automatic data-file migration and configure manually on Linux.",
         }
         self.choice_summary.setText(summary_map.get(choice_mode, summary_map["all_files"]))
 
-        self.file_types_panel.setVisible(choice_mode == "selected_types")
-        self.usage_panel.setVisible(choice_mode == "ai_recommended")
+        self.file_types_section.setVisible(choice_mode == "selected_types")
+        self.usage_section.setVisible(choice_mode == "ai_recommended")
 
         if choice_mode == "selected_types" and self.file_type_checkboxes:
             for ext, checkbox in self.file_type_checkboxes.items():
