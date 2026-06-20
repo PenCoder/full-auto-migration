@@ -43,7 +43,7 @@ class ReviewRecommendationsPage(BasePage):
         self.refresh()
 
     def _build_ui(self) -> None:
-        root = self.create_center_card_layout(max_width=1000)
+        root = self.create_center_card_layout()
 
         root.addWidget(self.create_page_header(
             "🔍",
@@ -131,7 +131,7 @@ class ReviewRecommendationsPage(BasePage):
 
         self.next_btn = QPushButton("Looks good — Continue to Backup")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(280)
+        self.next_btn.setMinimumWidth(280)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
@@ -151,15 +151,22 @@ class ReviewRecommendationsPage(BasePage):
                 "theme": "Theme",
                 "light_dark": "Light/Dark",
                 "accent_color": "Accent color",
-                "taskbar_layout": "Taskbar layout",
+                "taskbar_layout": "App shortcuts",
                 "keyboard_shortcuts": "Keyboard shortcuts",
                 "file_associations": "File associations",
             }
-            selected = [
-                label_map[k]
-                for k, v in self.ui_state.settings_selected_items.items()
-                if v and k in label_map
-            ]
+            selected = []
+            for k, v in self.ui_state.settings_selected_items.items():
+                if not v or k not in label_map:
+                    continue
+                label = label_map[k]
+                if k == "taskbar_layout":
+                    counts = self.ui_state.shortcuts_inventory.get("counts", {}) \
+                        if isinstance(self.ui_state.shortcuts_inventory, dict) else {}
+                    matched = int(counts.get("matched", 0)) if isinstance(counts, dict) else 0
+                    if matched:
+                        label = f"{label} ({matched} matched)"
+                selected.append(label)
             appearance_val = ", ".join(selected) if selected else "None selected"
         appearance_row = self.html_row("Appearance", appearance_val)
 
@@ -236,7 +243,7 @@ class ReviewRecommendationsPage(BasePage):
                     conf_color = {"high": "#1B5E20", "medium": "#E65100", "low": "#546E7A"}
                     conf_bg = {"high": "#E8F5E9", "medium": "#FFF3E0", "low": "#ECEFF1"}
                     rows = ""
-                    for rec in recs[:10]:
+                    for rec in recs:
                         win = str(rec.get("windows_app", ""))
                         linux = str(rec.get("linux_package", ""))
                         conf = str(rec.get("mapping_confidence", ""))
@@ -245,22 +252,17 @@ class ReviewRecommendationsPage(BasePage):
                         )
                         rows += (
                             f'<tr>'
-                            f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#0D1929;">✓ {win}</td>'
-                            f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#1565C0;">{linux}</td>'
+                            f'<td style="padding:3px 10px 3px 0;font-size: 15px;color:#1B1E28;">✓ {win}</td>'
+                            f'<td style="padding:3px 10px 3px 0;font-size: 15px;color:#3F6FE0;">{linux}</td>'
                             f'<td style="padding:3px 0;">{badge}</td>'
                             f'</tr>'
-                        )
-                    if len(recs) > 10:
-                        rows += (
-                            f'<tr><td colspan="3" style="color:#90A4AE;font-size:12px;padding-top:4px;">'
-                            f'+ {len(recs) - 10} more matched apps</td></tr>'
                         )
                     body = (
                         f'<table style="width:100%;">'
                         f'<tr>'
-                        f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Windows App</th>'
-                        f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Linux Package</th>'
-                        f'<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Match</th>'
+                        f'<th style="text-align:left;color:#90A4AE;font-size: 13px;font-weight:600;padding-bottom:4px;">Windows App</th>'
+                        f'<th style="text-align:left;color:#90A4AE;font-size: 13px;font-weight:600;padding-bottom:4px;">Linux Package</th>'
+                        f'<th style="text-align:left;color:#90A4AE;font-size: 13px;font-weight:600;padding-bottom:4px;">Match</th>'
                         f'</tr>{rows}</table>'
                     )
                 else:
@@ -298,25 +300,20 @@ class ReviewRecommendationsPage(BasePage):
                 )
                 recs = file_recs.get("recommendations", [])
                 if recs:
-                    imp_color = {"critical": "#B71C1C", "important": "#1565C0", "useful": "#1B5E20", "low": "#546E7A"}
-                    imp_bg = {"critical": "#FFEBEE", "important": "#E3F2FD", "useful": "#E8F5E9", "low": "#ECEFF1"}
+                    imp_color = {"critical": "#B71C1C", "important": "#1B3A86", "useful": "#1B5E20", "low": "#6B7390"}
+                    imp_bg = {"critical": "#FFEBEE", "important": "#DCE6FF", "useful": "#E8F5E9", "low": "#ECEFF1"}
                     rows = ""
-                    for rec in recs[:10]:
+                    for rec in recs:
                         path = str(rec.get("file_path", ""))
                         short_path = ("…" + path[-45:]) if len(path) > 48 else path
                         imp = str(rec.get("importance", "low"))
                         badge = self.html_pill(imp, imp_color.get(imp, "#546E7A"), imp_bg.get(imp, "#ECEFF1"))
                         rows += (
                             f'<tr>'
-                            f'<td style="padding:3px 10px 3px 0;font-size:12px;color:#0D1929;'
+                            f'<td style="padding:3px 10px 3px 0;font-size: 14px;color:#1B1E28;'
                             f'font-family:\'Cascadia Mono\',monospace;">✓ {short_path}</td>'
                             f'<td style="padding:3px 0;">{badge}</td>'
                             f'</tr>'
-                        )
-                    if len(recs) > 10:
-                        rows += (
-                            f'<tr><td colspan="2" style="color:#90A4AE;font-size:12px;padding-top:4px;">'
-                            f'+ {len(recs) - 10} more files selected</td></tr>'
                         )
                     body = f'<table style="width:100%;">{rows}</table>'
                 else:

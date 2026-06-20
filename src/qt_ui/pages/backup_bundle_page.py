@@ -18,9 +18,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.constants import RESTORE_DIR
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
+from src.services.migration_service import BUNDLE_ARCHIVE_NAME
 from src.qt_ui.utils.usb_utils import copy_bundle_to_usb, detect_usb_drives
 from src.qt_ui.workers import FunctionWorker
 
@@ -73,27 +73,21 @@ class BackupBundlePage(BasePage):
         btn_row.addStretch(1)
 
         self.backup_btn = QPushButton("Create Backup Bundle")
-        self.backup_btn.setProperty("role", "badge")
+        self.backup_btn.setProperty("role", "cta")
         self.backup_btn.setMinimumHeight(44)
-        self.backup_btn.setFixedWidth(220)
+        self.backup_btn.setMinimumWidth(220)
         self.backup_btn.clicked.connect(self._run_backup)
         btn_row.addWidget(self.backup_btn)
 
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setMinimumHeight(44)
-        self.cancel_btn.setFixedWidth(120)
+        self.cancel_btn.setMinimumWidth(120)
         self.cancel_btn.setVisible(False)
         self.cancel_btn.clicked.connect(self._on_cancel_clicked)
         btn_row.addWidget(self.cancel_btn)
         btn_row.addStretch(1)
 
         root.addLayout(btn_row)
-
-        self.next_btn = QPushButton("Continue to Linux Restore")
-        self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(220)
-        self.next_btn.clicked.connect(self.request_next.emit)
-        root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
     def _build_usb_section(self) -> QWidget:
         box = QFrame()
@@ -109,9 +103,9 @@ class BackupBundlePage(BasePage):
         title_row = QHBoxLayout()
         title_row.setSpacing(6)
         icon = QLabel("💾")
-        icon.setStyleSheet("font-size: 14px;")
+        icon.setStyleSheet("font-size: 16px;")
         title = QLabel("Save bundle to a USB drive (optional)")
-        title.setStyleSheet("font-size: 12px; font-weight: 600; color: #374151;")
+        title.setStyleSheet("font-size: 14px; font-weight: 600; color: #374151;")
         title_row.addWidget(icon)
         title_row.addWidget(title)
         title_row.addStretch(1)
@@ -128,20 +122,20 @@ class BackupBundlePage(BasePage):
 
         self.refresh_usb_btn = QPushButton("Refresh")
         self.refresh_usb_btn.setProperty("role", "badge")
-        self.refresh_usb_btn.setFixedWidth(80)
+        self.refresh_usb_btn.setMinimumWidth(80)
         self.refresh_usb_btn.clicked.connect(self._detect_usb_drives)
         picker_row.addWidget(self.refresh_usb_btn)
 
         self.browse_usb_btn = QPushButton("Browse…")
         self.browse_usb_btn.setProperty("role", "badge")
-        self.browse_usb_btn.setFixedWidth(80)
+        self.browse_usb_btn.setMinimumWidth(80)
         self.browse_usb_btn.clicked.connect(self._browse_usb)
         picker_row.addWidget(self.browse_usb_btn)
 
         layout.addLayout(picker_row)
 
         self.usb_dest_label = QLabel("")
-        self.usb_dest_label.setStyleSheet("font-size: 11px; color: #6B7280;")
+        self.usb_dest_label.setStyleSheet("font-size: 13px; color: #6B7280;")
         self.usb_dest_label.setWordWrap(True)
         self.usb_dest_label.setVisible(False)
         layout.addWidget(self.usb_dest_label)
@@ -187,8 +181,8 @@ class BackupBundlePage(BasePage):
         else:
             path = self.usb_combo.itemData(index) or ""
             self.ui_state.backup_usb_path = path
-            dest = Path(path) / "migration_bundle"
-            self.usb_dest_label.setText(f"Bundle will be copied to: {dest}")
+            dest = Path(path) / BUNDLE_ARCHIVE_NAME
+            self.usb_dest_label.setText(f"Bundle archive will be copied to: {dest}")
             self.usb_dest_label.setVisible(True)
 
     def _browse_usb(self) -> None:
@@ -233,7 +227,6 @@ class BackupBundlePage(BasePage):
         self._cancel_event = threading.Event()
         self.set_scanning(True)
         self.backup_btn.setEnabled(False)
-        self.next_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
         self.cancel_btn.setVisible(True)
         self.status.setText(
@@ -257,9 +250,10 @@ class BackupBundlePage(BasePage):
             self.status.setText("Backup cancelled. Click 'Create Backup Bundle' to try again.")
         elif isinstance(result, dict):
             self.ui_state.backup_completed = True
+            self.ui_state.bundle_archive_path = result.get("bundle_archive_path", "")
             total = int(result.get("total_files", 0))
             usb_path = self.ui_state.backup_usb_path
-            if usb_path:
+            if usb_path and self.ui_state.bundle_archive_path:
                 self.status.setText(
                     f"Bundle ready — {total} file{'s' if total != 1 else ''} packed."
                 )
@@ -267,8 +261,9 @@ class BackupBundlePage(BasePage):
                 return
             else:
                 self._set_success(
-                    f"Bundle ready — {total} file{'s' if total != 1 else ''} packed. "
-                    "Copy the bundle folder to your Linux machine and click 'Continue'."
+                    f"Bundle ready — {total} file{'s' if total != 1 else ''} packed into "
+                    f"{Path(self.ui_state.bundle_archive_path).name or 'migration_bundle.zip'}. "
+                    "Copy that file to your Linux machine and click 'Continue'."
                 )
         else:
             self.ui_state.backup_completed = True
@@ -278,22 +273,24 @@ class BackupBundlePage(BasePage):
     def _copy_to_usb(self, usb_path: str) -> None:
         self.status.setText(f"Copying bundle to {usb_path} — please wait…")
         self.set_scanning(True)
-        worker = FunctionWorker(copy_bundle_to_usb, RESTORE_DIR, usb_path)
+        archive_path = Path(self.ui_state.bundle_archive_path)
+        worker = FunctionWorker(copy_bundle_to_usb, archive_path, usb_path)
         worker.signals.result.connect(self._on_usb_copy_result)
         worker.signals.error.connect(self._on_usb_copy_error)
         worker.signals.finished.connect(self._on_usb_copy_finished)
         self.thread_pool.start(worker)
 
     def _on_usb_copy_result(self, dest: object) -> None:
-        self.status.setText(
+        self._set_success(
             f"Bundle saved to {dest} — eject the USB drive and carry it to your Linux machine, then click 'Continue'."
         )
         self.refresh()
 
     def _on_usb_copy_error(self, error: str) -> None:
+        self._clear_success()
         self.status.setText(
             f"Bundle created, but USB copy failed: {user_facing_error(error)}\n"
-            "You can copy the bundle folder manually from your computer."
+            "You can copy the bundle archive manually from your computer."
         )
         self.refresh()
 
@@ -303,6 +300,7 @@ class BackupBundlePage(BasePage):
         self.refresh()
 
     def _on_error(self, error: str) -> None:
+        self._clear_success()
         self.ui_state.last_error = error
         self.status.setText(f"Backup failed. {user_facing_error(error)}")
         self.refresh()
@@ -343,4 +341,9 @@ class BackupBundlePage(BasePage):
                     "Click 'Create Migration Bundle' to start."
                 )
 
-        self.next_btn.setEnabled(done or mode == "expert")
+    def can_proceed(self) -> bool:
+        return self.ui_state.backup_completed or self.ui_state.mode == "expert"
+
+    def blocked_reason(self) -> str:
+        return "Create your migration bundle before continuing."
+

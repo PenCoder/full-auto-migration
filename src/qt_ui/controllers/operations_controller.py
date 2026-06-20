@@ -436,6 +436,7 @@ class OperationsController:
             "target_home": str(target_home),
             "bundle_dir": str(bundle_dir),
             "report_path": str(service.report_path),
+            "warnings": service.warnings,
         }
         ui_state.restore_completed = True
         log_activity("restore", f"Restore completed. Report written to {service.report_path}", level="success")

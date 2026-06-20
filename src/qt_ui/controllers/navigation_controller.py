@@ -19,6 +19,7 @@ class NavigationController:
         is_busy: Callable[[], bool] | None = None,
         page_to_step: dict[int, int] | None = None,
         show_blocked_message: Callable[[str], None] | None = None,
+        on_finish: Callable[[], None] | None = None,
     ):
         self.stack = stack
         self.stepper = stepper
@@ -29,6 +30,7 @@ class NavigationController:
         self.is_busy = is_busy or (lambda: False)
         self.page_to_step: dict[int, int] = page_to_step or {}
         self.show_blocked_message = show_blocked_message or (lambda msg: None)
+        self.on_finish = on_finish or (lambda: None)
 
     def _page_is_blocked(self) -> bool:
         """Return True if the current page has a background task running."""
@@ -70,6 +72,8 @@ class NavigationController:
             if callable(refresh):
                 refresh()
             self.sync_nav()
+        else:
+            self.on_finish()
 
     def prev_page(self) -> None:
         if self._globally_blocked():
@@ -101,9 +105,7 @@ class NavigationController:
         current = self.stack.currentIndex()
         blocked = self._globally_blocked()
         self.back_btn.setEnabled(not blocked and current > 0)
-        self.next_btn.setEnabled(
-            not blocked and current < self.stack.count() - 1 and self._page_can_proceed()
-        )
+        self.next_btn.setEnabled(not blocked and self._page_can_proceed())
         step_idx = self.page_to_step.get(current, current)
         self.stepper.set_active_index(step_idx)
         if current == self.stack.count() - 1:

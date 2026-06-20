@@ -90,6 +90,13 @@ class RestoreExecutionService:
             raise FileNotFoundError(f"Manifest not found: {self.manifest_path}")
         
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        # Bundles created on Windows may have backslash-separated relative
+        # paths baked into manifest.json — PosixPath treats '\' as a literal
+        # filename character, not a separator, so normalize here too.
+        for entry in manifest.get("entries", []):
+            rel = entry.get("relative_path")
+            if isinstance(rel, str) and "\\" in rel:
+                entry["relative_path"] = rel.replace("\\", "/")
         self.logger.info("Manifest loaded with %d files", manifest.get("total_files", 0))
         return manifest
 

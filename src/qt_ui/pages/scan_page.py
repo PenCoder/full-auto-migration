@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import QThreadPool, QTimer, Qt
-from PySide6.QtWidgets import QLabel, QProgressBar, QRadioButton, QTextEdit
+from PySide6.QtWidgets import QCheckBox, QFrame, QLabel, QProgressBar, QRadioButton, QTextEdit, QVBoxLayout
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
@@ -56,9 +56,15 @@ class ScanPage(BasePage):
             )
         )
 
+        scan_results_card = QFrame()
+        scan_results_card.setProperty("card", "section")
+        scan_results_layout = QVBoxLayout(scan_results_card)
+        scan_results_layout.setContentsMargins(14, 12, 14, 12)
+        scan_results_layout.setSpacing(8)
+
         report_title = QLabel("Scan results")
         report_title.setObjectName("SectionTitle")
-        root.addWidget(report_title)
+        scan_results_layout.addWidget(report_title)
 
         self.scan_report_view = QTextEdit()
         self.scan_report_view.setObjectName("ReportView")
@@ -68,7 +74,9 @@ class ScanPage(BasePage):
         self.scan_report_view.setPlaceholderText(
             "Scan results will appear here automatically when the page loads."
         )
-        root.addWidget(self.scan_report_view)
+        scan_results_layout.addWidget(self.scan_report_view)
+
+        root.addWidget(scan_results_card)
 
         # App strategy question.
         self.migrate_all_radio = QRadioButton(
@@ -114,14 +122,38 @@ class ScanPage(BasePage):
         )
         root.addWidget(self.strategy_panel)
 
+        settings_card = QFrame()
+        settings_card.setProperty("card", "section")
+        settings_card_layout = QVBoxLayout(settings_card)
+        settings_card_layout.setContentsMargins(14, 12, 14, 12)
+        settings_card_layout.setSpacing(6)
+
+        settings_title = QLabel("Bring your desktop look with you")
+        settings_title.setObjectName("SectionTitle")
+        settings_card_layout.addWidget(settings_title)
+
+        self.migrate_toggle = QCheckBox("Yes — carry over the Windows look and feel")
+        self.migrate_toggle.setChecked(True)
+        self.migrate_toggle.toggled.connect(lambda _: self._sync_settings_selections())
+        settings_card_layout.addWidget(self.migrate_toggle)
+
+        self.customize_hint = QLabel(
+            "Individual appearance and shortcut items can be configured in the Customize panel."
+        )
+        self.customize_hint.setWordWrap(True)
+        self.customize_hint.setStyleSheet(
+            "color: #6B7390; font-size: 13px; font-style: italic; margin-left: 24px;"
+        )
+        self.customize_hint.setVisible(False)
+        settings_card_layout.addWidget(self.customize_hint)
+
+        root.addWidget(settings_card)
+
         self.status = QLabel("Scanning your computer — just a moment…")
         self.status.setObjectName("BodyText")
         self.status.setWordWrap(True)
         self.status.setAlignment(Qt.AlignCenter)
         root.addWidget(self.status)
-
-        _privacy_panel, self._privacy_label = self._make_info_panel("")
-        root.addWidget(_privacy_panel)
 
         self._sync_radios_from_state()
 
@@ -148,6 +180,38 @@ class ScanPage(BasePage):
             return
         self.ui_state.mapping_choice_mode = mode
         self.refresh()
+
+    # ── Settings migration toggle ───────────────────────────────────────────
+
+    def _sync_settings_selections(self) -> None:
+        self.ui_state.settings_migration_enabled = self.migrate_toggle.isChecked()
+
+        # Guided mode enforces a fixed minimal selection — user has no panel access.
+        if self.ui_state.mode == "guided":
+            self.ui_state.settings_selected_items = {
+                "wallpaper": True,
+                "theme": True,
+                "light_dark": False,
+                "accent_color": False,
+                "taskbar_layout": True,
+                "keyboard_shortcuts": False,
+                "file_associations": False,
+            }
+
+        self._rebuild_settings_plan()
+
+    def _rebuild_settings_plan(self) -> None:
+        inventory = self.ui_state.settings_inventory if isinstance(self.ui_state.settings_inventory, dict) else {}
+        if inventory:
+            self.ui_state.settings_migration_plan = self.settings_service.build_plan(
+                inventory,
+                self.ui_state.mode,
+                selections=self.ui_state.settings_selected_items,
+                migrate_enabled=self.ui_state.settings_migration_enabled,
+                shortcuts_inventory=self.ui_state.shortcuts_inventory,
+            )
+        else:
+            self.ui_state.settings_migration_plan = {}
 
     # ── Scanning pipeline ────────────────────────────────────────────────────
 
@@ -209,9 +273,14 @@ class ScanPage(BasePage):
             self.last_analysis_result = result
             self.ui_state.analysis_completed = True
             matched = len(result.get("software", []))
+            if self.ui_state.mode == "guided":
+                # Only one (pre-selected) strategy is offered in guided mode —
+                # there's nothing to actually choose, so don't imply there is.
+                next_step = "Click 'Next' to continue."
+            else:
+                next_step = "Choose your preferred approach above, then click 'Next'."
             self.status.setText(
-                f"✅  All done — Linux alternatives found for {matched} of your apps. "
-                "Choose your preferred approach below, then click 'Next'."
+                f"✅  All done — Linux alternatives found for {matched} of your apps. {next_step}"
             )
         self._render_scan_report()
 
@@ -256,13 +325,13 @@ class ScanPage(BasePage):
                 self.html_pill("Pending", "#546E7A", "#ECEFF1")
             )
         )
-        mode_pill = self.html_pill(mode, "#1565C0", "#E3F2FD")
+        mode_pill = self.html_pill(mode, "#1B3A86", "#DCE6FF")
 
         header = (
             f'<table style="width:100%;margin-bottom:14px;"><tr>'
-            f'<td style="font-size:13px;color:#546E7A;">Mode&nbsp;{mode_pill}</td>'
-            f'<td style="font-size:13px;color:#546E7A;text-align:center;">Scan&nbsp;{inv_pill}</td>'
-            f'<td style="font-size:13px;color:#546E7A;text-align:right;">'
+            f'<td style="font-size: 15px;color:#546E7A;">Mode&nbsp;{mode_pill}</td>'
+            f'<td style="font-size: 15px;color:#546E7A;text-align:center;">Scan&nbsp;{inv_pill}</td>'
+            f'<td style="font-size: 15px;color:#546E7A;text-align:right;">'
             f'App&nbsp;matching&nbsp;{match_pill}</td>'
             f'</tr></table>'
         )
@@ -292,6 +361,24 @@ class ScanPage(BasePage):
                 appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance", {}), dict) else {}
                 rows += self.html_row("Wallpaper captured", "Yes" if desktop.get("wallpaper_path") else "No")
                 rows += self.html_row("Theme captured", "Yes" if appearance.get("current_theme") else "No")
+            shortcuts = (
+                self.last_scan_result.get("shortcuts", {})
+                if isinstance(self.last_scan_result.get("shortcuts", {}), dict)
+                else {}
+            )
+            if shortcuts:
+                sc_counts = shortcuts.get("counts", {}) if isinstance(shortcuts.get("counts", {}), dict) else {}
+                total_shortcuts = (
+                    int(sc_counts.get("desktop", 0))
+                    + int(sc_counts.get("start_menu", 0))
+                    + int(sc_counts.get("taskbar", 0))
+                )
+                rows += self.html_row(
+                    "Shortcuts found",
+                    f"{total_shortcuts} ({sc_counts.get('desktop', 0)} desktop, "
+                    f"{sc_counts.get('start_menu', 0)} Start Menu, {sc_counts.get('taskbar', 0)} taskbar)",
+                )
+                rows += self.html_row("Shortcuts matched to an installed app", str(sc_counts.get("matched", 0)))
             sections.append(self.html_section("🖥", "Scan Results", f'<table style="width:100%;">{rows}</table>'))
         else:
             sections.append(self.html_section("🖥", "Scan Results",
@@ -308,7 +395,7 @@ class ScanPage(BasePage):
             recs = self.last_analysis_result.get("software", [])
             if recs:
                 preview_rows = ""
-                for rec in recs[:5]:
+                for rec in recs:
                     win = str(rec.get("windows_app", "") or rec.get("name", ""))
                     linux = str(rec.get("linux_package", "") or rec.get("linux_alternative", ""))
                     conf = str(rec.get("mapping_confidence", "") or rec.get("confidence", ""))
@@ -316,17 +403,12 @@ class ScanPage(BasePage):
                     conf_bg = {"high": "#E8F5E9", "medium": "#FFF3E0", "low": "#ECEFF1"}.get(conf, "#ECEFF1")
                     preview_rows += (
                         f'<tr>'
-                        f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#0D1929;">{win}</td>'
-                        f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#1565C0;">{linux}</td>'
+                        f'<td style="padding:3px 10px 3px 0;font-size: 15px;color:#1B1E28;">{win}</td>'
+                        f'<td style="padding:3px 10px 3px 0;font-size: 15px;color:#3F6FE0;">{linux}</td>'
                         f'<td>{self.html_pill(conf, conf_color, conf_bg)}</td>'
                         f'</tr>'
                     )
-                if len(recs) > 5:
-                    preview_rows += (
-                        f'<tr><td colspan="3" style="color:#90A4AE;font-size:12px;padding-top:4px;">'
-                        f'+ {len(recs) - 5} more — full list on the Review page</td></tr>'
-                    )
-                sections.append(self.html_section("✅", "Top Matches",
+                sections.append(self.html_section("✅", "App Matches",
                     f'<table style="width:100%;">{preview_rows}</table>'))
         elif self.ui_state.inventory_completed:
             sections.append(self.html_section("📦", "App Matching",
@@ -335,7 +417,7 @@ class ScanPage(BasePage):
         if self.ui_state.last_error:
             err_body = (
                 f'<div style="background:#FFF3E0;border-left:3px solid #E65100;'
-                f'padding:8px 10px;border-radius:4px;font-size:13px;color:#BF360C;">'
+                f'padding:8px 10px;border-radius:4px;font-size: 15px;color:#BF360C;">'
                 f'{self.ui_state.last_error}</div>'
             )
             sections.append(self.html_section("⚠", "Last Error", err_body))
@@ -355,13 +437,6 @@ class ScanPage(BasePage):
     def refresh(self) -> None:
         mode = self.ui_state.mode
         mapping_mode = self.ui_state.mapping_choice_mode
-
-        software_online_enabled = bool(self.privacy_policy.get("software_online_lookup_enabled", True))
-        self._privacy_label.setText(
-            "Only software metadata is used for package matching — file content stays local."
-            if software_online_enabled else
-            "Online lookup is disabled — all processing is local."
-        )
 
         # Mode-filtered strategy options — hide unavailable choices rather than disabling.
         if mode == "guided":
@@ -386,10 +461,8 @@ class ScanPage(BasePage):
             self.manual_mapping_radio.setVisible(True)
             self.manual_mapping_hint.setVisible(True)
 
-        if self.ui_state.inventory_completed and not self.is_processing:
-            if mode == "guided":
-                self.status.setText("Scan complete — click 'Next' to continue.")
-            else:
-                self.status.setText("Scan complete — choose how to handle your apps below, then click 'Next'.")
+        self.migrate_toggle.setChecked(self.ui_state.settings_migration_enabled)
+        self.customize_hint.setVisible(mode in ("balanced", "expert"))
+        self._sync_settings_selections()
 
         self._render_scan_report()

@@ -44,25 +44,16 @@ class ModeController:
             if self.expert_dock.isVisible():
                 self.expert_dock.hide()
             self.ui_state.expert_panel_visible = False
-            self.expert_toggle_btn.setText("Show Customize")
+            self.expert_toggle_btn.setText("Customize ▸")
             self.expert_toggle_btn.setEnabled(False)
             return
 
-        if mode == "expert":
-            if not self.expert_dock.isVisible():
-                self.expert_dock.show()
-            self.ui_state.expert_panel_visible = True
-            self.expert_toggle_btn.setText("Hide Customize")
-            self.expert_toggle_btn.setEnabled(True)
-            self.complete_all_btn.setEnabled(True)
-            return
-
-        # balanced mode keeps manual control, defaulting to hidden expert panel
-        if self.expert_dock.isVisible() and not self.ui_state.expert_panel_visible:
-            self.expert_dock.hide()
+        # Expert and balanced modes both leave the panel under manual
+        # control — selecting a mode only enables the toggle, it never
+        # forces the dock open on its own; the user opens it via the button.
         self.expert_toggle_btn.setEnabled(True)
         self.complete_all_btn.setEnabled(True)
-        self.expert_toggle_btn.setText("Hide Customize" if self.expert_dock.isVisible() else "Show Customize")
+        self.expert_toggle_btn.setText("Customize ◂" if self.expert_dock.isVisible() else "Customize ▸")
 
     def toggle_expert_panel(self) -> None:
         if self.ui_state.mode == "guided":
@@ -70,8 +61,8 @@ class ModeController:
         if self.expert_dock.isVisible():
             self.expert_dock.hide()
             self.ui_state.expert_panel_visible = False
-            self.expert_toggle_btn.setText("Show Customize")
+            self.expert_toggle_btn.setText("Customize ▸")
         else:
             self.expert_dock.show()
             self.ui_state.expert_panel_visible = True
-            self.expert_toggle_btn.setText("Hide Customize")
+            self.expert_toggle_btn.setText("Customize ◂")

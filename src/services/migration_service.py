@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import threading
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Any
@@ -13,7 +15,7 @@ from typing import Callable, Any
 from src.analysis.hw_matrix import generate_hardware_matrix, write_hardware_matrix
 from src.analysis.software_mapping import generate_software_mapping, write_software_mapping
 from src.backup.manifest import copy_backup_files, generate_manifest, write_manifest, create_backup_archive
-from src.constants import BASE_DIR, RESTORE_DIR
+from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
 from src.inventory.hardware import collect_hardware_inventory, write_hardware_inventory
 from src.inventory.settings import collect_settings_inventory, write_settings_inventory
 from src.inventory.software import collect_software_inventory, write_software_inventory
@@ -22,6 +24,9 @@ from src.loggers import get_logger
 from src.orchestration.checkpoints import CheckpointManager
 from src.orchestration.errors import ERR_BACKUP_FAILED, MigrationError
 from src.services.icon_extractor import extract_icon_png
+
+BUNDLE_ARCHIVE_NAME = "migration_bundle.zip"
+LINUX_BUILD_BINARY = BASE_DIR / "assets" / "linux_build" / "MigrationWizard"
 
 
 class MigrationService:
@@ -187,6 +192,10 @@ class MigrationService:
                     shutil.copytree(staged, bundle_files)
                     self.logger.info("Uncompressed files copied to bundle at %s", bundle_files)
             self.logger.info("Backup files copied successfully.")
+
+            bundle_archive_path = self._finalize_bundle_archive()
+            manifest["bundle_archive_path"] = str(bundle_archive_path) if bundle_archive_path else ""
+
             self.checkpoints.complete(manifest_entries=manifest.get("total_files", 0), archive_enabled=self.config.backup.compress)
 
             return manifest
@@ -290,6 +299,54 @@ class MigrationService:
             len(installable),
             apps_path,
         )
+
+    def _finalize_bundle_archive(self) -> Path | None:
+        """Embed the pre-built Linux binary (if present) and zip the whole
+        bundle folder into a single self-contained archive for export.
+
+        Returns the path to the created archive, or None if RESTORE_DIR has
+        nothing to bundle yet.
+        """
+        if not RESTORE_DIR.exists() or not any(RESTORE_DIR.iterdir()):
+            return None
+
+        if LINUX_BUILD_BINARY.exists():
+            dest_binary = RESTORE_DIR / LINUX_BUILD_BINARY.name
+            shutil.copy2(LINUX_BUILD_BINARY, dest_binary)
+            try:
+                os.chmod(dest_binary, 0o755)
+            except OSError:
+                pass
+            self.logger.info("Embedded pre-built Linux binary into bundle at %s", dest_binary)
+
+            readme_path = RESTORE_DIR / "RUN_ME.txt"
+            readme_path.write_text(
+                "Migration bundle — Linux restore\n"
+                "=================================\n\n"
+                "1. Unzip this archive if you haven't already.\n"
+                "2. Run ./MigrationWizard (in a terminal: `./MigrationWizard`;\n"
+                "   `chmod +x MigrationWizard` first if it's not executable).\n"
+                "3. On the Restore page, click Browse and select this same folder.\n",
+                encoding="utf-8",
+            )
+
+        archive_path = DATA_DIR / BUNDLE_ARCHIVE_NAME
+        if archive_path.exists():
+            archive_path.unlink()
+
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for file_path in RESTORE_DIR.rglob("*"):
+                if not file_path.is_file():
+                    continue
+                rel = file_path.relative_to(RESTORE_DIR)
+                # extracted_backup/ is local scratch space from a restore run
+                # performed directly against this RESTORE_DIR — never bundle it.
+                if rel.parts and rel.parts[0] == "extracted_backup":
+                    continue
+                zf.write(file_path, rel)
+
+        self.logger.info("Migration bundle archived at %s", archive_path)
+        return archive_path
 
     def run_task(self, worker_fn: Callable[[], Any], on_done: Callable[[Any], None]) -> None:
         """Run a worker function asynchronously and hand the result back on completion."""

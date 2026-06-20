@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QCheckBox, QGridLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton, QVBoxLayout, QWidget
 from src.qt_ui.pages.base_page import BasePage
 
 
@@ -90,10 +90,11 @@ class DataSelectionPage(BasePage):
 
     def _build_collapsible_section(self, title: str, body: QWidget) -> QWidget:
         """Wrap a widget in a collapsible section with a toggle button, collapsed by default."""
-        container = QWidget()
+        container = QFrame()
+        container.setProperty("card", "section")
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(6)
 
         toggle_btn = QPushButton(f"▶  {title}")
         toggle_btn.setProperty("role", "badge")
@@ -202,14 +203,14 @@ class DataSelectionPage(BasePage):
         self.choice_summary.setObjectName("BodyText")
         self.choice_summary.setWordWrap(True)
         self.choice_summary.setAlignment(Qt.AlignCenter)
-        root.addWidget(self.choice_summary)
+        # root.addWidget(self.choice_summary)
 
         row = QHBoxLayout()
         root.addLayout(row)
 
         self.next_btn = QPushButton("Continue")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(200)
+        self.next_btn.setMinimumWidth(200)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
@@ -238,9 +239,9 @@ class DataSelectionPage(BasePage):
         self.ui_state.selected_file_types[ext] = checked
         selected_count = sum(1 for enabled in self.ui_state.selected_file_types.values() if enabled)
         total_count = len(self.ui_state.selected_file_types)
-        self.choice_summary.setText(
-            f"Current choice: Migrate selected file types ({selected_count}/{total_count} enabled)."
-        )
+        # self.choice_summary.setText(
+        #     f"Current choice: Migrate selected file types ({selected_count}/{total_count} enabled)."
+        # )
         if self.ui_state.data_choice_mode == "ai_recommended":
             self._debounce_timer.start(500)
 
@@ -266,7 +267,7 @@ class DataSelectionPage(BasePage):
         self.usage_summary.setText(
             f"Loaded {len(recommendations)} usage-based file type recommendations from system file activity."
         )
-        for item in recommendations[:20]:
+        for item in recommendations:
             ext = str(item.get("extension", ""))
             usage = float(item.get("usage_percent", 0.0))
             count = int(item.get("count", 0))
@@ -311,7 +312,7 @@ class DataSelectionPage(BasePage):
             )
         elif mode == "balanced":
             self._trust_label.setText(
-                "Your files are only copied — never moved or deleted. You can always bring more across later."
+                "Balanced mode: your files are never moved or deleted. You can always bring more across later."
             )
         else:
             self._trust_label.setText(
@@ -324,7 +325,7 @@ class DataSelectionPage(BasePage):
             "ai_recommended": "Current choice: Usage-recommended file migration scope based on local activity signals.",
             "manual": "Current choice: Skip automatic data-file migration and configure manually on Linux.",
         }
-        self.choice_summary.setText(summary_map.get(choice_mode, summary_map["all_files"]))
+        # self.choice_summary.setText(summary_map.get(choice_mode, summary_map["all_files"]))
 
         self.file_types_section.setVisible(choice_mode == "selected_types")
         self.usage_section.setVisible(choice_mode == "ai_recommended")

@@ -1,19 +1,20 @@
 /* ============================================================
-   Migration Platform — Clean Professional Theme
-   Inspired by modern desktop tools (dark sidebar, white content)
-   Primary blue: #1565C0  |  Success green: #388E3C
+   Migration Platform — Material Blue Theme
+   Soft, rounded, borderless cards with a Material-You-inspired
+   blue accent. Dark navy sidebar, light blue-tinted page background.
+   Primary blue: #3F6FE0  |  Success green: #388E3C
    ============================================================ */
 
 /* === Base === */
 
 QMainWindow {
-    background: #FFFFFF;
+    background: #F5F8FF;
 }
 
 QWidget {
-    color: #0D1929;
+    color: #1B1E28;
     font-family: "Segoe UI", "Noto Sans", sans-serif;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 QWidget#RootSurface {
@@ -23,20 +24,20 @@ QWidget#RootSurface {
 /* === Per-page header typography === */
 
 QLabel#PageIcon {
-    font-size: 36px;
+    font-size: 41px;
     background: transparent;
 }
 
 QLabel#PageTitle {
-    color: #0D1929;
-    font-size: 22px;
+    color: #1B1E28;
+    font-size: 25px;
     font-weight: 800;
     letter-spacing: -0.3px;
 }
 
 QLabel#PageSubtitle {
-    color: #546E7A;
-    font-size: 14px;
+    color: #5A6072;
+    font-size: 16px;
     font-weight: 400;
     line-height: 1.5;
 }
@@ -44,91 +45,91 @@ QLabel#PageSubtitle {
 /* === Typography === */
 
 QLabel#AppTitle {
-    color: #0D1929;
-    font-size: 20px;
+    color: #1B1E28;
+    font-size: 23px;
     font-weight: 800;
     letter-spacing: -0.5px;
 }
 
 QLabel#AppSubtitle {
-    color: #78909C;
-    font-size: 12px;
+    color: #78889E;
+    font-size: 14px;
     font-weight: 400;
 }
 
 QLabel#StepTitle {
-    color: #0D1929;
-    font-size: 20px;
+    color: #1B1E28;
+    font-size: 23px;
     font-weight: 700;
 }
 
 QLabel#SectionTitle {
-    color: #1565C0;
-    font-size: 15px;
+    color: #3F6FE0;
+    font-size: 17px;
     font-weight: 700;
     margin-top: 6px;
 }
 
 QLabel#HeroTitle {
-    color: #1565C0;
-    font-size: 20px;
+    color: #3F6FE0;
+    font-size: 23px;
     font-weight: 700;
 }
 
 QLabel#BodyText {
-    color: #37474F;
-    font-size: 14px;
+    color: #3E4559;
+    font-size: 16px;
 }
 
 /* === Status chips & banners (used sparingly) === */
 
 QLabel#TrustBanner {
-    color: #1B5E20;
-    background: #E8F5E9;
-    border: 1px solid #C8E6C9;
-    border-radius: 10px;
-    padding: 8px 14px;
-    font-size: 13px;
+    color: #1B3A86;
+    background: #DCE6FF;
+    border: none;
+    border-radius: 16px;
+    padding: 9px 16px;
+    font-size: 15px;
     font-weight: 600;
 }
 
 QLabel#StatChip {
-    color: #1565C0;
-    background: #E3F2FD;
-    border: 1px solid #BBDEFB;
-    border-radius: 8px;
+    color: #1B3A86;
+    background: #DCE6FF;
+    border: none;
+    border-radius: 10px;
     padding: 4px 10px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
 }
 
 QLabel#ErrorBanner {
     color: #B71C1C;
     background: #FFEBEE;
-    border: 1px solid #FFCDD2;
-    border-radius: 10px;
-    padding: 8px 14px;
-    font-size: 13px;
+    border: none;
+    border-radius: 16px;
+    padding: 9px 16px;
+    font-size: 15px;
     font-weight: 600;
 }
 
 QLabel#FooterBadge {
-    color: #546E7A;
-    background: #F5F5F5;
-    border: 1px solid #E0E0E0;
+    color: #5A6072;
+    background: #EEF1FA;
+    border: none;
     border-radius: 10px;
     padding: 4px 10px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 500;
 }
 
 QLabel#StatusPill {
-    color: #546E7A;
-    background: #F5F5F5;
-    border: 1px solid #E0E0E0;
+    color: #5A6072;
+    background: #EEF1FA;
+    border: none;
     border-radius: 10px;
     padding: 4px 10px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 500;
 }
 
@@ -137,28 +138,28 @@ QLabel#StatusPill {
    ================================================================ */
 
 QWidget#StepperPanel {
-    background: #0D1929;
+    background: #16223D;
 }
 
 QLabel#StepperTitle {
     color: #FFFFFF;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 700;
 }
 
 /* Completed step rows are clickable — show a subtle hover highlight */
 QWidget[clickable="true"] {
-    border-radius: 6px;
+    border-radius: 14px;
 }
 
 QWidget[clickable="true"]:hover {
     background: rgba(255, 255, 255, 0.09);
-    border-radius: 6px;
+    border-radius: 14px;
 }
 
 QLabel#StepperSubtitle {
     color: rgba(255, 255, 255, 0.45);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 QFrame#StepperSeparator {
@@ -169,29 +170,29 @@ QFrame#StepperSeparator {
 /* Step dots — pending (default), active, done */
 
 QLabel#StepDot {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1.5px solid rgba(255, 255, 255, 0.40);
+    background: rgba(255, 255, 255, 0.10);
+    border: 1.5px solid rgba(255, 255, 255, 0.30);
     border-radius: 13px;
     color: rgba(255, 255, 255, 0.65);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
 }
 
 QLabel#StepDot[state="pending"] {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1.5px solid rgba(255, 255, 255, 0.40);
+    background: rgba(255, 255, 255, 0.10);
+    border: 1.5px solid rgba(255, 255, 255, 0.30);
     color: rgba(255, 255, 255, 0.65);
 }
 
 QLabel#StepDot[state="active"] {
-    background: #1976D2;
-    border: 2px solid rgba(33, 150, 243, 0.6);
+    background: #3F6FE0;
+    border: 2px solid rgba(63, 111, 224, 0.55);
     color: white;
 }
 
 QLabel#StepDot[state="done"] {
-    background: #388E3C;
-    border: 2px solid rgba(76, 175, 80, 0.5);
+    background: #3F6FE0;
+    border: 2px solid rgba(63, 111, 224, 0.4);
     color: white;
 }
 
@@ -199,13 +200,13 @@ QLabel#StepDot[state="done"] {
 
 QLabel#StepHeading {
     color: rgba(255, 255, 255, 0.65);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
 }
 
 QLabel#StepMeta {
     color: rgba(255, 255, 255, 0.45);
-    font-size: 11px;
+    font-size: 13px;
 }
 
 QLabel#StepHeading[state="pending"] {
@@ -223,7 +224,7 @@ QLabel#StepHeading[state="active"] {
 }
 
 QLabel#StepMeta[state="active"] {
-    color: rgba(100, 181, 246, 0.95);
+    color: rgba(140, 175, 250, 0.95);
 }
 
 QLabel#StepHeading[state="done"] {
@@ -231,12 +232,12 @@ QLabel#StepHeading[state="done"] {
 }
 
 QLabel#StepMeta[state="done"] {
-    color: #81C784;
+    color: rgba(140, 175, 250, 0.8);
 }
 
 QLabel#StepText {
     color: rgba(255, 255, 255, 0.65);
-    font-size: 12px;
+    font-size: 14px;
 }
 
 QLabel#StepText[state="pending"] {
@@ -244,7 +245,7 @@ QLabel#StepText[state="pending"] {
 }
 
 QLabel#StepText[state="active"] {
-    color: #64B5F6;
+    color: #8CAFFA;
     font-weight: 700;
 }
 
@@ -253,24 +254,50 @@ QLabel#StepText[state="done"] {
 }
 
 /* ================================================================
-   CONTENT AREA — cards, surfaces (white, clean)
+   CONTENT AREA — cards, surfaces (white, soft, borderless)
    ================================================================ */
 
 QWidget#StepCard {
     background: #FFFFFF;
-    border: 1px solid #EEEEEE;
-    border-radius: 12px;
+    border: none;
+    border-radius: 20px;
 }
 
 QFrame[card="true"] {
     background: #FFFFFF;
-    border: 1px solid #E0E0E0;
-    border-radius: 10px;
+    border: none;
+    border-radius: 16px;
 }
 
 QFrame[card="true"][selected="true"] {
-    border: 2px solid #1565C0;
-    background: #F8FBFF;
+    border: 2px solid #3F6FE0;
+    background: #EAF0FF;
+}
+
+/* Flat tinted grouping for a page's main sections — distinct from the plain
+   white card="true" (used where an inner widget, like a choice card, already
+   carries its own visible background) so a section reads as a group instead
+   of disappearing against the white StepCard behind it. */
+QFrame[card="section"] {
+    background: #F5F8FF;
+    border: 1px solid #E7ECF8;
+    border-radius: 16px;
+}
+
+/* Individual choice cards inside a guided questionnaire (radio + hint) */
+QFrame[choice="true"] {
+    background: #FFFFFF;
+    border: 1.5px solid transparent;
+    border-radius: 16px;
+}
+
+QFrame[choice="true"]:hover {
+    background: #F5F8FF;
+}
+
+QFrame[choice="true"][selected="true"] {
+    background: #EAF0FF;
+    border: 2px solid #3F6FE0;
 }
 
 /* ================================================================
@@ -278,74 +305,69 @@ QFrame[card="true"][selected="true"] {
    ================================================================ */
 
 QPushButton {
-    background: #FFFFFF;
-    border: 1px solid #E0E0E0;
-    color: #37474F;
-    border-radius: 8px;
-    padding: 7px 16px;
-    font-weight: 500;
+    background: #EEF1FA;
+    border: none;
+    color: #3E4559;
+    border-radius: 18px;
+    padding: 8px 18px;
+    font-weight: 600;
 }
 
 QPushButton:hover {
-    background: #F5F5F5;
-    border-color: #BDBDBD;
+    background: #E3E8F7;
 }
 
 QPushButton:pressed {
-    background: #EEEEEE;
+    background: #D6DEF3;
 }
 
 QPushButton[role="cta"] {
-    background: #1565C0;
+    background: #3F6FE0;
     border: none;
     color: #FFFFFF;
-    padding: 10px 24px;
-    border-radius: 8px;
+    padding: 10px 26px;
+    border-radius: 19px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 QPushButton[role="cta"]:hover {
-    background: #1976D2;
+    background: #5C84E8;
 }
 
 QPushButton[role="cta"]:pressed {
-    background: #0D47A1;
+    background: #2C56C2;
 }
 
-QPushButton[role="primary"] {
-    background: #1565C0;
-    border: none;
-    color: #FFFFFF;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 700;
-}
-
-QPushButton[role="primary"]:hover {
-    background: #1976D2;
+QPushButton[role="cta"]:disabled {
+    background: #B7C6EF;
+    color: #F0F3FC;
 }
 
 QPushButton[role="badge"] {
-    background: #F5F5F5;
-    border: 1px solid #E0E0E0;
-    color: #546E7A;
-    border-radius: 8px;
-    padding: 5px 12px;
-    font-size: 12px;
-    font-weight: 500;
+    background: #EEF1FA;
+    border: none;
+    color: #5A6072;
+    border-radius: 19px;
+    padding: 6px 16px;
+    font-size: 15px;
+    font-weight: 600;
 }
 
 QPushButton[role="badge"]:hover {
-    background: #EEEEEE;
-    border-color: #BDBDBD;
+    background: #E3E8F7;
+}
+
+QPushButton[role="badge"]:disabled {
+    background: #F4F5FA;
+    color: #B3B8C6;
 }
 
 QPushButton[role="danger"] {
     background: #FFEBEE;
-    border: 1px solid #FFCDD2;
+    border: none;
     color: #C62828;
-    border-radius: 8px;
+    border-radius: 16px;
 }
 
 QPushButton[role="danger"]:hover {
@@ -360,32 +382,32 @@ QLineEdit,
 QComboBox,
 QTextEdit {
     background: #FFFFFF;
-    border: 1px solid #E0E0E0;
-    border-radius: 8px;
-    padding: 7px 10px;
-    color: #0D1929;
+    border: 1.5px solid #E7ECF8;
+    border-radius: 14px;
+    padding: 7px 12px;
+    color: #1B1E28;
 }
 
 QLineEdit:focus,
 QComboBox:focus,
 QTextEdit:focus {
-    border-color: #1565C0;
+    border-color: #3F6FE0;
 }
 
 /* === Report / preview text areas used across wizard pages === */
 
 QTextEdit#ReportView {
     font-family: "Segoe UI", "Noto Sans", sans-serif;
-    font-size: 14px;
-    border: 1.5px solid #BBDEFB;
-    border-radius: 10px;
-    padding: 14px 16px;
-    background: #F8FBFF;
-    color: #0D1929;
+    font-size: 16px;
+    border: none;
+    border-radius: 18px;
+    padding: 16px 18px;
+    background: #EEF2FF;
+    color: #1B1E28;
 }
 
 QTextEdit#ReportView:focus {
-    border-color: #1565C0;
+    border: none;
 }
 
 QTextEdit#ReportView QScrollBar:vertical {
@@ -394,7 +416,7 @@ QTextEdit#ReportView QScrollBar:vertical {
 }
 
 QTextEdit#ReportView QScrollBar::handle:vertical {
-    background: #BBDEFB;
+    background: #B7C9F7;
     border-radius: 3px;
     min-height: 20px;
 }
@@ -411,13 +433,13 @@ QTextEdit#ReportView QScrollBar::sub-line:vertical {
 QProgressBar#GlobalScanBar {
     border: none;
     border-radius: 2px;
-    background: #E3F2FD;
+    background: #DCE6FF;
     min-height: 4px;
     max-height: 4px;
 }
 
 QProgressBar#GlobalScanBar::chunk {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1565C0, stop:1 #42A5F5);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3F6FE0, stop:1 #7BA0F2);
     border-radius: 2px;
 }
 
@@ -426,22 +448,22 @@ QProgressBar#GlobalScanBar::chunk {
    ================================================================ */
 
 QProgressBar {
-    background: #F5F5F5;
-    border: 1px solid #E0E0E0;
-    border-radius: 6px;
+    background: #EEF1FA;
+    border: none;
+    border-radius: 8px;
     text-align: center;
-    color: #546E7A;
+    color: #5A6072;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 14px;
     min-height: 16px;
 }
 
 QProgressBar::chunk {
-    border-radius: 6px;
+    border-radius: 8px;
     background: qlineargradient(
         x1: 0, y1: 0, x2: 1, y2: 0,
-        stop: 0 #1565C0,
-        stop: 1 #42A5F5
+        stop: 0 #3F6FE0,
+        stop: 1 #7BA0F2
     );
 }
 
@@ -450,19 +472,19 @@ QProgressBar::chunk {
    ================================================================ */
 
 QDockWidget {
-    color: #0D1929;
-    font-size: 14px;
+    color: #1B1E28;
+    font-size: 16px;
     font-weight: 700;
-    border: 1px solid #E0E0E0;
+    border: none;
     background: #FFFFFF;
 }
 
 QDockWidget::title {
-    background: #F5F5F5;
-    border-bottom: 1px solid #E0E0E0;
+    background: #F5F8FF;
+    border-bottom: 1px solid #E7ECF8;
     text-align: left;
     padding: 8px 12px;
-    color: #37474F;
+    color: #3E4559;
 }
 
 QDockWidget QWidget {
@@ -478,7 +500,7 @@ QSplitter#MainSplitter::handle {
 }
 
 QSplitter#MainSplitter::handle:hover {
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(63, 111, 224, 0.08);
 }
 
 /* ================================================================
@@ -486,13 +508,13 @@ QSplitter#MainSplitter::handle:hover {
    ================================================================ */
 
 QGroupBox {
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
+    border: 1.5px solid #E7ECF8;
+    border-radius: 16px;
     margin-top: 10px;
     padding-top: 14px;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 600;
-    color: #78909C;
+    color: #78889E;
     background: #FFFFFF;
 }
 
@@ -500,7 +522,7 @@ QGroupBox::title {
     subcontrol-origin: margin;
     left: 12px;
     padding: 0 6px;
-    color: #78909C;
+    color: #78889E;
 }
 
 /* ================================================================
@@ -509,17 +531,17 @@ QGroupBox::title {
 
 QTableWidget {
     background: #FFFFFF;
-    border: 1px solid #EEEEEE;
-    border-radius: 8px;
-    gridline-color: #F5F5F5;
+    border: none;
+    border-radius: 14px;
+    gridline-color: #F0F3FB;
 }
 
 QHeaderView::section {
-    background: #FAFAFA;
-    color: #546E7A;
+    background: #F5F8FF;
+    color: #5A6072;
     font-weight: 700;
     border: none;
-    border-bottom: 1px solid #E0E0E0;
+    border-bottom: 1px solid #E7ECF8;
     padding: 7px 8px;
 }
 
@@ -529,60 +551,60 @@ QHeaderView::section {
 
 QCheckBox {
     spacing: 10px;
-    color: #37474F;
+    color: #3E4559;
 }
 
 QCheckBox::indicator,
 QListWidget::indicator {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-    border: 1.5px solid #BDBDBD;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border: 1.5px solid #C3CCE4;
     background: white;
 }
 
 QCheckBox::indicator:checked,
 QListWidget::indicator::checked {
-    background-color: #1565C0;
-    border: 1.5px solid #1565C0;
+    background-color: #3F6FE0;
+    border: 1.5px solid #3F6FE0;
     image: url("src/qt_ui/assets/checkmark_white.ico");
 }
 
 QCheckBox::indicator:hover {
-    border: 1.5px solid #1565C0;
+    border: 1.5px solid #3F6FE0;
 }
 
 QRadioButton {
     spacing: 6px;
-    color: #37474F;
+    color: #3E4559;
 }
 
 QRadioButton::indicator {
-    width: 14px;
-    height: 14px;
-    border-radius: 7px;
-    border: 1.5px solid #BDBDBD;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border: 1.5px solid #C3CCE4;
     background: white;
 }
 
 QRadioButton::indicator:hover {
-    border: 1.5px solid #1565C0;
+    border: 1.5px solid #3F6FE0;
 }
 
 QRadioButton::indicator:checked {
-    border: 1.5px solid #1565C0;
+    border: 1.5px solid #3F6FE0;
     background: qradialgradient(
         cx: 0.5, cy: 0.5, radius: 0.4,
         fx: 0.5, fy: 0.5,
-        stop: 0 #1565C0,
+        stop: 0 #3F6FE0,
         stop: 1 #FFFFFF
     );
 }
 
 QCheckBox::indicator:disabled,
 QRadioButton::indicator:disabled {
-    border: 1.5px solid #E0E0E0;
-    background: #F5F5F5;
+    border: 1.5px solid #E7ECF8;
+    background: #F5F8FF;
 }
 
 QCheckBox:focus,
@@ -595,51 +617,51 @@ QRadioButton:focus {
    ================================================================ */
 
 QGroupBox#ActivityGroup {
-    border: 1px solid #DDEEFF;
-    border-radius: 10px;
-    background: #F8FAFB;
-    color: #37474F;
+    border: 1.5px solid #E7ECF8;
+    border-radius: 16px;
+    background: #F8FAFF;
+    color: #3E4559;
     margin-top: 0;
     padding-top: 8px;
 }
 
 QLabel#ActivityStatus {
-    color: #546E7A;
-    font-size: 12px;
+    color: #5A6072;
+    font-size: 14px;
     font-weight: 500;
 }
 
 QListWidget#ActivityLog {
-    border: 1px solid #1E2D40;
-    border-radius: 8px;
+    border: none;
+    border-radius: 14px;
     padding: 4px;
     font-family: "Consolas", "Cascadia Mono", monospace;
-    font-size: 12px;
-    background: #0D1929;
+    font-size: 14px;
+    background: #16223D;
     color: #CBD5E1;
 }
 
 QListWidget#ActivityLog::item {
     padding: 3px 6px;
-    border-bottom: 1px solid #1E2D40;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 QWidget#LogFiltersPanel {
-    background: #F5F5F5;
-    border: 1px solid #E0E0E0;
-    border-radius: 8px;
+    background: #EEF1FA;
+    border: none;
+    border-radius: 14px;
 }
 
 QWidget#LogFiltersPanel QCheckBox {
-    color: #546E7A;
-    font-size: 12px;
+    color: #5A6072;
+    font-size: 14px;
     font-weight: 600;
 }
 
 QWidget#LogFiltersPanel QCheckBox::indicator {
     width: 12px;
     height: 12px;
-    border-radius: 3px;
+    border-radius: 6px;
 }
 
 /* ================================================================
@@ -647,27 +669,26 @@ QWidget#LogFiltersPanel QCheckBox::indicator {
    ================================================================ */
 
 QTabWidget#ExpertTabs::pane {
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
+    border: none;
+    border-radius: 16px;
     background: #FFFFFF;
     top: -1px;
 }
 
 QTabBar::tab {
-    background: #F5F5F5;
-    border: 1px solid #E0E0E0;
-    border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
+    background: #EEF1FA;
+    border: none;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
     min-width: 90px;
-    padding: 5px 12px;
-    color: #78909C;
+    padding: 6px 14px;
+    color: #78889E;
     font-weight: 500;
 }
 
 QTabBar::tab:selected {
     background: #FFFFFF;
-    color: #1565C0;
+    color: #3F6FE0;
     font-weight: 700;
 }
 
@@ -676,7 +697,7 @@ QTabBar::tab:selected {
    ================================================================ */
 
 QScrollArea {
-    background: white;
+    background: transparent;
     border: none;
 }
 
@@ -686,24 +707,24 @@ QScrollArea {
 
 QScrollBar:vertical {
     width: 10px;
-    background: #F0F4F8;
+    background: #EEF1FA;
     border: none;
     border-radius: 5px;
     margin: 2px 1px;
 }
 
 QScrollBar::handle:vertical {
-    background: #90A4AE;
+    background: #AFC0EE;
     border-radius: 4px;
     min-height: 36px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #546E7A;
+    background: #7BA0F2;
 }
 
 QScrollBar::handle:vertical:pressed {
-    background: #37474F;
+    background: #3F6FE0;
 }
 
 QScrollBar::add-line:vertical,
@@ -730,13 +751,13 @@ QWidget#HorizontalStepper {
 }
 
 QLabel#StepLabel {
-    color: #9E9E9E;
-    font-size: 13px;
+    color: #AEB8CC;
+    font-size: 15px;
     font-weight: 600;
 }
 
 QLabel#StepLabel[state="active"] {
-    color: #1565C0;
+    color: #3F6FE0;
     font-weight: 700;
 }
 
@@ -746,6 +767,6 @@ QLabel#StepLabel[state="done"] {
 }
 
 QLabel#StepLabel[state="pending"] {
-    color: #BDBDBD;
+    color: #C3CCE4;
     font-weight: 500;
 }

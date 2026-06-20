@@ -243,7 +243,10 @@ def generate_manifest(config: MigrationConfigRoot) -> Dict[str, Any]:
 
             entries.append({
                 "source_path": str(file_path),
-                "relative_path": str(rel),
+                # Always store forward-slash paths in the manifest — this file
+                # is read back on Linux, where PosixPath treats backslashes as
+                # literal filename characters instead of separators.
+                "relative_path": rel.as_posix(),
                 "size_bytes": size,
                 "sha256": sha256,
             })

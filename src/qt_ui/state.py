@@ -29,6 +29,7 @@ class QtUiState:
     analysis_completed: bool = False
     backup_completed: bool = False
     backup_usb_path: str = ""
+    bundle_archive_path: str = ""
     restore_completed: bool = False
     verification_completed: bool = False
     total_sovereignty_score: int = 0

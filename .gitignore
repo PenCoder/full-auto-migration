@@ -9,6 +9,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+assets/linux_build/MigrationWizard
 .Python
 build/
 develop-eggs/
@@ -71,3 +72,4 @@ logs/
 *copy.py
 .claude/
 *cache/
+misc/
