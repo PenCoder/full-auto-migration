@@ -29,7 +29,7 @@ class ReportPage(BasePage):
         self.refresh()
 
     def _build_ui(self) -> None:
-        root = self.create_center_card_layout(max_width=980)
+        root = self.create_center_card_layout()
 
         root.addWidget(self.create_page_header(
             "📋",
@@ -77,20 +77,20 @@ class ReportPage(BasePage):
 
         self.open_markdown_btn = QPushButton("Open Report (Markdown)")
         self.open_markdown_btn.setProperty("role", "cta")
-        self.open_markdown_btn.setFixedWidth(240)
+        self.open_markdown_btn.setMinimumWidth(240)
         self.open_markdown_btn.clicked.connect(self._open_markdown)
         root.addWidget(self.open_markdown_btn, alignment=Qt.AlignHCenter)
 
         self.open_html_btn = QPushButton("Open Report (Web page)")
         self.open_html_btn.setProperty("role", "badge")
-        self.open_html_btn.setFixedWidth(240)
+        self.open_html_btn.setMinimumWidth(240)
         self.open_html_btn.clicked.connect(self._open_html)
         root.addWidget(self.open_html_btn, alignment=Qt.AlignHCenter)
 
         self.next_btn = QPushButton("🎉  Migration Complete — Finish")
         self.next_btn.setProperty("role", "cta")
         self.next_btn.setMinimumWidth(260)
-        self.next_btn.clicked.connect(self.request_next.emit)
+        self.next_btn.clicked.connect(self.request_finish.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
     def showEvent(self, event) -> None:
@@ -166,9 +166,9 @@ class ReportPage(BasePage):
                 return ("…" + p[-52:]) if len(p) > 55 else p
 
             path_rows = (
-                self.html_row("Markdown", f'<span style="color:#546E7A;font-size:12px;">{short(self.report_paths["markdown"])}</span>')
-                + self.html_row("Web page", f'<span style="color:#546E7A;font-size:12px;">{short(self.report_paths["html"])}</span>')
-                + self.html_row("JSON", f'<span style="color:#546E7A;font-size:12px;">{short(self.report_paths["json"])}</span>')
+                self.html_row("Markdown", f'<span style="color:#546E7A;font-size: 14px;">{short(self.report_paths["markdown"])}</span>')
+                + self.html_row("Web page", f'<span style="color:#546E7A;font-size: 14px;">{short(self.report_paths["html"])}</span>')
+                + self.html_row("JSON", f'<span style="color:#546E7A;font-size: 14px;">{short(self.report_paths["json"])}</span>')
             )
             sections.append(self.html_section("📁", "Report Files",
                 f'<table style="width:100%;">{path_rows}</table>'))
@@ -179,11 +179,21 @@ class ReportPage(BasePage):
                 desktop = settings.get("desktop", {}) if isinstance(settings.get("desktop", {}), dict) else {}
                 appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance", {}), dict) else {}
                 exported = settings.get("exported_assets", {}) if isinstance(settings.get("exported_assets", {}), dict) else {}
+                shortcuts = self.ui_state.shortcuts_inventory if isinstance(self.ui_state.shortcuts_inventory, dict) else {}
+                sc_counts = shortcuts.get("counts", {}) if isinstance(shortcuts.get("counts", {}), dict) else {}
                 snap_rows = (
                     self.html_row("Wallpaper", desktop.get("wallpaper_path", "n/a") or "n/a")
                     + self.html_row("Theme", appearance.get("current_theme", "n/a") or "n/a")
                     + self.html_row("Wallpaper export", exported.get("wallpaper", "") or "not exported")
                     + self.html_row("Theme export", exported.get("theme", "") or "not exported")
+                    + self.html_row(
+                        "App shortcuts",
+                        f"{sc_counts.get('matched', 0)} matched "
+                        f"(Desktop {sc_counts.get('desktop', 0)}, "
+                        f"Start Menu {sc_counts.get('start_menu', 0)}, "
+                        f"Taskbar {sc_counts.get('taskbar', 0)})"
+                        if sc_counts else "n/a",
+                    )
                 )
                 sections.append(self.html_section("🖥️", "Settings Snapshot",
                     f'<table style="width:100%;">{snap_rows}</table>'))
@@ -199,7 +209,7 @@ class ReportPage(BasePage):
                     + self.html_row("Suggest review", str(counts.get("suggest_review", 0)))
                     + self.html_row("Manual review", str(counts.get("manual_review", 0)))
                     + self.html_row("Excluded", str(counts.get("excluded", 0)))
-                    + self.html_row("Plan Markdown", f'<span style="color:#546E7A;font-size:12px;">{short(plan_paths.get("markdown_path", ""))}</span>')
+                    + self.html_row("Plan Markdown", f'<span style="color:#546E7A;font-size: 14px;">{short(plan_paths.get("markdown_path", ""))}</span>')
                 )
                 sections.append(self.html_section("📋", "Settings Migration Plan",
                     f'<table style="width:100%;">{plan_rows}</table>'))
@@ -233,6 +243,9 @@ class ReportPage(BasePage):
         path = self.report_paths.get("html")
         if path:
             QDesktopServices.openUrl(Path(path).as_uri())
+
+    def can_proceed(self) -> bool:
+        return bool(self.report_paths)
 
     def refresh(self) -> None:
         self.next_btn.setEnabled(bool(self.report_paths))

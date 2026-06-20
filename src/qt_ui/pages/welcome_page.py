@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -38,7 +39,7 @@ class WelcomePage(BasePage):
         hero.setStyleSheet("""
             QWidget#WelcomeHero {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #1565C0, stop:1 #1E88E5);
+                    stop:0 #3F6FE0, stop:1 #7BA0F2);
             }
         """)
         hero_layout = QVBoxLayout(hero)
@@ -54,18 +55,18 @@ class WelcomePage(BasePage):
         win_badge.setStyleSheet(
             "background: rgba(255,255,255,0.18); color: white;"
             "border: 1px solid rgba(255,255,255,0.45); border-radius: 20px;"
-            "padding: 5px 14px; font-size: 13px; font-weight: 700;"
+            "padding: 5px 14px; font-size: 15px; font-weight: 700;"
         )
         arrow_lbl = QLabel("→")
         arrow_lbl.setStyleSheet(
-            "color: rgba(255,255,255,0.7); font-size: 22px; font-weight: 300;"
+            "color: rgba(255,255,255,0.7); font-size: 25px; font-weight: 300;"
             "background: transparent;"
         )
         mint_badge = QLabel("  Linux Mint  ")
         mint_badge.setStyleSheet(
             "background: #2E7D32; color: white;"
             "border: 1px solid rgba(255,255,255,0.35); border-radius: 20px;"
-            "padding: 5px 14px; font-size: 13px; font-weight: 700;"
+            "padding: 5px 14px; font-size: 15px; font-weight: 700;"
         )
         badge_row.addWidget(win_badge)
         badge_row.addWidget(arrow_lbl)
@@ -74,7 +75,7 @@ class WelcomePage(BasePage):
 
         hero_title = QLabel("Migration Platform")
         hero_title.setStyleSheet(
-            "color: white; font-size: 34px; font-weight: 800;"
+            "color: white; font-size: 39px; font-weight: 800;"
             "letter-spacing: -1px; background: transparent;"
         )
         hero_title.setAlignment(Qt.AlignCenter)
@@ -85,7 +86,7 @@ class WelcomePage(BasePage):
             " step by step, all under your control."
         )
         hero_sub.setStyleSheet(
-            "color: rgba(255,255,255,0.88); font-size: 14px; background: transparent;"
+            "color: rgba(255,255,255,0.88); font-size: 16px; background: transparent;"
         )
         hero_sub.setAlignment(Qt.AlignCenter)
         hero_sub.setWordWrap(True)
@@ -97,14 +98,19 @@ class WelcomePage(BasePage):
         # Body — feature cards + stats + CTA                                 #
         # ------------------------------------------------------------------ #
         body = QWidget()
-        body.setStyleSheet("QWidget { background: #FFFFFF; }")
+        body.setObjectName("WelcomeBody")
+        body.setStyleSheet("QWidget#WelcomeBody { background: #FFFFFF; }")
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(36, 28, 36, 28)
         body_layout.setSpacing(22)
 
-        # Feature cards
-        features_row = QHBoxLayout()
-        features_row.setSpacing(14)
+        # Feature cards — laid out in a grid so the column count can drop as
+        # the window narrows, instead of clipping silently (horizontal
+        # scrolling is disabled on the page's scroll area).
+        self.features_grid = QGridLayout()
+        self.features_grid.setSpacing(14)
+        self._feature_columns = 0
+        self._feature_cards: list[QFrame] = []
 
         feature_data = [
             (
@@ -143,28 +149,29 @@ class WelcomePage(BasePage):
 
             icon_lbl = QLabel(icon)
             icon_lbl.setStyleSheet(
-                "font-size: 26px; background: transparent; border: none;"
+                "font-size: 30px; background: transparent; border: none;"
             )
             card_layout.addWidget(icon_lbl)
 
             t_lbl = QLabel(title_text)
             t_lbl.setStyleSheet(
-                "font-size: 13px; font-weight: 700; color: #1565C0;"
+                "font-size: 15px; font-weight: 700; color: #3F6FE0;"
                 "background: transparent; border: none;"
             )
             card_layout.addWidget(t_lbl)
 
             d_lbl = QLabel(desc_text)
             d_lbl.setStyleSheet(
-                "font-size: 12px; color: #546E7A; background: transparent; border: none;"
+                "font-size: 14px; color: #546E7A; background: transparent; border: none;"
             )
             d_lbl.setWordWrap(True)
             card_layout.addWidget(d_lbl)
             card_layout.addStretch(1)
 
-            features_row.addWidget(card)
+            self._feature_cards.append(card)
 
-        body_layout.addLayout(features_row)
+        body_layout.addLayout(self.features_grid)
+        self._relayout_feature_cards(4)
 
         # Stats row
         stats_row = QHBoxLayout()
@@ -199,4 +206,26 @@ class WelcomePage(BasePage):
         btn_row.addStretch(1)
         body_layout.addLayout(btn_row)
 
+        # Exposed so main_window can attach the shared Back/Next nav bar —
+        # this page uses a custom hero layout instead of create_center_card_layout.
+        self.card_widget = body
+        self.card_layout = body_layout
+
         outer.addWidget(body, stretch=1)
+
+    def _relayout_feature_cards(self, columns: int) -> None:
+        if columns == self._feature_columns:
+            return
+        self._feature_columns = columns
+        while self.features_grid.count():
+            self.features_grid.takeAt(0)
+        for idx, card in enumerate(self._feature_cards):
+            row, col = divmod(idx, columns)
+            self.features_grid.addWidget(card, row, col)
+
+    def resizeEvent(self, event) -> None:
+        # This page has its own full-width hero + body layout instead of the
+        # shared centered StepCard, so skip BasePage's card-width clamping —
+        # only the feature-card grid needs to reflow here.
+        columns = 4 if self.width() >= 980 else (2 if self.width() >= 560 else 1)
+        self._relayout_feature_cards(columns)

@@ -55,6 +55,8 @@ Double-click `MigrationWizard.exe`.
 
 The wizard opens. You will see a welcome screen.
 
+![The welcome screen, with a Start button to begin the migration.](assets/manual/welcome.png)
+
 ---
 
 ### Step 3 — Choose your mode
@@ -68,6 +70,8 @@ The tool asks you to choose how much control you want.
 | **Expert** | Advanced users | Full control over every setting |
 
 > **Recommendation:** Choose **Guided** if you are not sure.
+
+![Choosing a migration mode — Guided, Balanced, or Expert.](assets/manual/mode.png)
 
 Click **Next** to continue.
 
@@ -85,6 +89,8 @@ It is looking for:
 This takes about **30 to 60 seconds**.
 
 When it finishes you will see a list of your programs and their Linux alternatives.
+
+![The scan in progress, showing hardware and software inventory results.](assets/manual/scan.png)
 
 > **Example:** Microsoft Word → LibreOffice Writer · VLC → VLC · Chrome → Chromium
 
@@ -109,6 +115,8 @@ The tool asks which files you want to move.
 In Guided mode, all your personal files are selected automatically.
 
 In Balanced or Expert mode, you can choose specific file types — for example, only documents and photos.
+
+![Choosing which personal files to bring across.](assets/manual/files.png)
 
 Click **Next** to continue.
 
@@ -136,6 +144,8 @@ It creates a folder called `data/restore/` inside the tool's folder. This folder
 - Your desktop settings and wallpaper
 
 This takes **2 to 10 minutes** depending on how many files you have.
+
+![Packing the migration bundle, with an optional USB drive destination.](assets/manual/bundle.png)
 
 When it finishes you will see a message saying your bundle is ready.
 
@@ -196,6 +206,8 @@ Double-click it to run it.
 
 The tool opens on the Restore page.
 
+![The Restore page on Linux, ready to browse to the migration bundle.](assets/manual/restore.png)
+
 Click **Browse** and navigate to the `data/restore/` folder on your USB stick.
 
 Select the `restore` folder and click **OK**.
@@ -222,6 +234,8 @@ It compares each file against the original using a digital fingerprint (SHA-256 
 
 You will see a **Migration Score** — a percentage showing how much of your data moved successfully.
 
+![The Verification page, checking restored files and showing the Migration Score.](assets/manual/verify.png)
+
 | Score | What it means |
 |---|---|
 | 90% or above | Excellent — almost everything moved perfectly |
@@ -235,6 +249,8 @@ You will see a **Migration Score** — a percentage showing how much of your dat
 The tool generates a final report automatically.
 
 Click **Open Report** to open it in your browser.
+
+![The final migration report page, with the Migration Score and report links.](assets/manual/report.png)
 
 The report shows:
 - How many files were moved

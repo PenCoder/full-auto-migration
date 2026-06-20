@@ -121,8 +121,7 @@ class AutomationCoordinator:
             result["file_recommendations"] = file_recs
             timing["file_recommendations_s"] = t
 
-        # Settings, Data Selection, and Review used defaults — mark all done.
-        _done("settings")
+        # Data Selection and Review used defaults — mark both done.
         _done("data")
         _done("review")
 

@@ -24,7 +24,7 @@ class BundleReportPage(BasePage):
     # ── UI construction ──────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
-        root = self.create_center_card_layout(max_width=980)
+        root = self.create_center_card_layout()
 
         root.addWidget(self.create_page_header(
             "📋",
@@ -46,8 +46,8 @@ class BundleReportPage(BasePage):
 
         self.next_btn = QPushButton("Backup complete — move to Linux")
         self.next_btn.setProperty("role", "cta")
-        self.next_btn.setFixedWidth(290)
-        self.next_btn.clicked.connect(self.request_next.emit)
+        self.next_btn.setMinimumWidth(290)
+        self.next_btn.clicked.connect(self.request_finish.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
     # ── Rendering ────────────────────────────────────────────────────────────
@@ -74,8 +74,9 @@ class BundleReportPage(BasePage):
         # ── 1. Bundle location ───────────────────────────────────────────────
         loc_rows = self.html_row("Saved on this computer", local_path or "—")
         if usb_path:
+            archive_name = Path(local_path).name if local_path else "migration_bundle.zip"
             loc_rows += self.html_row(
-                "USB copy", str(Path(usb_path) / "migration_bundle")
+                "USB copy", str(Path(usb_path) / archive_name)
             )
         sections.append(self.html_section(
             "📁", "Bundle Location",
@@ -125,30 +126,24 @@ class BundleReportPage(BasePage):
             )
             app_body = f'<table style="width:100%;">{stat_rows}</table>'
 
-            recs = (app_recs.get("recommendations") or [])[:8]
+            recs = app_recs.get("recommendations") or []
             if recs:
                 conf_color = {"high": "#1B5E20", "medium": "#E65100", "low": "#546E7A"}
                 conf_bg = {"high": "#E8F5E9", "medium": "#FFF3E0", "low": "#ECEFF1"}
                 rows = "".join(
                     f'<tr>'
-                    f'<td style="padding:3px 10px 3px 0;font-size:12px;color:#0D1929;">{rec.get("windows_app","")}</td>'
-                    f'<td style="padding:3px 10px 3px 0;font-size:12px;color:#1565C0;">{rec.get("linux_package","")}</td>'
+                    f'<td style="padding:3px 10px 3px 0;font-size: 14px;color:#1B1E28;">{rec.get("windows_app","")}</td>'
+                    f'<td style="padding:3px 10px 3px 0;font-size: 14px;color:#3F6FE0;">{rec.get("linux_package","")}</td>'
                     f'<td style="padding:3px 0;">'
                     f'{self.html_pill(str(rec.get("mapping_confidence","")), conf_color.get(str(rec.get("mapping_confidence","")), "#546E7A"), conf_bg.get(str(rec.get("mapping_confidence","")), "#ECEFF1"))}'
                     f'</td></tr>'
                     for rec in recs
                 )
-                extra = len(app_recs.get("recommendations", [])) - 8
-                if extra > 0:
-                    rows += (
-                        f'<tr><td colspan="3" style="color:#90A4AE;font-size:11px;'
-                        f'padding-top:4px;">+ {extra} more matched</td></tr>'
-                    )
                 header = (
                     '<tr>'
-                    '<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Windows App</th>'
-                    '<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Linux Package</th>'
-                    '<th style="text-align:left;color:#90A4AE;font-size:11px;font-weight:600;padding-bottom:4px;">Match</th>'
+                    '<th style="text-align:left;color:#90A4AE;font-size: 13px;font-weight:600;padding-bottom:4px;">Windows App</th>'
+                    '<th style="text-align:left;color:#90A4AE;font-size: 13px;font-weight:600;padding-bottom:4px;">Linux Package</th>'
+                    '<th style="text-align:left;color:#90A4AE;font-size: 13px;font-weight:600;padding-bottom:4px;">Match</th>'
                     '</tr>'
                 )
                 app_body += (
@@ -166,16 +161,23 @@ class BundleReportPage(BasePage):
             "theme": "Theme",
             "light_dark": "Light/Dark mode",
             "accent_color": "Accent colour",
-            "taskbar_layout": "Taskbar layout",
+            "taskbar_layout": "App shortcuts",
             "keyboard_shortcuts": "Keyboard shortcuts",
             "file_associations": "File associations",
         }
         if self.ui_state.settings_migration_enabled:
-            selected = [
-                label_map[k]
-                for k, v in self.ui_state.settings_selected_items.items()
-                if v and k in label_map
-            ]
+            selected = []
+            for k, v in self.ui_state.settings_selected_items.items():
+                if not v or k not in label_map:
+                    continue
+                label = label_map[k]
+                if k == "taskbar_layout":
+                    counts = self.ui_state.shortcuts_inventory.get("counts", {}) \
+                        if isinstance(self.ui_state.shortcuts_inventory, dict) else {}
+                    matched = int(counts.get("matched", 0)) if isinstance(counts, dict) else 0
+                    if matched:
+                        label = f"{label} ({matched} matched)"
+                selected.append(label)
             appearance_val = ", ".join(selected) if selected else "None selected"
         else:
             appearance_val = "Disabled"
@@ -197,26 +199,32 @@ class BundleReportPage(BasePage):
         ))
 
         # ── 5. What to do next ───────────────────────────────────────────────
+        unzip_step = (
+            "Unzip the archive, then run the included <b>MigrationWizard</b> application "
+            "inside it (or open this tool from source if it isn't included) and proceed to "
+            "the Restore step."
+        )
         if usb_path:
             next_text = (
-                "Eject the USB drive and insert it into your Linux machine. "
-                "Open this tool in <b>Linux mode</b> and proceed to the Restore step."
+                f"Eject the USB drive and connect it to your Linux machine. {unzip_step}"
             )
         else:
             next_text = (
-                f'Copy the bundle folder from <span style="font-family:monospace;font-size:12px;">'
+                f'Copy the bundle archive from <span style="font-family:monospace;font-size: 14px;">'
                 f'{local_path}</span> to your Linux machine using a USB drive, '
-                f'network share, or cloud storage. '
-                f'Then open this tool in <b>Linux mode</b> and proceed to the Restore step.'
+                f'network share, or cloud storage. {unzip_step}'
             )
         sections.append(self.html_section(
             "🚀", "What to do next",
-            f'<p style="font-size:13px;color:#374151;line-height:1.7;margin:0;">{next_text}</p>',
+            f'<p style="font-size: 15px;color:#374151;line-height:1.7;margin:0;">{next_text}</p>',
         ))
 
         self.report_view.setHtml(self.html_wrap("".join(sections)))
 
     # ── Refresh ──────────────────────────────────────────────────────────────
+
+    def can_proceed(self) -> bool:
+        return self.ui_state.backup_completed
 
     def refresh(self) -> None:
         self.next_btn.setEnabled(self.ui_state.backup_completed)

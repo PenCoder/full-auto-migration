@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThreadPool, QTimer, Qt
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QLabel, QProgressBar, QPushButton
+from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
 from src.orchestration.errors import user_facing_error
 from src.qt_ui.pages.base_page import BasePage
@@ -48,17 +48,29 @@ class VerificationPage(BasePage):
             )
         )
 
+        results_card = QFrame()
+        results_card.setProperty("card", "section")
+        results_card_layout = QVBoxLayout(results_card)
+        results_card_layout.setContentsMargins(14, 12, 14, 12)
+        results_card_layout.setSpacing(10)
+
+        results_title = QLabel("Verification results")
+        results_title.setObjectName("SectionTitle")
+        results_card_layout.addWidget(results_title)
+
         self.score_progress = QProgressBar()
         self.score_progress.setRange(0, 100)
         self.score_progress.setValue(0)
         self.score_progress.setFormat("Migration Score: %p%")
         self.score_progress.setTextVisible(True)
-        root.addWidget(self.score_progress)
+        results_card_layout.addWidget(self.score_progress)
 
         self.evidence_chips = self.create_stat_chip_row(
             ["Files checked: 0", "Verified intact: 0", "Apps matched: 0"]
         )
-        root.addWidget(self.evidence_chips)
+        results_card_layout.addWidget(self.evidence_chips)
+
+        root.addWidget(results_card)
 
         self.loading = QProgressBar()
         self.loading.setRange(0, 0)
@@ -66,15 +78,15 @@ class VerificationPage(BasePage):
         root.addWidget(self.loading)
 
         self.verify_btn = QPushButton("Check Everything Arrived Safely")
-        self.verify_btn.setProperty("role", "primary")
+        self.verify_btn.setProperty("role", "cta")
         self.verify_btn.setMinimumHeight(48)
-        self.verify_btn.setFixedWidth(260)
+        self.verify_btn.setMinimumWidth(260)
         self.verify_btn.clicked.connect(self._run_verification)
         root.addWidget(self.verify_btn, alignment=Qt.AlignHCenter)
 
         self.report_btn = QPushButton("View Migration Report")
-        self.report_btn.setProperty("role", "cta")
-        self.report_btn.setFixedWidth(250)
+        self.report_btn.setProperty("role", "badge")
+        self.report_btn.setMinimumWidth(250)
         self.report_btn.clicked.connect(self._show_report_path)
         root.addWidget(self.report_btn, alignment=Qt.AlignHCenter)
 

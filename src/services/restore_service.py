@@ -103,6 +103,7 @@ class RestoreService:
         self.settings_guidance_path: str = ""
         self.apps_to_install: list[dict] = []
         self.shortcuts_restored: list[dict] = []
+        self.warnings: list[str] = []
         self.report_path = RESTORE_REPORT
 
     def _progress(self, percent: int, msg: str) -> None:
@@ -127,18 +128,31 @@ class RestoreService:
         self._verify_files(manifest)
 
         self._progress(82, "Applying desktop settings…")
-        self._restore_settings()
+        self._run_optional_step("Settings restore", self._restore_settings)
 
         if self.apps_path.exists():
             self._progress(90, "Installing applications…")
-            self._install_applications()
+            self._run_optional_step("Application install", self._install_applications)
 
         if self.shortcuts_path.exists():
             self._progress(96, "Recreating shortcuts and launchers…")
-            self._restore_shortcuts()
+            self._run_optional_step("Shortcut restore", self._restore_shortcuts)
 
         self._write_restore_report()
         self._progress(100, "Restore complete.")
+
+    def _run_optional_step(self, label: str, fn: Callable[[], None]) -> None:
+        """Run a best-effort restore step without aborting the whole restore.
+
+        File restore + verification (the critical part) already happened by
+        the time these run — a failed app install or shortcut recreation
+        shouldn't throw away a successful file restore.
+        """
+        try:
+            fn()
+        except Exception as exc:
+            self.logger.exception("%s failed (continuing): %s", label, exc)
+            self.warnings.append(f"{label} failed: {exc}")
 
     def _validate_bundle(self) -> None:
         """Require manifest.json plus either backup.zip or an uncompressed files/ directory."""
@@ -173,7 +187,16 @@ class RestoreService:
 
     def _load_manifest(self) -> dict:
         with self.manifest_path.open(encoding="utf-8") as f:
-            return json.load(f)
+            manifest = json.load(f)
+        # Bundles created on Windows may have backslash-separated relative
+        # paths baked into manifest.json from before this was normalized at
+        # generation time — PosixPath treats '\' as a literal filename
+        # character, not a separator, so normalize here too.
+        for entry in manifest.get("entries", []):
+            rel = entry.get("relative_path")
+            if isinstance(rel, str) and "\\" in rel:
+                entry["relative_path"] = rel.replace("\\", "/")
+        return manifest
 
     def _extract_backup(self) -> Path:
         """Extract backup.zip, or return the uncompressed files/ directory directly."""
@@ -411,7 +434,11 @@ class RestoreService:
         # ── Theme name (guidance only — .theme files are not portable) ───────
         theme_val = appearance.get("current_theme", "")
         if theme_val:
-            theme_name = Path(theme_val).stem
+            # theme_val is a raw Windows path (e.g. "C:\Users\...\Custom.theme")
+            # recorded as source metadata — PosixPath would treat the whole
+            # backslash-laden string as one filename instead of splitting it,
+            # so pull out the last component manually before taking the stem.
+            theme_name = Path(theme_val.replace("\\", "/")).stem
             manual.append(
                 f"Windows theme: **{theme_name}**. "
                 f"Windows `.theme` files are not compatible with Linux. "
@@ -616,6 +643,7 @@ class RestoreService:
             "settings_applied": self.settings_applied,
             "settings_guidance": self.settings_guidance_path,
             "shortcuts_restored": self.shortcuts_restored,
+            "warnings": self.warnings,
         }
         self.report_path.parent.mkdir(parents=True, exist_ok=True)
         with self.report_path.open("w", encoding="utf-8") as f:

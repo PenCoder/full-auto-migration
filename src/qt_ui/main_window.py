@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QThreadPool, QTimer, Qt, Signal
+from PySide6.QtCore import QEvent, QThreadPool, QTimer, Qt, Signal
 from PySide6.QtWidgets import QMessageBox
 
 from PySide6.QtWidgets import (
@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QRadioButton,
     QSizePolicy,
-    QStackedWidget,
     QSplitter,
     QScrollArea,
     QVBoxLayout,
@@ -33,7 +32,6 @@ from src.qt_ui.pages.data_selection_page import DataSelectionPage
 from src.qt_ui.pages.report_page import ReportPage
 from src.qt_ui.pages.restore_page import RestorePage
 from src.qt_ui.pages.scan_page import ScanPage
-from src.qt_ui.pages.settings_page import SettingsPage
 from src.qt_ui.pages.mode_page import ModePage
 from src.qt_ui.pages.review_recommendations_page import ReviewRecommendationsPage
 from src.qt_ui.pages.verification_page import VerificationPage
@@ -42,6 +40,8 @@ from src.qt_ui.state import QtUiState
 from src.qt_ui.workers import FunctionWorker
 from src.qt_ui.widgets.automation_overlay import AutomationOverlay
 from src.qt_ui.widgets.expert_panel import ExpertPanel
+from src.qt_ui.widgets.help_dialog import HelpDialog
+from src.qt_ui.widgets.sized_stack import CurrentSizeStackedWidget
 from src.qt_ui.widgets.stepper_sidebar import StepperSidebar
 from src.qt_ui.controllers import ActivityLogController, AutomationCoordinator, NavigationController, ModeController, OperationsController
 
@@ -91,7 +91,7 @@ class QtMigrationWindow(QMainWindow):
         self.automation_step_done.connect(self._on_automation_step_done)
 
         self.setWindowTitle("Sovereignty Migration Platform (Qt)")
-        self.resize(1360, 820)
+        self.resize(1440, 860)
         self.setMinimumSize(1160, 700)
 
         self._build_ui()
@@ -113,8 +113,17 @@ class QtMigrationWindow(QMainWindow):
         root.setObjectName("RootSurface")
         self._root_widget = root
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(18, 14, 18, 12)
-        root_layout.setSpacing(12)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        # Right-hand column: title/controls/banners stacked above the page
+        # content. Built as its own widget so the sidebar (added directly to
+        # the splitter alongside it) can span the full window height instead
+        # of starting below a full-width title bar.
+        right_column = QWidget()
+        right_layout = QVBoxLayout(right_column)
+        right_layout.setContentsMargins(18, 14, 18, 12)
+        right_layout.setSpacing(12)
 
         # Title bar.
         top_bar = QHBoxLayout()
@@ -124,7 +133,7 @@ class QtMigrationWindow(QMainWindow):
         top_bar.addStretch(1)
         top_bar.addWidget(title)
         top_bar.addStretch(1)
-        root_layout.addLayout(top_bar)
+        right_layout.addLayout(top_bar)
 
         subtitle = QLabel(
             "A guided migration workspace for discovery, backup, restore, validation, and evidence reports."
@@ -132,7 +141,7 @@ class QtMigrationWindow(QMainWindow):
         subtitle.setObjectName("AppSubtitle")
         subtitle.setAlignment(Qt.AlignCenter)
         subtitle.setWordWrap(True)
-        root_layout.addWidget(subtitle)
+        right_layout.addWidget(subtitle)
 
         # Controls row.
         control_bar = QHBoxLayout()
@@ -152,18 +161,24 @@ class QtMigrationWindow(QMainWindow):
         control_bar.addWidget(self.balanced_radio)
         control_bar.addWidget(self.expert_radio)
 
-        self.expert_toggle_btn = QPushButton("Customize")
+        self.expert_toggle_btn = QPushButton("Customize ▸")
         self.expert_toggle_btn.setProperty("role", "badge")
         self.expert_toggle_btn.clicked.connect(self._toggle_expert_panel)
         control_bar.addWidget(self.expert_toggle_btn)
 
-        root_layout.addLayout(control_bar)
+        self.help_btn = QPushButton("❓ Help")
+        self.help_btn.setProperty("role", "badge")
+        self.help_btn.setToolTip("What to do on this page")
+        self.help_btn.clicked.connect(self._show_help)
+        control_bar.addWidget(self.help_btn)
+
+        right_layout.addLayout(control_bar)
 
         self.error_banner = QLabel("")
         self.error_banner.setObjectName("ErrorBanner")
         self.error_banner.setWordWrap(True)
         self.error_banner.setVisible(False)
-        root_layout.addWidget(self.error_banner)
+        right_layout.addWidget(self.error_banner)
 
         self.global_scan_bar = QProgressBar()
         self.global_scan_bar.setObjectName("GlobalScanBar")
@@ -171,14 +186,12 @@ class QtMigrationWindow(QMainWindow):
         self.global_scan_bar.setFixedHeight(4)
         self.global_scan_bar.setTextVisible(False)
         self.global_scan_bar.setVisible(False)
-        root_layout.addWidget(self.global_scan_bar)
+        right_layout.addWidget(self.global_scan_bar)
 
-        # Main content with left stepper + page stack.
-        content_row = QHBoxLayout()
-        content_row.setSpacing(16)
-        self.stack = QStackedWidget()
+        self.stack = CurrentSizeStackedWidget()
         self.stack.setObjectName("PageStack")
-        self.stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.stack.installEventFilter(self)
 
         if self.runtime_mode == "windows":
             self.stepper = StepperSidebar(
@@ -187,7 +200,7 @@ class QtMigrationWindow(QMainWindow):
                 steps=[
                     "Get Started\nChoose your migration mode",
                     "System Scan\nDiscover apps, hardware and settings",
-                    "Configure\nFiles, settings and recommendations",
+                    "Configure\nFiles and recommendations",
                     "Bundle\nPack and export your migration data",
                     "Report\nReview everything before moving to Linux",
                 ],
@@ -201,7 +214,6 @@ class QtMigrationWindow(QMainWindow):
                 run_analysis_cb=self._run_analysis,
                 privacy_policy=self.operations.get_ai_config(self.config),
             )
-            self.settings_page = SettingsPage(self.ui_state)
             self.data_page = DataSelectionPage(
                 self.ui_state,
                 file_type_catalog=self.config.source_system.file_types,
@@ -220,11 +232,10 @@ class QtMigrationWindow(QMainWindow):
             self.welcome_page.request_next.connect(self.next_page)
             self.mode_page.request_next.connect(self.next_page)
             self.scan_page.request_next.connect(self.next_page)
-            self.settings_page.request_next.connect(self.next_page)
             self.data_page.request_next.connect(self.next_page)
             self.review_page.request_next.connect(self.next_page)
             self.backup_page.request_next.connect(self.next_page)
-            self.bundle_report_page.request_next.connect(self.next_page)
+            self.bundle_report_page.request_finish.connect(self._on_finish)
 
             self.guided_radio.toggled.connect(self.mode_page.guided_radio.setChecked)
             self.balanced_radio.toggled.connect(self.mode_page.balanced_radio.setChecked)
@@ -234,11 +245,10 @@ class QtMigrationWindow(QMainWindow):
             self.mode_page.balanced_radio.toggled.connect(lambda checked: self.balanced_radio.setChecked(checked))
             self.mode_page.expert_radio.toggled.connect(lambda checked: self.expert_radio.setChecked(checked))
 
-            # Order: Welcome → Mode → Scan → Settings → Data → Review → Backup → Bundle Report
+            # Order: Welcome → Mode → Scan → Data → Review → Backup → Bundle Report
             self.stack.addWidget(self.welcome_page)
             self.stack.addWidget(self.mode_page)
             self.stack.addWidget(self.scan_page)
-            self.stack.addWidget(self.settings_page)
             self.stack.addWidget(self.data_page)
             self.stack.addWidget(self.review_page)
             self.stack.addWidget(self.backup_page)
@@ -246,11 +256,17 @@ class QtMigrationWindow(QMainWindow):
 
             # Connect each page's processing_changed → sync_nav so nav buttons update in real-time.
             for _p in [
-                self.welcome_page, self.mode_page, self.scan_page, self.settings_page,
+                self.welcome_page, self.mode_page, self.scan_page,
                 self.data_page, self.review_page, self.backup_page, self.bundle_report_page,
             ]:
                 _p.processing_changed.connect(self._sync_nav)
                 _p.processing_changed.connect(self._on_any_page_processing_changed)
+                # A LayoutRequest from a deeply nested widget (e.g. a choice
+                # card's hint label correcting its own height) bubbles up to
+                # the page widget itself, not to self.stack — install the
+                # filter on each page too so _resize_stack_to_current() gets
+                # re-triggered once that settles.
+                _p.installEventFilter(self)
         else:
             self.stepper = StepperSidebar(
                 title="Migration Steps",
@@ -267,10 +283,12 @@ class QtMigrationWindow(QMainWindow):
 
             self.restore_page.request_next.connect(self.next_page)
             self.verify_page.request_next.connect(self.next_page)
-            self.report_page.request_next.connect(self.next_page)
+            self.report_page.request_finish.connect(self._on_finish)
             self.stack.addWidget(self.restore_page)
             self.stack.addWidget(self.verify_page)
             self.stack.addWidget(self.report_page)
+            for _p in (self.restore_page, self.verify_page, self.report_page):
+                _p.installEventFilter(self)
 
         self.stepper.setMinimumWidth(260)
         self.stepper.setMaximumWidth(310)
@@ -285,7 +303,7 @@ class QtMigrationWindow(QMainWindow):
         stepper_scroll.setWidget(self.stepper)
         stepper_scroll.setMinimumWidth(260)
         stepper_scroll.setMaximumWidth(310)
-        stepper_scroll.setStyleSheet("QScrollArea { background: #0D1929; border: none; } QScrollArea > QWidget { background: #0D1929; }")
+        stepper_scroll.setStyleSheet("QScrollArea { background: #16223D; border: none; } QScrollArea > QWidget { background: #16223D; }")
 
         self.stack_scroll = QScrollArea()
         self.stack_scroll.setWidgetResizable(True)
@@ -293,64 +311,76 @@ class QtMigrationWindow(QMainWindow):
         self.stack_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.stack_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.stack_scroll.setWidget(self.stack)
+        right_layout.addWidget(self.stack_scroll, stretch=1)
 
-        content_splitter = QSplitter(Qt.Horizontal)
-        content_splitter.setObjectName("MainSplitter")
-        content_splitter.setChildrenCollapsible(False)
-        content_splitter.setHandleWidth(10)
-        content_splitter.addWidget(stepper_scroll)
-        content_splitter.addWidget(self.stack_scroll)
-        content_splitter.setStretchFactor(0, 0)
-        content_splitter.setStretchFactor(1, 1)
-        content_splitter.setSizes([270, 920])
-
-        content_row.addWidget(content_splitter, stretch=1)
-        root_layout.addLayout(content_row, stretch=1)
-
-        # Bottom navigation.
-        nav = QHBoxLayout()
+        # Bottom navigation — built as its own widget so it can be reparented
+        # into the bottom of whichever page's own card is currently showing,
+        # instead of floating in a separate bar below the content.
+        self.nav_bar = QWidget()
+        nav = QHBoxLayout(self.nav_bar)
+        nav.setContentsMargins(0, 0, 0, 0)
         nav.setSpacing(10)
+
+        nav.addStretch(1)
 
         self.back_btn = QPushButton("Back")
         self.back_btn.setProperty("role", "badge")
+        self.back_btn.setFixedHeight(38)
         self.back_btn.clicked.connect(self.prev_page)
-        nav.addWidget(self.back_btn, alignment=Qt.AlignLeft)
-
-        nav.addStretch(1)
-
-        center_status = QWidget()
-        center_status.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
-        center_status_layout = QHBoxLayout(center_status)
-        center_status_layout.setContentsMargins(0, 0, 0, 0)
-        center_status_layout.setSpacing(8)
-
-        self.mode_badge = QLabel("Mode Status: Guided")
-        self.mode_badge.setObjectName("StatusPill")
-        self.mode_badge.setToolTip("Current interaction mode status")
-        center_status_layout.addWidget(self.mode_badge)
-
-        self.commitment_badge = QLabel("License: Open Source")
-        self.commitment_badge.setObjectName("StatusPill")
-        self.commitment_badge.setToolTip("Project licensing and openness status")
-        center_status_layout.addWidget(self.commitment_badge)
-
-        nav.addWidget(center_status, alignment=Qt.AlignCenter)
-        nav.addStretch(1)
+        nav.addWidget(self.back_btn)
 
         self.complete_all_btn = QPushButton("Run Automatically")
-        self.complete_all_btn.setProperty("role", "cta")
+        self.complete_all_btn.setProperty("role", "badge")
+        self.complete_all_btn.setFixedHeight(38)
         self.complete_all_btn.setToolTip(
             "Run the full migration pipeline with default settings — no page-by-page steps needed."
         )
         self.complete_all_btn.clicked.connect(self._run_full_automation)
         self.complete_all_btn.setEnabled(True)
-        nav.addWidget(self.complete_all_btn, alignment=Qt.AlignRight)
+        nav.addWidget(self.complete_all_btn)
 
         self.next_btn = QPushButton("Next")
         self.next_btn.setProperty("role", "cta")
+        self.next_btn.setFixedHeight(38)
         self.next_btn.clicked.connect(self.next_page)
-        nav.addWidget(self.next_btn, alignment=Qt.AlignRight)
-        root_layout.addLayout(nav)
+        nav.addWidget(self.next_btn)
+
+        nav.addStretch(1)
+
+        # Sidebar | right column, in a splitter spanning the full window
+        # height so the dark sidebar isn't cut off below a title bar.
+        content_splitter = QSplitter(Qt.Horizontal)
+        content_splitter.setObjectName("MainSplitter")
+        content_splitter.setChildrenCollapsible(False)
+        content_splitter.setHandleWidth(10)
+        content_splitter.addWidget(stepper_scroll)
+        content_splitter.addWidget(right_column)
+        content_splitter.setStretchFactor(0, 0)
+        content_splitter.setStretchFactor(1, 1)
+        content_splitter.setSizes([260, 1160])
+
+        root_layout.addWidget(content_splitter, stretch=1)
+
+        # App-wide footer — mode/license status, pinned to the very bottom
+        # of the window (spans full width, below the sidebar too) instead of
+        # cluttering the per-page nav button row.
+        footer = QHBoxLayout()
+        footer.setContentsMargins(18, 6, 18, 8)
+        footer.setSpacing(8)
+        footer.addStretch(1)
+
+        self.mode_badge = QLabel("Mode Status: Guided")
+        self.mode_badge.setObjectName("StatusPill")
+        self.mode_badge.setToolTip("Current interaction mode status")
+        footer.addWidget(self.mode_badge)
+
+        self.commitment_badge = QLabel("License: Open Source")
+        self.commitment_badge.setObjectName("StatusPill")
+        self.commitment_badge.setToolTip("Project licensing and openness status")
+        footer.addWidget(self.commitment_badge)
+
+        footer.addStretch(1)
+        root_layout.addLayout(footer)
 
         self.navigation = NavigationController(
             stack=self.stack,
@@ -362,9 +392,11 @@ class QtMigrationWindow(QMainWindow):
             is_busy=self._is_busy,
             page_to_step=self._PAGE_TO_STEP if self.runtime_mode == "windows" else None,
             show_blocked_message=self._show_blocked_message,
+            on_finish=self._on_finish,
         )
 
         self.stepper.step_clicked.connect(self._on_stepper_step_clicked)
+        self.stack.currentChanged.connect(self._sync_nav)
 
         self.setCentralWidget(root)
 
@@ -376,8 +408,8 @@ class QtMigrationWindow(QMainWindow):
         if not profile_path.is_absolute():
             profile_path = Path(__file__).resolve().parents[2] / profile_path
         self.expert_panel = ExpertPanel(self.ui_state, profile_path=profile_path)
-        if hasattr(self, "settings_page"):
-            self.expert_panel.on_settings_changed = self.settings_page._sync_selections
+        if hasattr(self, "scan_page"):
+            self.expert_panel.on_settings_changed = self.scan_page._sync_settings_selections
         self.expert_panel.setMaximumWidth(460)
         self.expert_dock.setMinimumWidth(360)
         self.expert_dock.setMaximumWidth(460)
@@ -422,6 +454,12 @@ class QtMigrationWindow(QMainWindow):
         if self.mode_controller is not None:
             self.mode_controller.toggle_expert_panel()
 
+    def _show_help(self) -> None:
+        current = self.stack.currentWidget()
+        page_name = type(current).__name__ if current is not None else ""
+        dialog = HelpDialog(page_name, parent=self)
+        dialog.exec()
+
     def _is_busy(self) -> bool:
         return self._busy_count > 0
 
@@ -432,6 +470,31 @@ class QtMigrationWindow(QMainWindow):
         )
         self.global_scan_bar.setVisible(any_busy)
 
+        if self.auto_running:
+            return  # the full-automation flow already owns the overlay
+        if any_busy:
+            self.overlay.set_subtitle("Please wait")
+            self.overlay.set_phase(self._current_page_status_text())
+            self.overlay.show()
+            self.overlay.raise_()
+            # Pages typically call set_scanning(True) and THEN set their
+            # status label's text — both within the same call, before
+            # control returns to the event loop. Re-read once deferred so
+            # the overlay doesn't show whatever stale text was there before
+            # this operation started.
+            QTimer.singleShot(0, self._refresh_overlay_phase_from_current_page)
+        else:
+            self.overlay.hide()
+
+    def _current_page_status_text(self) -> str:
+        status_label = getattr(self.stack.currentWidget(), "status", None)
+        text = status_label.text() if status_label is not None and hasattr(status_label, "text") else ""
+        return text or "Working…"
+
+    def _refresh_overlay_phase_from_current_page(self) -> None:
+        if self.overlay.isVisible() and not self.auto_running:
+            self.overlay.set_phase(self._current_page_status_text())
+
     def _set_busy(self, busy: bool) -> None:
         self._busy_count = max(0, self._busy_count + (1 if busy else -1))
         self._sync_nav()
@@ -441,6 +504,7 @@ class QtMigrationWindow(QMainWindow):
         self.complete_all_btn.setEnabled(not running)
         self.expert_toggle_btn.setEnabled(not running and self.ui_state.mode != "guided")
         if running:
+            self.overlay.set_subtitle("Running migration automatically")
             self.overlay.set_phase("Starting…")
             self.overlay.show()
             self.overlay.raise_()
@@ -508,31 +572,29 @@ class QtMigrationWindow(QMainWindow):
         else:
             self.overlay.set_phase(phase)
 
-    # ── Page↔Step mappings (Windows 8 pages → 5 stepper steps) ──────────────
-    #   Page indices:  0=Welcome 1=Mode 2=Scan 3=Settings 4=Data 5=Review 6=Backup 7=Report
+    # ── Page↔Step mappings (Windows 7 pages → 5 stepper steps) ──────────────
+    #   Page indices:  0=Welcome 1=Mode 2=Scan 3=Data 4=Review 5=Backup 6=Report
     #   Step indices:  0=GetStarted  1=Scan  2=Configure  3=Bundle  4=Report
     _PAGE_TO_STEP: dict[int, int] = {
         0: 0,  # Welcome      → Get Started
         1: 0,  # Mode         → Get Started
         2: 1,  # Scan         → System Scan
-        3: 2,  # Settings     → Configure
-        4: 2,  # Data         → Configure
-        5: 2,  # Review       → Configure
-        6: 3,  # Backup       → Bundle
-        7: 4,  # BundleReport → Report
+        3: 2,  # Data         → Configure
+        4: 2,  # Review       → Configure
+        5: 3,  # Backup       → Bundle
+        6: 4,  # BundleReport → Report
     }
     _STEP_TO_FIRST_PAGE: dict[int, int] = {
         0: 0,  # Get Started  → Welcome
         1: 2,  # System Scan  → Scan
-        2: 3,  # Configure    → Settings
-        3: 6,  # Bundle       → Backup
-        4: 7,  # Report       → BundleReport
+        2: 3,  # Configure    → Data
+        3: 5,  # Bundle       → Backup
+        4: 6,  # Report       → BundleReport
     }
 
     # Automation step-name → stepper step index
     _WIN_STEP_MAP: dict[str, int] = {
         "scan": 1,
-        "settings": 2,
         "data": 2,
         "review": 2,
         "backup": 3,
@@ -567,12 +629,27 @@ class QtMigrationWindow(QMainWindow):
         )
 
     def _resolve_restore_bundle_dir(self) -> Path:
+        def _is_valid_bundle(path: Path) -> bool:
+            return (path / "manifest.json").exists() and (
+                (path / "backup.zip").exists() or (path / "files").is_dir()
+            )
+
+        # Prefer whatever bundle the user already selected on the Restore
+        # page (browsed .zip gets auto-extracted there, or an already-
+        # unzipped folder) — Run Automatically should pick up from there
+        # instead of silently ignoring it.
+        selected = getattr(self.restore_page, "bundle_path", None) if hasattr(self, "restore_page") else None
+        if selected and _is_valid_bundle(Path(selected)):
+            return Path(selected)
+
         bundle_dir = RESTORE_REPORT.parent
-        if (bundle_dir / "manifest.json").exists() and (bundle_dir / "backup.zip").exists():
+        if _is_valid_bundle(bundle_dir):
             return bundle_dir
 
         raise RuntimeError(
-            "No backup bundle found. Run the Windows backup flow first so manifest.json and backup.zip exist in the restore directory."
+            "No backup bundle found. Browse to your migration_bundle.zip (or an unzipped "
+            "bundle folder) on the Restore page first, or run the Windows backup flow so "
+            "manifest.json and files are present in the restore directory."
         )
 
     def _on_automation_result(self, result: object) -> None:
@@ -588,6 +665,28 @@ class QtMigrationWindow(QMainWindow):
     def _on_automation_error(self, error: str) -> None:
         self.ui_state.last_error = error
         self._log_activity("pipeline", f"Automation failed: {error}", level="error")
+
+        if "No backup bundle found" in error and hasattr(self, "restore_page"):
+            self._clear_error_banner()
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle("Bundle not found")
+            dialog.setIcon(QMessageBox.Warning)
+            dialog.setText("<b>Run Automatically couldn't find a migration bundle.</b>")
+            dialog.setInformativeText(
+                "Go to the Restore Data step and click 'Browse' to select your "
+                "migration_bundle.zip (or an already-unzipped bundle folder), "
+                "then try Run Automatically again."
+            )
+            dialog.setStandardButtons(QMessageBox.Ok)
+            go_btn = dialog.addButton("Go to Restore Data", QMessageBox.ActionRole)
+            dialog.exec()
+            if dialog.clickedButton() is go_btn:
+                idx = self.stack.indexOf(self.restore_page)
+                if idx >= 0:
+                    self.stack.setCurrentIndex(idx)
+                    self._sync_nav()
+            return
+
         self.error_banner.setText(user_facing_error(error))
         self.error_banner.setVisible(True)
 
@@ -607,10 +706,6 @@ class QtMigrationWindow(QMainWindow):
         self._sync_expert_page_context()
 
     def next_page(self) -> None:
-        current = self.stack.currentWidget()
-        if isinstance(current, SettingsPage):
-            self.ui_state.settings_completed = True
-            self._mark_action_done("settings")
         if self.navigation is not None:
             self.navigation.next_page()
         self._sync_expert_page_context()
@@ -623,10 +718,119 @@ class QtMigrationWindow(QMainWindow):
     def _show_blocked_message(self, message: str) -> None:
         QMessageBox.information(self, "Can't continue yet", message)
 
+    def _on_finish(self) -> None:
+        verb = "move the bundle to your Linux machine" if self.runtime_mode == "windows" else "close this tool"
+        QMessageBox.information(
+            self,
+            "Migration Complete",
+            f"Migration complete. You can now {verb}.",
+        )
+        self.close()
+
     def _sync_nav(self) -> None:
         if self.navigation is not None:
             self.navigation.sync_nav()
+        current = self.stack.currentWidget()
+        hide_automation = isinstance(current, (BackupBundlePage, BundleReportPage))
+        self.complete_all_btn.setVisible(not hide_automation)
+        self._resize_stack_to_current()
+        self._attach_nav_bar_to_current_page()
         self._sync_expert_page_context()
+
+    def _attach_nav_bar_to_current_page(self) -> None:
+        """Move the shared nav button bar into the bottom of the current page's own card."""
+        current = self.stack.currentWidget()
+        card_layout = getattr(current, "card_layout", None)
+        if card_layout is None:
+            return
+        card_layout.addWidget(self.nav_bar)
+        # Dynamic-property-styled buttons (role="cta"/"badge") can end up
+        # with a stale/blank paint buffer after being reparented into a new
+        # widget hierarchy — force a style + repaint refresh.
+        for widget in (self.back_btn, self.complete_all_btn, self.next_btn, self.nav_bar):
+            style = widget.style()
+            style.unpolish(widget)
+            style.polish(widget)
+            widget.update()
+
+    @staticmethod
+    def _fix_wrapped_label_heights(root: QWidget) -> None:
+        """Pin every word-wrapped descendant label's minimum height to its
+        real heightForWidth() before any ancestor layout computes sizes.
+        """
+        for label in root.findChildren(QLabel):
+            if not label.wordWrap() or label.width() <= 0:
+                continue
+            needed = label.heightForWidth(label.width())
+            if needed > 0 and needed != label.minimumHeight():
+                label.setMinimumHeight(needed)
+
+    def _resize_stack_to_current(self) -> None:
+        """Shrink-or-grow the page stack to the current page's actual height.
+
+        QScrollArea's widgetResizable mode only ever grows the contained
+        widget to fit the viewport — plain resize() calls get silently
+        overridden back to the largest size it has ever held. Pinning the
+        height via setFixedHeight (which Qt does honor) keeps the scrollable
+        range matched to the visible page instead of the tallest page ever
+        shown, while never going below the viewport height.
+        """
+        if getattr(self, "_resizing_stack", False):
+            return
+        current = self.stack.currentWidget()
+        if current is None:
+            return
+        self._resizing_stack = True
+        try:
+            # Fix every word-wrapped label's minimum height BEFORE asking any
+            # ancestor layout to compute sizes. The propagation-after-the-fact
+            # approach (correct a label, then hope updateGeometry() invalidates
+            # every ancestor's cached sizeHint) is unreliable through several
+            # nested QVBoxLayout levels — each level can keep using a stale
+            # snapshot of its child's needs taken before the correction.
+            # Fixing all labels first, then doing one fresh activate() pass,
+            # sidesteps that ordering problem entirely. The whole method body
+            # runs under the _resizing_stack guard since activate() and the
+            # label height changes below also post LayoutRequest events that
+            # would otherwise re-trigger this same method via the event
+            # filter installed on the stack/page.
+            self._fix_wrapped_label_heights(current)
+            page_layout = current.layout()
+            if page_layout is not None:
+                page_layout.activate()
+            viewport_height = self.stack_scroll.viewport().height()
+            if page_layout is not None and page_layout.hasHeightForWidth():
+                # current.sizeHint() is unreliable here: Qt's height-for-width
+                # propagation through several nested QVBoxLayout levels (choice
+                # cards inside a questionnaire frame inside the page) routinely
+                # under-reports, silently clipping word-wrapped hint text. Asking
+                # the layout directly for its heightForWidth at the actual
+                # current width is the accurate path.
+                content_height = max(page_layout.heightForWidth(current.width()), current.minimumSizeHint().height())
+            else:
+                content_height = max(current.sizeHint().height(), current.minimumSizeHint().height())
+            target_height = max(content_height, viewport_height)
+            if self.stack.height() != target_height:
+                self.stack.setFixedHeight(target_height)
+        finally:
+            self._resizing_stack = False
+
+    def eventFilter(self, obj, event) -> bool:
+        # Any descendant page's layout invalidating (a radio toggling a
+        # choice card's visibility, mode-dependent widgets appearing, etc.)
+        # posts a LayoutRequest up through the ancestor chain to the stack
+        # itself — catching it here keeps the card's pinned height in sync
+        # with the current page's actual content instead of only updating
+        # on page-change. Guarded against recursion since setFixedHeight()
+        # below will itself trigger another LayoutRequest.
+        is_relevant = obj is self.stack or obj is self.stack.currentWidget()
+        if is_relevant and event.type() == QEvent.LayoutRequest and not getattr(self, "_resizing_stack", False):
+            # Deferred via singleShot(0): word-wrapped labels inside a
+            # freshly toggled choice card report a stale/short sizeHint if
+            # queried synchronously here — Qt needs one more event-loop
+            # pass to finish the height-for-width reflow first.
+            QTimer.singleShot(0, self._resize_stack_to_current)
+        return super().eventFilter(obj, event)
 
     def _sync_expert_page_context(self) -> None:
         if not hasattr(self, "expert_panel"):
@@ -637,8 +841,6 @@ class QtMigrationWindow(QMainWindow):
             page_key = "welcome"
         elif isinstance(current, ModePage):
             page_key = "mode_selection"
-        elif isinstance(current, SettingsPage):
-            page_key = "settings_migration"
         elif isinstance(current, DataSelectionPage):
             page_key = "data_selection"
         elif isinstance(current, ReviewRecommendationsPage):
@@ -671,6 +873,12 @@ class QtMigrationWindow(QMainWindow):
         except Exception:
             pass
         super().closeEvent(event)
+
+    def resizeEvent(self, event) -> None:
+        """Re-pin the page stack's height to the current page when the window resizes."""
+        super().resizeEvent(event)
+        if hasattr(self, "stack_scroll"):
+            self._resize_stack_to_current()
 
     def _mark_action_done(self, action_key: str) -> None:
         self.completed_actions.add(action_key)
@@ -755,7 +963,7 @@ class QtMigrationWindow(QMainWindow):
         return {
             "manifest": self.runtime_data.get("backup") or {},
             "app_recs": self.runtime_data.get("review_app_recommendations") or {},
-            "local_bundle_path": str(RESTORE_DIR),
+            "local_bundle_path": self.ui_state.bundle_archive_path or str(RESTORE_DIR),
             "usb_path": self.ui_state.backup_usb_path,
         }
 

@@ -68,7 +68,6 @@ class ExpertPanel(QWidget):
 
         # Build page-specific panels
         self.page_widgets["mode_selection"] = self._build_mode_selection_panel()
-        self.page_widgets["settings_migration"] = self._build_settings_migration_panel()
         self.page_widgets["data_selection"] = self._build_data_selection_panel()
         self.page_widgets["application_mapping"] = self._build_application_mapping_panel()
         self.page_widgets["review_recommendations"] = self._build_review_recommendations_panel()
@@ -103,10 +102,6 @@ class ExpertPanel(QWidget):
                 "title": "Mode Selection",
                 "description": "Configure target distro and system-level operations.",
             },
-            "settings_migration": {
-                "title": "Settings Migration",
-                "description": "Adjust distro and advanced operations for settings portability.",
-            },
             "data_selection": {
                 "title": "Data Selection",
                 "description": "Customize folder scope and additional paths to include in the migration.",
@@ -121,7 +116,7 @@ class ExpertPanel(QWidget):
             },
             "scan": {
                 "title": "Scan",
-                "description": "Review detected apps and adjust mapping overrides and system settings.",
+                "description": "Adjust mapping overrides, target distro, and which appearance/settings items to migrate.",
             },
             "backup_bundle": {
                 "title": "Backup",
@@ -173,7 +168,7 @@ class ExpertPanel(QWidget):
             "Use this to preview the migration before committing."
         )
         dry_run_info.setWordWrap(True)
-        dry_run_info.setStyleSheet("color: #546E7A; font-size: 11px;")
+        dry_run_info.setStyleSheet("color: #546E7A; font-size: 13px;")
 
         sim_form.addRow(self.mode_dry_run)
         sim_form.addRow(dry_run_info)
@@ -181,13 +176,13 @@ class ExpertPanel(QWidget):
         layout.addStretch(1)
         return widget
 
-    def _build_settings_migration_panel(self) -> QWidget:
-        """Expert controls for settings migration page."""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(10)
+    def _build_settings_migration_controls(self, layout: QVBoxLayout) -> None:
+        """Append target-distro and appearance-item controls to an existing layout.
 
+        Folded into the scan panel since settings migration no longer has its
+        own wizard page — these controls are reached via the scan page's
+        Customize context instead.
+        """
         distro_group = QGroupBox("Target Distro")
         distro_layout = QVBoxLayout(distro_group)
         self.settings_distro_combo = QComboBox()
@@ -227,9 +222,6 @@ class ExpertPanel(QWidget):
             self.settings_appearance_checkboxes[k]
             for k in ("taskbar_layout", "keyboard_shortcuts", "file_associations")
         ]
-
-        layout.addStretch(1)
-        return widget
 
     def _build_data_selection_panel(self) -> QWidget:
         """Expert controls for data selection page."""
@@ -444,6 +436,8 @@ class ExpertPanel(QWidget):
         actions_row.addWidget(self.scan_remove_btn)
         mapping_layout.addLayout(actions_row)
         layout.addWidget(mapping_group)
+
+        self._build_settings_migration_controls(layout)
 
         layout.addStretch(1)
         return widget

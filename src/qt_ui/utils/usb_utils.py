@@ -60,16 +60,14 @@ def detect_usb_drives() -> list[dict]:
     return drives
 
 
-def copy_bundle_to_usb(bundle_src: Path, usb_root: str) -> Path:
-    """Copy the migration bundle folder to a USB drive.
+def copy_bundle_to_usb(bundle_archive: Path, usb_root: str) -> Path:
+    """Copy the migration bundle archive (a single .zip) to a USB drive.
 
-    Copies *bundle_src* into ``<usb_root>/migration_bundle/``, removing any
-    previous copy first.  Returns the destination path.
+    Copies *bundle_archive* to ``<usb_root>/<archive name>``, removing any
+    previous copy first. Returns the destination path.
     """
-    dest = Path(usb_root) / "migration_bundle"
+    dest = Path(usb_root) / bundle_archive.name
     if dest.exists():
-        import shutil as _shutil
-        _shutil.rmtree(dest)
-    import shutil as _shutil
-    _shutil.copytree(bundle_src, dest)
+        dest.unlink()
+    shutil.copy2(bundle_archive, dest)
     return dest
