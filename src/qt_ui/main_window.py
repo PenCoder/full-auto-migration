@@ -29,12 +29,10 @@ from src.config import MigrationConfigRoot
 from src.qt_ui.pages.backup_bundle_page import BackupBundlePage
 from src.qt_ui.pages.bundle_report_page import BundleReportPage
 from src.qt_ui.pages.data_selection_page import DataSelectionPage
-from src.qt_ui.pages.report_page import ReportPage
 from src.qt_ui.pages.restore_page import RestorePage
 from src.qt_ui.pages.scan_page import ScanPage
 from src.qt_ui.pages.mode_page import ModePage
 from src.qt_ui.pages.review_recommendations_page import ReviewRecommendationsPage
-from src.qt_ui.pages.verification_page import VerificationPage
 from src.qt_ui.pages.welcome_page import WelcomePage
 from src.qt_ui.state import QtUiState
 from src.qt_ui.workers import FunctionWorker
@@ -90,7 +88,7 @@ class QtMigrationWindow(QMainWindow):
         self.automation_phase.connect(self._on_automation_phase)
         self.automation_step_done.connect(self._on_automation_step_done)
 
-        self.setWindowTitle("Sovereignty Migration Platform (Qt)")
+        self.setWindowTitle("Sovereignty Migration Platform")
         self.resize(1440, 860)
         self.setMinimumSize(1160, 700)
 
@@ -146,7 +144,8 @@ class QtMigrationWindow(QMainWindow):
         # Controls row.
         control_bar = QHBoxLayout()
         control_bar.addStretch(1)
-        control_bar.addWidget(QLabel("Mode:"))
+        self.mode_label = QLabel("Mode:")
+        control_bar.addWidget(self.mode_label)
         self.guided_radio = QRadioButton("Guided")
         self.guided_radio.setChecked(True)
 
@@ -165,6 +164,18 @@ class QtMigrationWindow(QMainWindow):
         self.expert_toggle_btn.setProperty("role", "badge")
         self.expert_toggle_btn.clicked.connect(self._toggle_expert_panel)
         control_bar.addWidget(self.expert_toggle_btn)
+
+        # The mode concept (Guided/Balanced/Expert) and its Customize panel
+        # only apply to the Windows-side wizard's complexity choices — the
+        # Linux-side flow is just three single-button steps with nothing to
+        # customize, so hide both there instead of showing controls with no
+        # effect on this side.
+        if self.runtime_mode != "windows":
+            self.mode_label.setVisible(False)
+            self.guided_radio.setVisible(False)
+            self.balanced_radio.setVisible(False)
+            self.expert_radio.setVisible(False)
+            self.expert_toggle_btn.setVisible(False)
 
         self.help_btn = QPushButton("❓ Help")
         self.help_btn.setProperty("role", "badge")
@@ -268,27 +279,32 @@ class QtMigrationWindow(QMainWindow):
                 # re-triggered once that settles.
                 _p.installEventFilter(self)
         else:
+            # Single-window flow: restore, verification, and report are all
+            # one page now — no stepper/Back/Next navigation needed between
+            # them, so the stepper sidebar is built but never shown (see
+            # content_splitter below).
             self.stepper = StepperSidebar(
                 title="Migration Steps",
-                subtitle="Follow the Linux-side steps to finalize migration and publish the report.",
-                steps=[
-                    "Restore Data\nStart restoration",
-                    "Validation\nReview and verify",
-                    "Final Report\nGenerate evidence",
-                ],
+                subtitle="Restore, verify, and publish the report — all in one step.",
+                steps=["Restore & Report\nOne click restores, verifies, and reports"],
             )
-            self.restore_page = RestorePage(self.ui_state, run_restore_cb=self._run_restore)
-            self.verify_page = VerificationPage(self.ui_state, run_validation_cb=self._run_validation)
-            self.report_page = ReportPage(self.ui_state, generate_report_cb=self._generate_final_report)
+            self.restore_page = RestorePage(
+                self.ui_state,
+                run_restore_cb=self._run_restore,
+                run_validation_cb=self._run_validation,
+                generate_report_cb=self._generate_final_report,
+                reset_restore_cb=self._reset_restore,
+            )
 
-            self.restore_page.request_next.connect(self.next_page)
-            self.verify_page.request_next.connect(self.next_page)
-            self.report_page.request_finish.connect(self._on_finish)
+            self.restore_page.request_finish.connect(self._on_finish)
             self.stack.addWidget(self.restore_page)
-            self.stack.addWidget(self.verify_page)
-            self.stack.addWidget(self.report_page)
-            for _p in (self.restore_page, self.verify_page, self.report_page):
-                _p.installEventFilter(self)
+            # Same wiring as the Windows-side pages above — without this,
+            # the shared Next button never re-enables itself after a page's
+            # background worker finishes. Harmless here too even though the
+            # nav bar is never shown for this mode (see _attach_nav_bar_to_current_page).
+            self.restore_page.processing_changed.connect(self._sync_nav)
+            self.restore_page.processing_changed.connect(self._on_any_page_processing_changed)
+            self.restore_page.installEventFilter(self)
 
         self.stepper.setMinimumWidth(260)
         self.stepper.setMaximumWidth(310)
@@ -349,15 +365,28 @@ class QtMigrationWindow(QMainWindow):
 
         # Sidebar | right column, in a splitter spanning the full window
         # height so the dark sidebar isn't cut off below a title bar.
+        # Linux mode is a single page with no step navigation, so the
+        # sidebar is skipped entirely there — right_column gets the full
+        # window width instead.
         content_splitter = QSplitter(Qt.Horizontal)
         content_splitter.setObjectName("MainSplitter")
         content_splitter.setChildrenCollapsible(False)
         content_splitter.setHandleWidth(10)
+        # Always parent stepper_scroll to the splitter (even when hidden) —
+        # a parentless local QScrollArea gets garbage-collected once
+        # _build_ui() returns, which would delete self.stepper's children
+        # with it and crash the next sync_nav() call.
         content_splitter.addWidget(stepper_scroll)
         content_splitter.addWidget(right_column)
-        content_splitter.setStretchFactor(0, 0)
-        content_splitter.setStretchFactor(1, 1)
-        content_splitter.setSizes([260, 1160])
+        if self.runtime_mode == "windows":
+            content_splitter.setStretchFactor(0, 0)
+            content_splitter.setStretchFactor(1, 1)
+            content_splitter.setSizes([260, 1160])
+        else:
+            stepper_scroll.setVisible(False)
+            content_splitter.setStretchFactor(0, 0)
+            content_splitter.setStretchFactor(1, 1)
+            content_splitter.setSizes([0, 1])
 
         root_layout.addWidget(content_splitter, stretch=1)
 
@@ -372,6 +401,7 @@ class QtMigrationWindow(QMainWindow):
         self.mode_badge = QLabel("Mode Status: Guided")
         self.mode_badge.setObjectName("StatusPill")
         self.mode_badge.setToolTip("Current interaction mode status")
+        self.mode_badge.setVisible(self.runtime_mode == "windows")
         footer.addWidget(self.mode_badge)
 
         self.commitment_badge = QLabel("License: Open Source")
@@ -739,6 +769,11 @@ class QtMigrationWindow(QMainWindow):
 
     def _attach_nav_bar_to_current_page(self) -> None:
         """Move the shared nav button bar into the bottom of the current page's own card."""
+        if self.runtime_mode != "windows":
+            # Single-page Linux flow manages its own action buttons —
+            # there's nothing to navigate between, so the shared Back/Run
+            # Automatically/Next bar is never shown here.
+            return
         current = self.stack.currentWidget()
         card_layout = getattr(current, "card_layout", None)
         if card_layout is None:
@@ -853,10 +888,6 @@ class QtMigrationWindow(QMainWindow):
             page_key = "bundle_report"
         elif isinstance(current, RestorePage):
             page_key = "restore"
-        elif isinstance(current, VerificationPage):
-            page_key = "verification"
-        elif isinstance(current, ReportPage):
-            page_key = "report"
 
         self.expert_panel.set_page_context(page_key)
 
@@ -992,6 +1023,15 @@ class QtMigrationWindow(QMainWindow):
             mark_action_done=self._mark_action_done,
             clear_error_banner=self._clear_error_banner,
             bundle_dir=bundle_dir,
+        )
+
+    def _reset_restore(self, uninstall_apps: bool) -> dict:
+        return self.operations.reset_restore(
+            config=self.config,
+            ui_state=self.ui_state,
+            log_activity=self._log_activity,
+            clear_error_banner=self._clear_error_banner,
+            uninstall_apps=uninstall_apps,
         )
 
     def _run_validation(self) -> dict:

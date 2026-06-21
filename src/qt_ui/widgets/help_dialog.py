@@ -47,7 +47,7 @@ HELP_CONTENT: dict[str, dict[str, object]] = {
         "steps": [
             "Guided — everything handled for you, no decisions needed.",
             "Balanced — you choose files/apps, defaults handle the rest.",
-            "Expert — full manual control, including AI-assisted app matching.",
+            "Expert — full manual control, including live online package verification and custom override rules.",
         ],
         "note": "You can switch modes later without losing progress.",
     },
@@ -101,27 +101,10 @@ HELP_CONTENT: dict[str, dict[str, object]] = {
         "title": "Restore your data (Linux side)",
         "steps": [
             "Click 'Browse' and select the migration_bundle.zip you carried over from Windows (or an already-unzipped bundle folder).",
-            "Click 'Restore My Files to This Computer' to copy files, apply settings, install matched apps, and recreate shortcuts.",
+            "Click 'Restore My Files to This Computer' — this automatically restores your files, verifies them, and generates your final report, one after another.",
+            "Once it finishes, your Migration Score and report links appear right here — open the report or click 'Finish' when you're done.",
         ],
-        "note": "If an optional step (like app installation) can't complete, the rest of the restore still finishes — you'll see a warning instead of a silent failure.",
-    },
-    "VerificationPage": {
-        "icon": "✅",
-        "title": "Verify your migration was successful",
-        "steps": [
-            "Runs automatically after a successful restore — checks every restored file's hash against the original.",
-            "Produces your Migration Score, shown as a percentage.",
-        ],
-        "note": "Click 'View Migration Report' afterwards for the full breakdown.",
-    },
-    "ReportPage": {
-        "icon": "📋",
-        "title": "Your Migration Report",
-        "steps": [
-            "Generates the final evidence report automatically: your Migration Score, what was restored, and what was verified.",
-            "Open it as Markdown or as a web page — both are saved locally, nothing is uploaded.",
-        ],
-        "note": "Click 'Migration Complete — Finish' once you're done reviewing.",
+        "note": "If a step fails partway, you'll be offered 'Restart' (reset and try again) or 'Review & Complete Anyway' (continue with whatever already succeeded) — nothing fails silently.",
     },
 }
 

@@ -15,7 +15,7 @@ from typing import Callable, Any
 from src.analysis.hw_matrix import generate_hardware_matrix, write_hardware_matrix
 from src.analysis.software_mapping import generate_software_mapping, write_software_mapping
 from src.backup.manifest import copy_backup_files, generate_manifest, write_manifest, create_backup_archive
-from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
+from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR, resolve_linux_build_binary
 from src.inventory.hardware import collect_hardware_inventory, write_hardware_inventory
 from src.inventory.settings import collect_settings_inventory, write_settings_inventory
 from src.inventory.software import collect_software_inventory, write_software_inventory
@@ -26,7 +26,6 @@ from src.orchestration.errors import ERR_BACKUP_FAILED, MigrationError
 from src.services.icon_extractor import extract_icon_png
 
 BUNDLE_ARCHIVE_NAME = "migration_bundle.zip"
-LINUX_BUILD_BINARY = BASE_DIR / "assets" / "linux_build" / "MigrationWizard"
 
 
 class MigrationService:
@@ -310,9 +309,10 @@ class MigrationService:
         if not RESTORE_DIR.exists() or not any(RESTORE_DIR.iterdir()):
             return None
 
-        if LINUX_BUILD_BINARY.exists():
-            dest_binary = RESTORE_DIR / LINUX_BUILD_BINARY.name
-            shutil.copy2(LINUX_BUILD_BINARY, dest_binary)
+        linux_build_binary = resolve_linux_build_binary()
+        if linux_build_binary is not None:
+            dest_binary = RESTORE_DIR / linux_build_binary.name
+            shutil.copy2(linux_build_binary, dest_binary)
             try:
                 os.chmod(dest_binary, 0o755)
             except OSError:

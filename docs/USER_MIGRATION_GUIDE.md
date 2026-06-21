@@ -28,7 +28,7 @@ When you open the application, you will be asked to choose a **mode**. Each mode
 |---|---|---|
 | **Guided** | First-time users | Scans your system, suggests apps, packs your files — minimal decisions required |
 | **Balanced** | Most users | Everything in Guided, plus file type analysis and usage-based prioritisation |
-| **Expert** | Power users | Everything in Balanced, plus AI-assisted ranking and full manual overrides |
+| **Expert** | Power users | Everything in Balanced, plus live online package verification and full manual overrides |
 
 **Recommendation:** Start with **Balanced** if you are unsure.
 
@@ -162,8 +162,8 @@ For applications marked as `external`, follow the link in the recommendation not
 **Will my files be safe?**
 Yes. The tool only reads your files during the scan and copies them during backup. It never modifies originals. Your Windows installation remains untouched until you choose to replace it.
 
-**Can I use the tool without AI features?**
-Yes. The default configuration uses only local, offline analysis. AI-assisted ranking is optional and disabled by default.
+**Can I use the tool without online lookups?**
+Yes. Guided and Balanced mode only ever use local, offline analysis. The optional online package verification (via Repology) only runs in Expert mode — it is never used otherwise, regardless of mode.
 
 **What if I do not want to migrate all my files?**
 Use **Selected types** mode in Step 4 to choose only the file types you care about (e.g. documents and photos only).

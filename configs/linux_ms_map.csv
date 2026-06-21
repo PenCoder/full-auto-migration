@@ -35,7 +35,7 @@ HandBrake,handbrake,HandBrake,Media,apt,high,Video transcoder direct equivalent
 Plex,plexmediaserver,Plex Media Server,Media,external,high,Official Linux server package
 OBS Studio,obs-studio,OBS Studio,Media,apt,high,Direct streaming equivalent
 Visual Studio Code,code,VS Code,Development,external,high,Microsoft repository
-Visual Studio,monodevelop,MonoDevelop,Development,apt,medium,Partial IDE replacement
+Visual Studio,monodevelop,MonoDevelop,Development,external,medium,Discontinued and no longer in default apt repos — needs a PPA or Flatpak; consider Visual Studio Code instead
 JetBrains IntelliJ,intellij-idea-community,IntelliJ IDEA,Development,external,high,Official Linux build
 JetBrains PyCharm,pycharm-community,PyCharm,Development,external,high,Official Linux build
 Android Studio,android-studio,Android Studio,Development,external,high,Official Linux build
@@ -148,3 +148,92 @@ ProtonVPN,protonvpn,ProtonVPN,Network,external,high,Official Linux client
 Wireshark,wireshark,Wireshark,Network,apt,high,Direct equivalent
 Nmap,nmap,Nmap,Network,apt,high,Direct equivalent
 Fiddler,mitmproxy,mitmproxy,Network,apt,medium,CLI-based HTTP proxy and inspector
+Microsoft Access,libreoffice-base,LibreOffice Base,Office,apt,medium,Database component equivalent
+Microsoft Publisher,scribus,Scribus,Office,apt,medium,Desktop publishing equivalent
+Microsoft Project,planner,GNOME Planner,Productivity,apt,medium,Project management equivalent
+Microsoft Visio,dia,Dia,Office,apt,medium,Diagramming tool equivalent
+Microsoft To Do,gnome-todo,GNOME To Do,Productivity,apt,medium,Task management equivalent
+WPS Office,wps-office,WPS Office,Office,external,high,Office suite with strong MS format compatibility
+OnlyOffice,onlyoffice-desktopeditors,ONLYOFFICE Desktop Editors,Office,external,high,Office suite with strong MS Office compatibility
+Evernote,joplin,Joplin,Productivity,external,medium,Note-taking with sync support
+Notion,notion-app-enhanced,Notion,Productivity,external,medium,Unofficial Linux client (snap)
+Obsidian,obsidian,Obsidian,Productivity,external,high,Official Linux build
+Todoist,todoist-electron,Todoist,Productivity,external,medium,Unofficial Electron client
+Simplenote,simplenote,Simplenote,Productivity,external,medium,Official Linux client
+Vivaldi,vivaldi-stable,Vivaldi,Browser,external,high,Official Linux build
+Tor Browser,torbrowser-launcher,Tor Browser,Browser,apt,high,Official launcher package
+Internet Explorer,firefox,Firefox,Browser,apt,high,Legacy browser replacement
+foobar2000,audacious,Audacious,Media,apt,medium,Lightweight audio player equivalent
+MusicBee,audacious,Audacious,Media,apt,medium,Music library player equivalent
+Winamp,audacious,Audacious,Media,apt,high,Classic-style audio player equivalent
+Media Player Classic,mpv,mpv,Media,apt,high,Lightweight video player equivalent
+PotPlayer,mpv,mpv,Media,apt,medium,Feature-rich video player equivalent
+KMPlayer,mpv,mpv,Media,apt,medium,Video player equivalent
+Clementine,clementine,Clementine,Media,apt,high,Direct equivalent music player
+MusicBrainz Picard,picard,MusicBrainz Picard,Media,apt,medium,Audio tagging tool
+Calibre,calibre,calibre,Office,apt,high,E-book management direct equivalent
+Adobe Digital Editions,calibre,calibre,Office,apt,medium,E-book reader alternative
+Adobe Illustrator,inkscape,Inkscape,Graphics,apt,medium,Vector graphics alternative
+Adobe Premiere Pro,kdenlive,Kdenlive,Media,apt,medium,Video editing alternative
+Adobe After Effects,natron,Natron,Media,external,medium,Compositing and motion graphics alternative
+Adobe XD,figma-linux,Figma Linux,Graphics,external,medium,Unofficial Figma desktop wrapper
+CorelDRAW,inkscape,Inkscape,Graphics,apt,medium,Vector graphics alternative
+Affinity Photo,gimp,GIMP,Graphics,apt,medium,Raster image editing alternative
+Affinity Designer,inkscape,Inkscape,Graphics,apt,medium,Vector design alternative
+Affinity Publisher,scribus,Scribus,Graphics,apt,medium,Desktop publishing alternative
+Capture One,darktable,Darktable,Graphics,apt,medium,RAW photo processing alternative
+ON1 Photo RAW,darktable,Darktable,Graphics,apt,medium,RAW photo processing alternative
+CyberLink PowerDirector,kdenlive,Kdenlive,Media,apt,medium,Video editing alternative
+Shotcut,shotcut,Shotcut,Media,apt,high,Direct equivalent video editor
+Eclipse,eclipse,Eclipse IDE,Development,apt,high,Direct equivalent
+NetBeans,netbeans,Apache NetBeans,Development,external,high,Official Linux build
+Unity,unityhub,Unity Hub,Development,external,high,Official Linux build
+Unreal Engine,unreal-engine,Unreal Engine,Development,external,medium,Official Linux build via Epic Games
+Insomnia,insomnia,Insomnia,Development,external,high,Official Linux build
+MongoDB Compass,mongodb-compass,MongoDB Compass,Development,external,high,Official Linux build
+pgAdmin,pgadmin4,pgAdmin 4,Development,apt,high,Direct equivalent
+Beyond Compare,beyond-compare,Beyond Compare,Development,external,high,Official Linux build
+WinMerge,meld,Meld,Development,apt,high,Diff and merge tool equivalent
+CMake,cmake,CMake,Development,apt,high,Direct equivalent
+Vagrant,vagrant,Vagrant,Development,external,high,Official Linux build
+Robo 3T,mongodb-compass,MongoDB Compass,Development,external,medium,MongoDB GUI alternative
+Process Hacker,htop,htop,System,apt,medium,Process and resource monitor
+Autoruns,bleachbit,BleachBit,System,apt,low,Startup management alternative; concept differs on Linux
+Bulk Rename Utility,gprename,GPRename,Utility,apt,medium,Batch file renaming tool
+ImgBurn,brasero,Brasero,Utility,apt,medium,Disc burning equivalent
+CDBurnerXP,brasero,Brasero,Utility,apt,high,Disc burning direct equivalent
+Daemon Tools,furiusisomount,Furius ISO Mount,Utility,apt,medium,ISO mounting equivalent
+Driver Booster,gnome-software,Software Updater,System,apt,low,Drivers are managed via kernel/distro updates on Linux; no direct equivalent
+Advanced SystemCare,bleachbit,BleachBit,System,apt,medium,System cleaning alternative
+Revo Uninstaller,synaptic,Synaptic Package Manager,System,apt,medium,Package removal with dependency cleanup
+IObit Uninstaller,synaptic,Synaptic Package Manager,System,apt,medium,Package removal with dependency cleanup
+Acronis True Image,timeshift,Timeshift,System,apt,medium,System backup and restore alternative
+EaseUS Todo Backup,timeshift,Timeshift,System,apt,medium,Backup and restore alternative
+Macrium Reflect,timeshift,Timeshift,System,apt,medium,Disk imaging alternative
+AVG AntiVirus,clamav,ClamAV,Security,apt,medium,Open-source antivirus alternative
+Norton Antivirus,clamav,ClamAV,Security,apt,medium,Open-source antivirus alternative
+McAfee,clamav,ClamAV,Security,apt,medium,Open-source antivirus alternative
+ESET,clamav,ClamAV,Security,apt,medium,Open-source antivirus alternative
+NordPass,bitwarden,Bitwarden,Security,external,medium,Password manager alternative
+Dashlane,bitwarden,Bitwarden,Security,external,medium,Password manager alternative
+Mega,megasync,MEGAsync,Cloud,external,high,Official Linux client
+Amazon Drive,rclone,Rclone,Cloud,apt,medium,CLI-based sync solution
+Yandex Disk,rclone,Rclone,Cloud,apt,medium,CLI-based sync solution
+ExpressVPN,expressvpn,ExpressVPN,Network,external,high,Official Linux client
+Surfshark,surfshark,Surfshark,Network,external,high,Official Linux client
+Windscribe,windscribe,Windscribe,Network,external,high,Official Linux client
+Chrome Remote Desktop,chrome-remote-desktop,Chrome Remote Desktop,Remote Access,external,high,Official browser-based remote access
+Splashtop,splashtop-streamer,Splashtop,Remote Access,external,medium,Official Linux client with limited support
+Battle.net,lutris,Lutris,Games,external,medium,Game launcher with Battle.net support via Wine
+Origin,lutris,Lutris,Games,external,medium,Game launcher with Origin support via Wine
+EA App,lutris,Lutris,Games,external,medium,Game launcher alternative via Wine
+Ubisoft Connect,lutris,Lutris,Games,external,medium,Game launcher with Ubisoft Connect support via Wine
+Minecraft Launcher,minecraft-launcher,Minecraft Launcher,Games,external,high,Official Linux build
+AutoCAD,freecad,FreeCAD,Development,apt,medium,CAD design alternative
+SketchUp,freecad,FreeCAD,Development,apt,medium,3D modeling alternative
+Fusion 360,freecad,FreeCAD,Development,apt,medium,3D CAD alternative
+FL Studio,lmms,LMMS,Media,apt,medium,Digital audio workstation alternative
+Ableton Live,ardour,Ardour,Media,external,medium,Professional DAW alternative
+Cubase,ardour,Ardour,Media,external,medium,Professional DAW alternative
+Viber,viber,Viber,Communication,external,high,Official Linux client
+WeChat,wechat,WeChat,Communication,external,low,Limited unofficial Linux support; consider the web version

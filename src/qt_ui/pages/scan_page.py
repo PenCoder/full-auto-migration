@@ -310,8 +310,30 @@ class ScanPage(BasePage):
 
     # ── Report rendering ─────────────────────────────────────────────────────
 
+    @staticmethod
+    def _confidence_label(rec: dict) -> str:
+        """Resolve a confidence label, tolerating the different field names
+        used by the scan-time mapper (confidence_score, a 0-1 float) versus
+        the review-time recommender (mapping_confidence, already a label).
+        """
+        label = str(rec.get("mapping_confidence") or rec.get("confidence") or "").lower()
+        if label:
+            return label
+        try:
+            score = float(rec.get("confidence_score", ""))
+        except (TypeError, ValueError):
+            return ""
+        if score >= 0.85:
+            return "high"
+        if score >= 0.6:
+            return "medium"
+        return "low"
+
     def _render_scan_report(self) -> None:
-        mode = self.ui_state.mode.capitalize()
+        raw_mode = self.ui_state.mode
+        mode = raw_mode.capitalize()
+        is_guided = raw_mode == "guided"
+        is_expert = raw_mode == "expert"
         inv_done = self.ui_state.inventory_completed
         analysis_done = bool(self.last_analysis_result)
 
@@ -347,15 +369,18 @@ class ScanPage(BasePage):
                 if isinstance(self.last_scan_result.get("settings", {}), dict)
                 else {}
             )
-            rows = (
-                self.html_row("Scan depth", depth.capitalize())
-                + self.html_row("Hardware categories", str(hw))
-                + self.html_row("Software entries", str(sw))
-            )
-            if depth == "deep":
-                deep = self.last_scan_result.get("software", {}).get("deep_scan_summary", {})
-                rows += self.html_row("Via package manager", str(deep.get("package_manager_entries", 0)))
-                rows += self.html_row("Via AppX / Store", str(deep.get("appx_entries", 0)))
+            # Everyone gets the headline count; the breakdown by hardware
+            # category and scan mechanics is implementation detail that
+            # only Balanced/Expert users tend to care about.
+            rows = self.html_row("Apps found", str(sw))
+            if not is_guided:
+                rows += self.html_row("Hardware categories", str(hw))
+            if is_expert:
+                rows += self.html_row("Scan depth", depth.capitalize())
+                if depth == "deep":
+                    deep = self.last_scan_result.get("software", {}).get("deep_scan_summary", {})
+                    rows += self.html_row("Via package manager", str(deep.get("package_manager_entries", 0)))
+                    rows += self.html_row("Via AppX / Store", str(deep.get("appx_entries", 0)))
             if settings:
                 desktop = settings.get("desktop", {}) if isinstance(settings.get("desktop", {}), dict) else {}
                 appearance = settings.get("appearance", {}) if isinstance(settings.get("appearance", {}), dict) else {}
@@ -373,12 +398,15 @@ class ScanPage(BasePage):
                     + int(sc_counts.get("start_menu", 0))
                     + int(sc_counts.get("taskbar", 0))
                 )
-                rows += self.html_row(
-                    "Shortcuts found",
-                    f"{total_shortcuts} ({sc_counts.get('desktop', 0)} desktop, "
-                    f"{sc_counts.get('start_menu', 0)} Start Menu, {sc_counts.get('taskbar', 0)} taskbar)",
-                )
-                rows += self.html_row("Shortcuts matched to an installed app", str(sc_counts.get("matched", 0)))
+                if is_guided:
+                    rows += self.html_row("Shortcuts found", str(total_shortcuts))
+                else:
+                    rows += self.html_row(
+                        "Shortcuts found",
+                        f"{total_shortcuts} ({sc_counts.get('desktop', 0)} desktop, "
+                        f"{sc_counts.get('start_menu', 0)} Start Menu, {sc_counts.get('taskbar', 0)} taskbar)",
+                    )
+                    rows += self.html_row("Shortcuts matched to an installed app", str(sc_counts.get("matched", 0)))
             sections.append(self.html_section("🖥", "Scan Results", f'<table style="width:100%;">{rows}</table>'))
         else:
             sections.append(self.html_section("🖥", "Scan Results",
@@ -386,30 +414,52 @@ class ScanPage(BasePage):
 
         if self.last_analysis_result:
             matched = len(self.last_analysis_result.get("software", []))
-            hw_rows_count = len(self.last_analysis_result.get("hardware", []))
-            rows = (
-                self.html_row("Apps with Linux alternatives", str(matched))
-                + self.html_row("Hardware advisories", str(hw_rows_count))
-            )
+            rows = self.html_row("Apps with Linux alternatives", str(matched))
+            if not is_guided:
+                hw_rows_count = len(self.last_analysis_result.get("hardware", []))
+                rows += self.html_row("Hardware advisories", str(hw_rows_count))
             sections.append(self.html_section("📦", "App Matching", f'<table style="width:100%;">{rows}</table>'))
             recs = self.last_analysis_result.get("software", [])
             if recs:
                 preview_rows = ""
                 for rec in recs:
-                    win = str(rec.get("windows_app", "") or rec.get("name", ""))
-                    linux = str(rec.get("linux_package", "") or rec.get("linux_alternative", ""))
-                    conf = str(rec.get("mapping_confidence", "") or rec.get("confidence", ""))
+                    win = str(
+                        rec.get("windows_name") or rec.get("windows_app") or rec.get("name", "")
+                    )
+                    linux = str(
+                        rec.get("linux_display_name") or rec.get("linux_package")
+                        or rec.get("linux_alternative", "")
+                    )
+                    conf = self._confidence_label(rec)
                     conf_color = {"high": "#1B5E20", "medium": "#E65100", "low": "#546E7A"}.get(conf, "#546E7A")
                     conf_bg = {"high": "#E8F5E9", "medium": "#FFF3E0", "low": "#ECEFF1"}.get(conf, "#ECEFF1")
+                    extra_cols = ""
+                    if is_expert:
+                        category = str(rec.get("category", "") or "—")
+                        strategy = str(rec.get("migration_strategy", "") or "—")
+                        extra_cols = (
+                            f'<td style="padding:3px 10px 3px 0;font-size: 13px;color:#6B7390;">{category}</td>'
+                            f'<td style="padding:3px 10px 3px 0;font-size: 13px;color:#6B7390;">{strategy}</td>'
+                        )
                     preview_rows += (
                         f'<tr>'
                         f'<td style="padding:3px 10px 3px 0;font-size: 15px;color:#1B1E28;">{win}</td>'
                         f'<td style="padding:3px 10px 3px 0;font-size: 15px;color:#3F6FE0;">{linux}</td>'
-                        f'<td>{self.html_pill(conf, conf_color, conf_bg)}</td>'
+                        f'<td>{self.html_pill(conf, conf_color, conf_bg) if conf else ""}</td>'
+                        f'{extra_cols}'
                         f'</tr>'
                     )
+                header_cols = (
+                    '<tr>'
+                    '<th style="text-align:left;font-size:11px;color:#90A4AE;">Windows App</th>'
+                    '<th style="text-align:left;font-size:11px;color:#90A4AE;">Linux Alternative</th>'
+                    '<th style="text-align:left;font-size:11px;color:#90A4AE;">Confidence</th>'
+                    + ('<th style="text-align:left;font-size:11px;color:#90A4AE;">Category</th>'
+                       '<th style="text-align:left;font-size:11px;color:#90A4AE;">Strategy</th>' if is_expert else '')
+                    + '</tr>'
+                ) if is_expert else ""
                 sections.append(self.html_section("✅", "App Matches",
-                    f'<table style="width:100%;">{preview_rows}</table>'))
+                    f'<table style="width:100%;">{header_cols}{preview_rows}</table>'))
         elif self.ui_state.inventory_completed:
             sections.append(self.html_section("📦", "App Matching",
                 self.html_empty("Matching your apps to Linux alternatives…")))

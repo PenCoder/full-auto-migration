@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QThreadPool, QTimer, Qt
@@ -134,6 +135,30 @@ class ReviewRecommendationsPage(BasePage):
         self.next_btn.setMinimumWidth(280)
         self.next_btn.clicked.connect(self.request_next.emit)
         root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
+
+    def _friendly_file_label(self, path: str) -> str:
+        """Render a recommendation's file_path for display.
+
+        In "usage-based recommendation" mode there's no real file list yet —
+        operations_controller.run_file_recommendations() fakes one synthetic
+        pseudo-file per file *type* (not per file) so it can reuse the same
+        file-level recommendation engine, using a placeholder path like
+        "usage:.py" as an internal implementation detail. That placeholder
+        was leaking straight into the UI verbatim; render it as the file
+        type it actually represents instead.
+
+        For a real file path, show 'parent folder/filename' instead of an
+        arbitrary character truncation, which can cut mid-word and read as
+        gibberish (e.g. "…ata\\Local\\Temp\\x.json"). The full path is still
+        available as a hover tooltip.
+        """
+        if path.startswith("usage:"):
+            ext = path[len("usage:"):]
+            return f"All {self.humanize_file_type_label(ext)} ({ext})" if ext else "Unknown file type"
+
+        p = Path(path)
+        parent_name = p.parent.name
+        return f"{parent_name}/{p.name}" if parent_name else p.name
 
     # ── Configuration summary renderer ──────────────────────────────────────
 
@@ -302,20 +327,34 @@ class ReviewRecommendationsPage(BasePage):
                 if recs:
                     imp_color = {"critical": "#B71C1C", "important": "#1B3A86", "useful": "#1B5E20", "low": "#6B7390"}
                     imp_bg = {"critical": "#FFEBEE", "important": "#DCE6FF", "useful": "#E8F5E9", "low": "#ECEFF1"}
+                    imp_label = {
+                        "critical": "Always included",
+                        "important": "Recommended",
+                        "useful": "Optional",
+                        "low": "Low priority",
+                    }
+                    legend = (
+                        '<p style="font-size: 12px;color:#90A4AE;margin:0 0 8px;">'
+                        "Files are flagged by how likely you are to need them — "
+                        "Always included and Recommended files are brought across by default."
+                        "</p>"
+                    )
                     rows = ""
                     for rec in recs:
                         path = str(rec.get("file_path", ""))
-                        short_path = ("…" + path[-45:]) if len(path) > 48 else path
+                        short_path = self._friendly_file_label(path)
+                        tooltip = "" if path.startswith("usage:") else path
                         imp = str(rec.get("importance", "low"))
-                        badge = self.html_pill(imp, imp_color.get(imp, "#546E7A"), imp_bg.get(imp, "#ECEFF1"))
+                        label = imp_label.get(imp, imp.capitalize())
+                        badge = self.html_pill(label, imp_color.get(imp, "#546E7A"), imp_bg.get(imp, "#ECEFF1"))
                         rows += (
                             f'<tr>'
-                            f'<td style="padding:3px 10px 3px 0;font-size: 14px;color:#1B1E28;'
-                            f'font-family:\'Cascadia Mono\',monospace;">✓ {short_path}</td>'
+                            f'<td style="padding:3px 10px 3px 0;font-size: 14px;color:#1B1E28;" title="{tooltip}">'
+                            f'✓ {short_path}</td>'
                             f'<td style="padding:3px 0;">{badge}</td>'
                             f'</tr>'
                         )
-                    body = f'<table style="width:100%;">{rows}</table>'
+                    body = legend + f'<table style="width:100%;">{rows}</table>'
                 else:
                     body = self.html_empty("No file recommendations available.")
                 self.file_details.setHtml(self.html_wrap(body))

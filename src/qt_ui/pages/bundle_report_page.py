@@ -19,7 +19,6 @@ class BundleReportPage(BasePage):
         super().__init__(ui_state)
         self.get_bundle_data_cb = get_bundle_data_cb
         self._build_ui()
-        self.refresh()
 
     # ── UI construction ──────────────────────────────────────────────────────
 
@@ -43,12 +42,6 @@ class BundleReportPage(BasePage):
         self.report_view.setReadOnly(True)
         self.report_view.setMinimumHeight(380)
         root.addWidget(self.report_view)
-
-        self.next_btn = QPushButton("Backup complete — move to Linux")
-        self.next_btn.setProperty("role", "cta")
-        self.next_btn.setMinimumWidth(290)
-        self.next_btn.clicked.connect(self.request_finish.emit)
-        root.addWidget(self.next_btn, alignment=Qt.AlignHCenter)
 
     # ── Rendering ────────────────────────────────────────────────────────────
 
@@ -225,10 +218,6 @@ class BundleReportPage(BasePage):
 
     def can_proceed(self) -> bool:
         return self.ui_state.backup_completed
-
-    def refresh(self) -> None:
-        self.next_btn.setEnabled(self.ui_state.backup_completed)
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

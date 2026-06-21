@@ -43,7 +43,7 @@ src/config.py        # Backward compatibility shim (30 lines)
   - `ValidationConfig` - Validation settings
   - `ResearchConfig` - Research & metrics
   - `BackupConfig` - Backup settings
-  - `AIConfig` - AI/ML settings
+  - `AIConfig` - alias for Repology online package-verification settings (no AI/ML involved)
   - `DemoConfig` - Demo mode settings
   - `MigrationConfigRoot` - Top-level container
 

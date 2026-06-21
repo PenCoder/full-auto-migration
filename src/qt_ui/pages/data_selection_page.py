@@ -34,58 +34,8 @@ class DataSelectionPage(BasePage):
         self._build_ui()
         self.refresh()
 
-    @staticmethod
-    def _humanize_file_type_label(ext: str) -> str:
-        ext = str(ext).strip().lower()
-        fallback_map = {
-            ".doc": "Word document files",
-            ".docx": "Word document files",
-            ".pdf": "PDF files",
-            ".mp3": "MP3 audio files",
-            ".wav": "WAV audio files",
-            ".flac": "FLAC audio files",
-            ".aac": "AAC audio files",
-            ".jpg": "JPEG image files",
-            ".jpeg": "JPEG image files",
-            ".png": "PNG image files",
-            ".gif": "GIF image files",
-            ".bmp": "Bitmap image files",
-            ".webp": "WebP image files",
-            ".svg": "SVG image files",
-            ".ppt": "PowerPoint presentation files",
-            ".pptx": "PowerPoint presentation files",
-            ".xls": "Excel spreadsheet files",
-            ".xlsx": "Excel spreadsheet files",
-            ".csv": "CSV files",
-            ".zip": "ZIP archive files",
-            ".rar": "RAR archive files",
-            ".7z": "7-Zip archive files",
-            ".tar": "TAR archive files",
-            ".gz": "GZip archive files",
-            ".json": "JSON files",
-            ".xml": "XML files",
-            ".yaml": "YAML files",
-            ".yml": "YAML files",
-            ".ini": "INI configuration files",
-            ".html": "HTML files",
-            ".css": "CSS files",
-            ".js": "JavaScript files",
-            ".ts": "TypeScript files",
-            ".py": "Python files",
-            ".sql": "SQL files",
-            ".txt": "Text files",
-            ".md": "Markdown files",
-            ".rtf": "Rich text files",
-            ".mp4": "MP4 video files",
-            ".mkv": "Matroska video files",
-            ".mov": "MOV video files",
-            ".avi": "AVI video files",
-            ".log": "Log files",
-        }
-        return fallback_map.get(ext, f"{ext.lstrip('.').upper()} files" if ext else "Files")
-
     def _format_file_type_label(self, ext: str) -> str:
-        label = self.file_type_labels.get(ext) or self._humanize_file_type_label(ext)
+        label = self.file_type_labels.get(ext) or self.humanize_file_type_label(ext)
         return f"{label} ({ext})"
 
     def _build_collapsible_section(self, title: str, body: QWidget) -> QWidget:
@@ -265,19 +215,28 @@ class DataSelectionPage(BasePage):
             return
 
         self.usage_summary.setText(
-            f"Loaded {len(recommendations)} usage-based file type recommendations from system file activity."
+            f"Found {len(recommendations)} file type{'s' if len(recommendations) != 1 else ''} "
+            "based on how often you actually use them."
         )
         for item in recommendations:
             ext = str(item.get("extension", ""))
-            usage = float(item.get("usage_percent", 0.0))
             count = int(item.get("count", 0))
             recent = int(item.get("recent_30_days", 0))
             recommended = bool(item.get("recommended", False))
-            mark = "*" if recommended else "-"
-            list_item = self.checklist_item(
-                f"{mark} {ext:8} usage={usage:5.1f}% files={count:4} recent={recent:4}",
-                checked=recommended,
-            )
+
+            label = self._format_file_type_label(ext)
+            file_word = "file" if count == 1 else "files"
+            if recent:
+                recency_text = f"{recent} opened in the last 30 days"
+            else:
+                recency_text = "none opened recently"
+            text = f"{label} — {count} {file_word} found, {recency_text}"
+            if recommended:
+                text = f"★ {text} (recommended)"
+            else:
+                text = f"   {text}"
+
+            list_item = self.checklist_item(text, checked=recommended)
             self.activity_view_list.addItem(list_item)
 
     def _sync_radios_from_state(self) -> None:

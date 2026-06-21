@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from pathlib import Path
-
 from PySide6.QtCore import QThreadPool, QTimer, Qt
-from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
 from src.orchestration.errors import user_facing_error
@@ -22,7 +19,6 @@ class VerificationPage(BasePage):
         super().__init__(ui_state)
         self.run_validation_cb = run_validation_cb
         self.thread_pool = QThreadPool.globalInstance()
-        self.report_path: str = ""
         self._build_ui()
         self.refresh()
 
@@ -84,12 +80,6 @@ class VerificationPage(BasePage):
         self.verify_btn.clicked.connect(self._run_verification)
         root.addWidget(self.verify_btn, alignment=Qt.AlignHCenter)
 
-        self.report_btn = QPushButton("View Migration Report")
-        self.report_btn.setProperty("role", "badge")
-        self.report_btn.setMinimumWidth(250)
-        self.report_btn.clicked.connect(self._show_report_path)
-        root.addWidget(self.report_btn, alignment=Qt.AlignHCenter)
-
     def showEvent(self, event) -> None:
         super().showEvent(event)
         if self.ui_state.restore_completed and not self.ui_state.verification_completed and not self.is_processing:
@@ -100,7 +90,6 @@ class VerificationPage(BasePage):
             return
         self.set_scanning(True)
         self.verify_btn.setEnabled(False)
-        self.report_btn.setEnabled(False)
         self.loading.setVisible(True)
         self.status.setText("Checking your files — comparing what was backed up with what arrived on Linux...")
         worker = FunctionWorker(self.run_validation_cb)
@@ -114,7 +103,6 @@ class VerificationPage(BasePage):
             self.ui_state.verification_completed = True
             self.ui_state.total_sovereignty_score = int(result.get("total_sovereignty_score", 0))
             self.ui_state.restored_data_size_label = result.get("restored_data_size", "")
-            self.report_path = result.get("report_path", "")
             self.score_progress.setValue(self.ui_state.total_sovereignty_score)
 
             total_files = int(result.get("total_files", 0))
@@ -133,7 +121,7 @@ class VerificationPage(BasePage):
                 summary = f"⚠️  Migration Score: {score}%. Some files may need attention — check the report for details."
             self.status.setText(summary)
         else:
-            self.status.setText("Verification complete — click View Migration Report for full details.")
+            self.status.setText("Verification complete — click Next to see the full report.")
         self.refresh()
 
     def _on_error(self, error: str) -> None:
@@ -141,19 +129,8 @@ class VerificationPage(BasePage):
         self.status.setText(f"Verification failed.\n{user_facing_error(error)}")
         self.refresh()
 
-    def _show_report_path(self) -> None:
-        if self.report_path and Path(self.report_path).exists():
-            QDesktopServices.openUrl(Path(self.report_path).as_uri())
-        elif self.report_path:
-            self.status.setText(f"Report path: {self.report_path}")
-        else:
-            self.status.setText("No report available yet — run verification first.")
-
     def _on_finished(self) -> None:
         self.set_scanning(False)
         self.verify_btn.setEnabled(True)
         self.loading.setVisible(False)
         self.refresh()
-
-    def refresh(self) -> None:
-        self.report_btn.setEnabled(self.ui_state.verification_completed)

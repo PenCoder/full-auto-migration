@@ -8,10 +8,17 @@ import zipfile
 import hashlib
 from typing import Callable, Optional
 
-from src.constants import EXTRACTED_BACKUP_DIR, RESTORE_REPORT
+from src.constants import (
+    EXTRACTED_BACKUP_DIR,
+    FINAL_REPORT_HTML,
+    FINAL_REPORT_JSON,
+    FINAL_REPORT_MARKDOWN,
+    RESTORE_DIR,
+    RESTORE_REPORT,
+)
 from src.loggers import get_logger
 from src.orchestration.errors import ERR_ARCHIVE_UNSAFE_PATH, ERR_MISSING_BUNDLE, MigrationError
-from src.services.package_manager import detect_package_manager, install_packages
+from src.services.package_manager import detect_package_manager, install_packages, remove_packages
 
 # Maps Windows user-folder names (lowercase) to Linux home-directory equivalents.
 # Files in known folders land directly in ~/Documents, ~/Pictures, etc.
@@ -78,28 +85,35 @@ class RestoreService:
 
     def __init__(
         self,
-        bundle_dir: Path,
-        target_home: Path,
+        bundle_dir: Path | None = None,
+        target_home: Path | None = None,
         progress_cb: Optional[ProgressCb] = None,
         target_distro: str | None = None,
     ):
+        """bundle_dir/target_home are optional only because undo_restore()
+        operates purely off the already-written restore_report.json and
+        never needs the original bundle — every other method requires them.
+        """
         self.logger = get_logger("restore_service")
         self.bundle_dir = bundle_dir
         self.target_home = target_home
         self.progress_cb = progress_cb
         self.target_distro = target_distro
 
-        self.manifest_path = bundle_dir / "manifest.json"
-        self.archive_path = bundle_dir / "backup.zip"
-        self.apps_path = bundle_dir / "apps_to_install.json"
-        self.settings_inv_path = bundle_dir / "settings_inventory.json"
-        self.settings_plan_path = bundle_dir / "settings_migration_plan.json"
-        self.settings_assets_dir = bundle_dir / "settings_assets"
-        self.shortcuts_path = bundle_dir / "shortcuts_inventory.json"
+        if bundle_dir is not None:
+            self.manifest_path = bundle_dir / "manifest.json"
+            self.archive_path = bundle_dir / "backup.zip"
+            self.apps_path = bundle_dir / "apps_to_install.json"
+            self.settings_inv_path = bundle_dir / "settings_inventory.json"
+            self.settings_plan_path = bundle_dir / "settings_migration_plan.json"
+            self.settings_assets_dir = bundle_dir / "settings_assets"
+            self.shortcuts_path = bundle_dir / "shortcuts_inventory.json"
 
         self.restored_files: list[dict] = []
         self.installed_apps: list[dict] = []
         self.settings_applied: list[str] = []
+        self.settings_manual: list[str] = []
+        self.settings_files_written: list[str] = []
         self.settings_guidance_path: str = ""
         self.apps_to_install: list[dict] = []
         self.shortcuts_restored: list[dict] = []
@@ -212,7 +226,12 @@ class RestoreService:
         extract_dir.mkdir(parents=True)
 
         with zipfile.ZipFile(self.archive_path, "r") as zf:
-            for member in zf.infolist():
+            members = zf.infolist()
+            total = max(1, len(members))
+            self.logger.info("Extracting %d entries from backup archive…", len(members))
+            last_logged_pct = -1
+
+            for i, member in enumerate(members, start=1):
                 target_path = (extract_dir / member.filename).resolve()
                 if not str(target_path).startswith(str(extract_dir.resolve())):
                     raise MigrationError(ERR_ARCHIVE_UNSAFE_PATH, member.filename)
@@ -223,12 +242,20 @@ class RestoreService:
                     with zf.open(member, "r") as src, target_path.open("wb") as dst:
                         shutil.copyfileobj(src, dst)
 
+                self._progress(5 + int((i / total) * 10), f"Extracting backup archive… ({i}/{total})")
+                pct = int((i / total) * 100)
+                if pct >= last_logged_pct + 10:
+                    self.logger.info("Extracting… %d/%d (%d%%)", i, len(members), pct)
+                    last_logged_pct = pct
+
         self.logger.info("Backup archive extracted to %s", extract_dir)
         return extract_dir
 
     def _restore_files(self, manifest: dict, extract_dir: Path) -> None:
         entries = manifest.get("entries", [])
         total = max(1, len(entries))
+        self.logger.info("Restoring %d files…", len(entries))
+        last_logged_pct = -1
 
         for i, entry in enumerate(entries, start=1):
             src = extract_dir / entry["relative_path"]
@@ -252,11 +279,21 @@ class RestoreService:
             })
             self._progress(15 + int((i / total) * 55), f"Restoring files… ({i}/{total})")
 
+            # Hashing + copying thousands of files can take minutes with the
+            # UI as the only sign of life — mirror periodic progress into the
+            # log file too, every ~10%, so it doesn't look like a hang.
+            pct = int((i / total) * 100)
+            if pct >= last_logged_pct + 10:
+                self.logger.info("Restoring files… %d/%d (%d%%)", i, len(entries), pct)
+                last_logged_pct = pct
+
         self.logger.info("File restore complete: %d entries", len(entries))
 
     def _verify_files(self, manifest: dict) -> None:
         entries = manifest.get("entries", [])
         total = max(1, len(entries))
+        self.logger.info("Verifying %d files…", len(entries))
+        last_logged_pct = -1
 
         for i, entry in enumerate(entries, start=1):
             path = self._resolve_destination(entry["relative_path"])
@@ -272,6 +309,11 @@ class RestoreService:
                     break
 
             self._progress(70 + int((i / total) * 12), f"Verifying… ({i}/{total})")
+
+            pct = int((i / total) * 100)
+            if pct >= last_logged_pct + 10:
+                self.logger.info("Verifying files… %d/%d (%d%%)", i, len(entries), pct)
+                last_logged_pct = pct
 
         mismatches = sum(1 for f in self.restored_files if f.get("verification_status") == "mismatch")
         if mismatches:
@@ -390,6 +432,7 @@ class RestoreService:
                 dst = Path.home() / ".local" / "share" / "backgrounds" / src.name
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+                self.settings_files_written.append(str(dst))
                 self.logger.info("Wallpaper copied to %s", dst)
 
                 if self._apply_wallpaper(dst, de):
@@ -477,6 +520,7 @@ class RestoreService:
             self.logger.warning("Could not write guidance file: %s", exc)
 
         self.settings_applied = applied
+        self.settings_manual = manual
         self.logger.info(
             "Settings restore: %d applied automatically, %d need manual setup",
             len(applied), len(manual),
@@ -492,12 +536,22 @@ class RestoreService:
         applications = self._load_applications(self.apps_path)
         self.apps_to_install = applications.get("applications", [])
 
-        packages = [
-            app["linux_package"]
+        # Keyed by linux_package so a successful/failed install (reported by
+        # package name) maps back to the app entry that requested it.
+        installable = {
+            app["linux_package"]: app
             for app in self.apps_to_install
             if app.get("migration_strategy") in {"apt", "dnf", "pacman", "install linux equivalent"}
             and app.get("linux_package")
-        ]
+        }
+        packages = list(installable.keys())
+
+        # Apps this tool never attempts to auto-install (e.g. "external" /
+        # snap-only software) stay eligible for a shortcut — the user is
+        # expected to install those manually, and we have no install result
+        # to judge them by either way. Only apt/dnf/pacman attempts that
+        # actually fail get excluded below.
+        self.installed_apps = [app for app in self.apps_to_install if app.get("linux_package") not in installable]
 
         if not packages:
             self.logger.info("No installable packages found in apps_to_install.json")
@@ -505,9 +559,44 @@ class RestoreService:
 
         manager = detect_package_manager(self.target_distro)
         self._progress(90, f"Installing {len(packages)} packages via {manager}…")
-        result = install_packages(packages, manager=manager, use_pkexec=True)
-        self.installed_apps = self.apps_to_install
-        self.logger.info("Package installation complete. Output: %s", result.stdout)
+
+        # pkexec needs a real desktop session (DISPLAY + a D-Bus session with
+        # a polkit agent on it) to show its auth prompt at all — if this
+        # process's own environment is missing those (e.g. launched in a way
+        # that didn't inherit the desktop session), pkexec fails instantly
+        # with "Request dismissed" and never shows anything to click. Logging
+        # this up front turns "did a dialog even appear?" from a guess into
+        # something visible in restore.log.
+        self.logger.info(
+            "Session env before pkexec: DISPLAY=%r DBUS_SESSION_BUS_ADDRESS=%r XDG_SESSION_TYPE=%r XDG_CURRENT_DESKTOP=%r",
+            os.environ.get("DISPLAY"),
+            os.environ.get("DBUS_SESSION_BUS_ADDRESS"),
+            os.environ.get("XDG_SESSION_TYPE"),
+            os.environ.get("XDG_CURRENT_DESKTOP"),
+        )
+
+        def _on_package_progress(pkg: str, index: int, total: int) -> None:
+            # Only fires once the batch attempt has already failed and we're
+            # retrying one package at a time — each call re-pays package-
+            # manager overhead, so without this the UI looks stuck for
+            # however long that takes.
+            self.logger.info("Installing %s (%d/%d)…", pkg, index, total)
+            self._progress(90 + int((index / total) * 6), f"Installing {pkg} ({index}/{total})…")
+
+        result = install_packages(packages, manager=manager, use_pkexec=True, on_progress=_on_package_progress)
+
+        # Only apps whose package genuinely installed count as "installed" —
+        # shortcuts are matched against this, not the merely-requested list,
+        # so a failed install doesn't get a launcher pointing at nothing.
+        self.installed_apps += [installable[pkg] for pkg in result.installed]
+        self.logger.info(
+            "Package installation: %d installed, %d failed.",
+            len(result.installed), len(result.failed),
+        )
+        if result.failed:
+            self.warnings.append(
+                f"{len(result.failed)} app(s) could not be installed: {', '.join(result.failed)}"
+            )
 
     # ── Shortcut / launcher recreation ──────────────────────────────────────────
 
@@ -552,6 +641,26 @@ class RestoreService:
             self.logger.debug("Cinnamon panel pin failed for %s: %s", desktop_id, exc)
             return False
 
+    def _try_unpin_cinnamon(self, desktop_id: str) -> bool:
+        """Reverse of _try_pin_cinnamon — drop one entry from the panel-launchers list."""
+        try:
+            result = self._run_cmd_capture(["gsettings", "get", "org.cinnamon", "panel-launchers"])
+            if result is None:
+                return False
+            current = result.strip()
+            if desktop_id not in current:
+                return True
+            if current.startswith("[") and current.endswith("]"):
+                entries = [e.strip().strip("'\"") for e in current[1:-1].split(",") if e.strip()]
+                remaining = [e for e in entries if e != desktop_id]
+                new_value = "[" + ", ".join(f"'{e}'" for e in remaining) + "]"
+            else:
+                return True
+            return self._run_cmd(["gsettings", "set", "org.cinnamon", "panel-launchers", new_value])
+        except Exception as exc:
+            self.logger.debug("Cinnamon panel unpin failed for %s: %s", desktop_id, exc)
+            return False
+
     def _run_cmd_capture(self, cmd: list[str]) -> str | None:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -576,9 +685,12 @@ class RestoreService:
         if not entries:
             return
 
+        # Matched against apps that actually finished installing — not just
+        # the requested list — so a failed package install doesn't get a
+        # desktop shortcut pointing at software that was never installed.
         installed_by_windows_app = {
             str(app.get("windows_app", "")): app
-            for app in self.apps_to_install
+            for app in self.installed_apps
             if app.get("windows_app")
         }
 
@@ -641,6 +753,8 @@ class RestoreService:
             "files_restored": self.restored_files,
             "applications_installed": self.installed_apps,
             "settings_applied": self.settings_applied,
+            "settings_manual": self.settings_manual,
+            "settings_files_written": self.settings_files_written,
             "settings_guidance": self.settings_guidance_path,
             "shortcuts_restored": self.shortcuts_restored,
             "warnings": self.warnings,
@@ -649,3 +763,150 @@ class RestoreService:
         with self.report_path.open("w", encoding="utf-8") as f:
             json.dump(report, f, indent=2)
         self.logger.info("Restore report written to %s", self.report_path)
+
+    # ── Undo / reset ─────────────────────────────────────────────────────────
+
+    def undo_restore(self, uninstall_apps: bool = False) -> dict:
+        """Reverse a previous restore.
+
+        Deletes the restored files, removes the shortcuts/launchers this
+        tool created, and deletes the wallpaper file it copied. Reads
+        exclusively from the already-written restore_report.json — no
+        bundle is required, so this works even in a fresh app session that
+        only loaded a leftover report (see RestorePage._load_existing_report).
+
+        uninstall_apps is opt-in and off by default: removing a package
+        that some other, unrelated software also depends on can affect that
+        other software too. When True, only the apps this tool's own
+        restore_report shows as installed are removed (plain remove, not
+        purge/autoremove), never anything pre-existing on the system.
+
+        Settings note: only undoes what we ourselves wrote (the wallpaper
+        file). The desktop's color scheme/theme from before the restore was
+        never captured, so it can't be restored — only the file we added
+        can be cleaned up.
+        """
+        result: dict = {
+            "files_removed": 0,
+            "files_failed": 0,
+            "shortcuts_removed": 0,
+            "settings_files_removed": 0,
+            "apps_removed": [],
+            "apps_failed": [],
+            "warnings": [],
+        }
+        if not RESTORE_REPORT.exists():
+            self._progress(100, "Nothing to reset — no previous restore found.")
+            return result
+
+        try:
+            report = json.loads(RESTORE_REPORT.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            result["warnings"].append(f"Could not read restore report: {exc}")
+            return result
+
+        files = report.get("files_restored", [])
+        self._progress(5, f"Removing {len(files)} restored file(s)…")
+        self.logger.info("Reset: removing %d restored file(s)…", len(files))
+        for entry in files:
+            dest = entry.get("destination")
+            if not dest:
+                continue
+            try:
+                path = Path(dest)
+                if path.is_file():
+                    path.unlink()
+                    result["files_removed"] += 1
+            except OSError:
+                result["files_failed"] += 1
+        self.logger.info(
+            "Reset: %d file(s) removed, %d failed.", result["files_removed"], result["files_failed"]
+        )
+
+        apps_dir = Path.home() / ".local" / "share" / "applications"
+        desktop_dir = Path.home() / "Desktop"
+        recreated_statuses = {
+            "desktop_entry_created", "desktop_icon_created",
+            "pinned_to_taskbar", "added_to_menu_manual_pin_needed",
+        }
+        shortcuts = [sc for sc in report.get("shortcuts_restored", []) if sc.get("status") in recreated_statuses]
+        self._progress(40, f"Removing {len(shortcuts)} shortcut(s)/launcher(s)…")
+        self.logger.info("Reset: removing %d shortcut(s)/launcher(s)…", len(shortcuts))
+        for sc in shortcuts:
+            desktop_id = f"{self._safe_filename(str(sc.get('name', '')))}.desktop"
+            try:
+                (apps_dir / desktop_id).unlink(missing_ok=True)
+                result["shortcuts_removed"] += 1
+            except OSError:
+                pass
+            if sc.get("category") == "desktop":
+                (desktop_dir / desktop_id).unlink(missing_ok=True)
+            if sc.get("status") == "pinned_to_taskbar":
+                self._try_unpin_cinnamon(desktop_id)
+        self.logger.info("Reset: %d shortcut(s)/launcher(s) removed.", result["shortcuts_removed"])
+
+        self._progress(55, "Removing settings files written during restore…")
+        for path_str in report.get("settings_files_written", []):
+            try:
+                Path(path_str).unlink(missing_ok=True)
+                result["settings_files_removed"] += 1
+            except OSError:
+                pass
+        guidance = report.get("settings_guidance")
+        if guidance:
+            Path(guidance).unlink(missing_ok=True)
+        self.logger.info("Reset: %d settings file(s) removed.", result["settings_files_removed"])
+
+        if uninstall_apps:
+            packages = [
+                str(app["linux_package"])
+                for app in report.get("applications_installed", [])
+                if app.get("linux_package")
+            ]
+            if packages:
+                self._progress(60, f"Uninstalling {len(packages)} app(s) via {detect_package_manager(self.target_distro)}…")
+                self.logger.info(
+                    "Reset: uninstalling %d app(s) — this calls pkexec and can take a while "
+                    "if the batch removal fails and falls back to one at a time: %s",
+                    len(packages), ", ".join(packages),
+                )
+
+                def _on_remove_progress(pkg: str, index: int, total: int) -> None:
+                    self.logger.info("Uninstalling %s (%d/%d)…", pkg, index, total)
+                    self._progress(60 + int((index / total) * 35), f"Uninstalling {pkg} ({index}/{total})…")
+
+                try:
+                    manager = detect_package_manager(self.target_distro)
+                    pkg_result = remove_packages(
+                        packages, manager=manager, use_pkexec=True, on_progress=_on_remove_progress
+                    )
+                    result["apps_removed"] = pkg_result.installed
+                    result["apps_failed"] = pkg_result.failed
+                    self.logger.info(
+                        "Reset: %d app(s) uninstalled, %d failed.",
+                        len(pkg_result.installed), len(pkg_result.failed),
+                    )
+                except MigrationError as exc:
+                    result["warnings"].append(f"App removal failed: {exc}")
+                    self.logger.warning("Reset: app removal failed: %s", exc)
+
+        self._progress(100, "Reset complete.")
+
+        for report_file in (
+            RESTORE_REPORT,
+            RESTORE_DIR / "validation_report.json",
+            FINAL_REPORT_JSON,
+            FINAL_REPORT_MARKDOWN,
+            FINAL_REPORT_HTML,
+        ):
+            try:
+                report_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        self.logger.info(
+            "Undo restore: %d file(s) removed (%d failed), %d shortcut(s) removed, %d app(s) uninstalled (%d failed)",
+            result["files_removed"], result["files_failed"], result["shortcuts_removed"],
+            len(result["apps_removed"]), len(result["apps_failed"]),
+        )
+        return result

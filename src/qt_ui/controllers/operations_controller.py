@@ -443,6 +443,43 @@ class OperationsController:
         mark_action_done("restore")
         return runtime_data["restore"]
 
+    def reset_restore(
+        self,
+        *,
+        config,
+        ui_state,
+        log_activity,
+        clear_error_banner,
+        uninstall_apps: bool = False,
+    ) -> dict:
+        """Undo a previous restore: files, shortcuts, the wallpaper file we wrote,
+        and (only if uninstall_apps) the apps this tool itself installed.
+        """
+        clear_error_banner()
+        log_activity("restore", f"Resetting previous restore (uninstall_apps={uninstall_apps})...")
+
+        last_progress = {"value": -10}
+
+        def progress_cb(percent: int, msg: str) -> None:
+            if percent == 100 or percent - last_progress["value"] >= 10:
+                last_progress["value"] = percent
+                log_activity("restore", f"{msg} ({percent}%)")
+
+        service = RestoreService(target_distro=config.target_system.distro, progress_cb=progress_cb)
+        result = service.undo_restore(uninstall_apps=uninstall_apps)
+
+        ui_state.restore_completed = False
+        ui_state.verification_completed = False
+        ui_state.total_sovereignty_score = 0
+        log_activity(
+            "restore",
+            f"Reset complete: {result['files_removed']} file(s) removed, "
+            f"{result['shortcuts_removed']} shortcut(s) removed, "
+            f"{len(result['apps_removed'])} app(s) uninstalled.",
+            level="success",
+        )
+        return result
+
     def run_validation(
         self,
         *,
