@@ -1,5 +1,0 @@
-#!/bin/bash
-# AppRun — entry point executed when the AppImage is launched.
-SELF="$(readlink -f "$0")"
-HERE="${SELF%/*}"
-exec "${HERE}/usr/bin/MigrationWizard" "$@"

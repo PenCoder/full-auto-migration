@@ -38,7 +38,7 @@ AutomationConfig          # Runtime behavior
 ValidationConfig          # Post-install validation
 ResearchConfig            # Research & metrics
 BackupConfig              # Backup settings
-AIConfig                  # AI/ML settings
+AIConfig                  # alias for RepologyConfig — online package-verification settings (no AI/ML)
 DemoConfig                # Demo mode settings
 MigrationConfigRoot       # Top-level container
 ```

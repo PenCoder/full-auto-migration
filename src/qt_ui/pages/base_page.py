@@ -399,7 +399,58 @@ class BasePage(QWidget):
         item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
         item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
         return item
-        
+
+    @staticmethod
+    def humanize_file_type_label(ext: str) -> str:
+        """Map a file extension to a plain-English description, e.g. '.pdf' -> 'PDF files'."""
+        ext = str(ext).strip().lower()
+        fallback_map = {
+            ".doc": "Word document files",
+            ".docx": "Word document files",
+            ".pdf": "PDF files",
+            ".mp3": "MP3 audio files",
+            ".wav": "WAV audio files",
+            ".flac": "FLAC audio files",
+            ".aac": "AAC audio files",
+            ".jpg": "JPEG image files",
+            ".jpeg": "JPEG image files",
+            ".png": "PNG image files",
+            ".gif": "GIF image files",
+            ".bmp": "Bitmap image files",
+            ".webp": "WebP image files",
+            ".svg": "SVG image files",
+            ".ppt": "PowerPoint presentation files",
+            ".pptx": "PowerPoint presentation files",
+            ".xls": "Excel spreadsheet files",
+            ".xlsx": "Excel spreadsheet files",
+            ".csv": "CSV files",
+            ".zip": "ZIP archive files",
+            ".rar": "RAR archive files",
+            ".7z": "7-Zip archive files",
+            ".tar": "TAR archive files",
+            ".gz": "GZip archive files",
+            ".json": "JSON files",
+            ".xml": "XML files",
+            ".yaml": "YAML files",
+            ".yml": "YAML files",
+            ".ini": "INI configuration files",
+            ".html": "HTML files",
+            ".css": "CSS files",
+            ".js": "JavaScript files",
+            ".ts": "TypeScript files",
+            ".py": "Python files",
+            ".sql": "SQL files",
+            ".txt": "Text files",
+            ".md": "Markdown files",
+            ".rtf": "Rich text files",
+            ".mp4": "MP4 video files",
+            ".mkv": "Matroska video files",
+            ".mov": "MOV video files",
+            ".avi": "AVI video files",
+            ".log": "Log files",
+        }
+        return fallback_map.get(ext, f"{ext.lstrip('.').upper()} files" if ext else "Files")
+
 
     # ── HTML report helpers ──────────────────────────────────────────────────
     # Used by pages that render rich content into QTextEdit#ReportView widgets.

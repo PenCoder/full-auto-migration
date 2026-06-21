@@ -65,7 +65,7 @@ mindmap
       CSV confidence floors
       Repology integration
       Usage-based file recs
-      AI-assisted ranking
+      Online package verification (Expert mode)
     WP3 Workflow and UI
       Three-mode wizard
       Auto-triggering pages
@@ -114,7 +114,7 @@ gantt
     Fuzzy matching                :done, 2026-04-15, 2026-04-25
     Repology integration          :done, 2026-04-20, 2026-05-05
     Usage-based file recs         :done, 2026-04-25, 2026-05-10
-    AI-assisted ranking           :done, 2026-05-01, 2026-05-14
+    Online package verification   :done, 2026-05-01, 2026-05-14
 
     section WP3 Workflow and UI
     Three-mode wizard             :done, 2026-04-15, 2026-05-01

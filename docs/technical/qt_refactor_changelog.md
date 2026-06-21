@@ -31,7 +31,7 @@ This changelog captures the decomposition of `QtMigrationWindow` into focused co
 - Added `OperationsController` for:
   - inventory, analysis, recommendation, backup, restore, validation, report workflows
   - selected-folder resolution
-  - AI config mapping
+  - Repology online-verification config mapping (`AIConfig` alias)
 - `main_window.py` operational methods converted to wrappers.
 
 ## Files Added

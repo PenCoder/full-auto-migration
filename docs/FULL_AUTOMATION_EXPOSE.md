@@ -50,7 +50,7 @@ Qt Wizard                CLI (python -m src.cli scan)
         │  run_analysis()      mode policy  │
         │  run_app_recommendations()  ──── ▶│ guided  → local strategy only
         │  run_file_recommendations()       │ balanced → local + file recs
-        │  run_backup()                     │ expert   → online + AI ranking
+        │  run_backup()                     │ expert   → online + Repology check
         └───────────────────────────────────┘
                 │
                 ▼

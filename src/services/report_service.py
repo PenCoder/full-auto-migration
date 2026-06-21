@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
+from src.constants import DATA_DIR, REPORTS_DIR, RESTORE_DIR
 from src.loggers import get_logger
 
 
@@ -18,7 +18,7 @@ class ReportService:
     def __init__(self, report_dir: Path | None = None) -> None:
         """Create the report service and ensure the output directory exists."""
         self.logger = get_logger("report_service")
-        self.report_dir = report_dir or (BASE_DIR / "docs" / "reports")
+        self.report_dir = report_dir or REPORTS_DIR
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
     def load_validation_summary(self) -> dict[str, Any]:
@@ -106,6 +106,25 @@ class ReportService:
             f"- Restore report: {report['restore_report_path']}",
             "",
         ]
+
+        warnings: list[str] = restore_report.get("warnings", [])
+        if warnings:
+            lines += ["## Warnings — Steps That Didn't Fully Complete", ""]
+            for w in warnings:
+                lines.append(f"- ⚠️ {w}")
+            lines.append("")
+
+        settings_applied: list[str] = restore_report.get("settings_applied", [])
+        settings_manual: list[str] = restore_report.get("settings_manual", [])
+        if settings_applied or settings_manual:
+            lines += ["## Settings & Configuration", ""]
+            for s in settings_applied:
+                lines.append(f"- ✅ {s}")
+            for s in settings_manual:
+                lines.append(f"- ⚠️ Needs manual setup: {s}")
+            if restore_report.get("settings_guidance"):
+                lines.append(f"- Full guidance written to: `{restore_report['settings_guidance']}`")
+            lines.append("")
 
         failed_files: list[dict[str, Any]] = validation.get("failed_files", [])
         if failed_files:
@@ -235,6 +254,28 @@ class ReportService:
             else ""
         )
 
+        warnings: list[str] = restore_report.get("warnings", [])
+        warning_items = "".join(f"<li>⚠️ {_esc(str(w))}</li>" for w in warnings)
+        warnings_section = (
+            f"<div class='card warning-card'><h2>Warnings — Steps That Didn't Fully Complete ({len(warnings)})</h2>"
+            f"<ul>{warning_items}</ul></div>"
+            if warnings
+            else ""
+        )
+
+        settings_applied: list[str] = restore_report.get("settings_applied", [])
+        settings_manual: list[str] = restore_report.get("settings_manual", [])
+        settings_guidance: str = restore_report.get("settings_guidance", "")
+        settings_items = "".join(f"<li class='ok'>✅ {_esc(str(s))}</li>" for s in settings_applied)
+        settings_items += "".join(f"<li class='warn'>⚠️ Needs manual setup: {_esc(str(s))}</li>" for s in settings_manual)
+        settings_section = (
+            f"<div class='card'><h2>Settings &amp; Configuration</h2><ul class='settings'>{settings_items}</ul>"
+            + (f"<p class='hint'>Full guidance written to <code>{_esc(settings_guidance)}</code></p>" if settings_guidance else "")
+            + "</div>"
+            if (settings_applied or settings_manual)
+            else ""
+        )
+
         failed_files: list[dict[str, Any]] = validation.get("failed_files", [])
         failed_rows = "".join(
             f"<tr><td>{_esc(item.get('relative_path', item.get('destination', 'unknown')))}</td>"
@@ -294,6 +335,12 @@ class ReportService:
     h1, h2 {{ margin-top: 0; }}
     .app-icon {{ width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; border-radius: 4px; }}
     .app-icon-placeholder {{ display: inline-block; width: 20px; height: 20px; vertical-align: middle; margin-right: 8px; }}
+    .warning-card {{ background: #fff8e6; border-color: #f0c674; }}
+    .warning-card ul {{ margin: 0; padding-left: 20px; }}
+    ul.settings {{ list-style: none; padding: 0; }}
+    ul.settings li {{ padding: 4px 0; border-bottom: 1px solid #edf2f5; }}
+    ul.settings li.warn {{ color: #8a5a00; }}
+    .hint {{ color: #6b8fa3; font-size: 13px; }}
   </style>
 </head>
 <body>
@@ -314,6 +361,7 @@ class ReportService:
       <div class="metric">Restored data: {_esc(validation.get('restored_data_size', '0 B'))}</div>
     </div>
   </div>
+  {warnings_section}
   <div class="card">
     <h2>Timing</h2>
     <table>
@@ -323,6 +371,7 @@ class ReportService:
       <tr><td>Validated at</td><td>{_esc(validation.get('validated_at', 'n/a'))}</td></tr>
     </table>
   </div>
+  {settings_section}
   {failed_section}
   {missing_section}
   {app_map_section}

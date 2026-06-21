@@ -53,7 +53,7 @@ class ModePage(BasePage):
         self.expert_radio.toggled.connect(lambda: self._set_mode("expert"))
         expert_hint = self.hint_label(
             "For experienced users who want to fine-tune every aspect of the migration, "
-            "including AI-powered app matching and custom override rules."
+            "including live online package verification and custom override rules."
         )
 
         questionnaire = self.create_guided_questionnaire(
