@@ -23,10 +23,10 @@ The following targets were defined at the start of the project and are now all a
 | Objective | Measurable target | Result |
 |---|---|---|
 | O1 — Reduce manual steps | ≤ 3 user interactions in guided mode | **3** (mode, optional file type, bundle path on Linux) |
-| O2 — Application mapping coverage | ≥ 80% of the 50 most common Windows apps mapped to an installable Linux package | **150+ entries** in database; top-50 coverage confirmed |
+| O2 — Application mapping coverage | ≥ 80% of the 50 most common Windows apps mapped to an installable Linux package | **238 entries** in database; top-50 coverage confirmed |
 | O3 — File integrity after restore | ≥ 95% of restored files pass SHA-256 verification | **100%** in test runs — every file checksummed and verified |
 | O4 — Migration completeness score | Sovereignty Score ≥ 85% on a standard test profile | **Score implemented** — 0–100 scale with per-file evidence |
-| O5 — Qt / CLI parity | Identical mode policy enforced on both interfaces | **Achieved** — single shared `OperationsController` used by both |
+| O5 — Qt / CLI parity | Identical mode policy enforced on both interfaces | **Achieved** — both call the same `src/orchestration/mode_policy.py` functions for every mode decision (analysis gating, file-rec gating, app-recommendation strategy); verified by asserting the imported function objects are identical, not just behaviourally similar |
 | O6 — End-to-end cycle time | Full migration cycle < 20 minutes for ≤ 5 GB of files | **Achieved** — per-stage timing recorded in every pipeline run |
 
 ---
@@ -37,29 +37,32 @@ The following targets were defined at the start of the project and are now all a
 
 ### 3.1 Mode-policy enforcement (Qt / CLI parity)
 
-The central design decision is a **shared operations layer** — a single `OperationsController` class that both the Qt wizard and the CLI call for every operation. Mode-specific behaviour is defined once inside this class, not scattered across pages or commands.
+The Qt wizard and the CLI are two separate call paths into the same services — `OperationsController`/`AutomationCoordinator` on the Qt side, `cli.py`'s `scan` command on the CLI side. They were never going to share a single controller class (the CLI has no UI state, progress callbacks, or page lifecycle to coordinate), so the actual risk wasn't "two different controllers" — it was the three **mode-policy decisions** (does analysis run? do file recs run? does app-recommendation go online?) being re-implemented independently in both places, free to drift apart silently.
+
+The fix is a dedicated, dependency-free module — `src/orchestration/mode_policy.py` — that is the single source of truth for exactly those three decisions. Both call paths import and call the *same function objects* (verified directly: `Qt.resolve_app_recommendation_strategy is CLI.resolve_app_recommendation_strategy`, not just "produces the same output").
 
 ```
-Qt Wizard                CLI (python -m src.cli scan)
-     │                              │
-     └──────────┬───────────────────┘
-                ▼
-        OperationsController
-        ┌───────────────────────────────────┐
-        │  run_inventory()                  │
-        │  run_analysis()      mode policy  │
-        │  run_app_recommendations()  ──── ▶│ guided  → local strategy only
-        │  run_file_recommendations()       │ balanced → local + file recs
-        │  run_backup()                     │ expert   → online + Repology check
-        └───────────────────────────────────┘
-                │
-                ▼
-           Services Layer
-    (MigrationService, RecommendationService,
-     FileRecommendationService, RestoreService)
+Qt Wizard                              CLI (python -m src.cli scan)
+     │                                            │
+     ▼                                            ▼
+OperationsController / AutomationCoordinator   scan_command()
+     │                                            │
+     └──────────────────┬─────────────────────────┘
+                         ▼
+              src/orchestration/mode_policy.py
+        ┌─────────────────────────────────────────┐
+        │ should_run_analysis(mode)                │  guided   → False / False / local
+        │ should_run_file_recommendations(mode)     │  balanced → True  / True  / local
+        │ resolve_app_recommendation_strategy(mode)│  expert   → True  / True  / online
+        └─────────────────────────────────────────┘
+                         │
+                         ▼
+                   Services Layer
+        (MigrationService, RecommendationService,
+         FileRecommendationService, RestoreService)
 ```
 
-This guarantees that running `python -m src.cli scan --mode balanced` produces identical behaviour to clicking through the Qt wizard in balanced mode.
+This guarantees that running `python -m src.cli scan --mode balanced` applies the identical analysis/file-rec/strategy decisions as clicking through the Qt wizard in balanced mode — not because the two interfaces happen to agree today, but because changing the policy means changing one function that both already call.
 
 ### 3.2 Application mapping pipeline
 
@@ -107,18 +110,27 @@ The restore executes five stages in sequence, each with a defined success criter
 ### 4.1 Recommendation quality — Precision and Recall
 
 **Precision** = correct Linux packages suggested / total Linux packages suggested
+**Recall** = correct packages found / total correct packages in a ground-truth set
 
-Measured against a ground-truth set of 30 common Windows applications (browsers, office, media, development tools):
+**Methodology (defined, not yet executed):** build a ground-truth set of ~30 common
+Windows applications spanning browsers, office, media, and development tools, each
+with a manually verified correct Linux package. Run `resolve_mapping()` against it
+under each strategy — CSV exact match, fuzzy match, Repology-confirmed — and compute
+precision/recall directly from those results.
 
-| Mapping strategy | Precision | Notes |
+**Status:** no automated evaluation script exists yet. `test_recommendation_quality.py`
+verifies *behavior* (e.g. "fuzzy matching catches typos," "unknown apps are honestly
+flagged") but does not compute a precision/recall number against a labeled set. The
+figures below are pre-implementation **targets**, not measured results, and should
+not be cited as findings until the evaluation script above is built and run:
+
+| Mapping strategy | Target precision | Notes |
 |---|---|---|
-| CSV exact match | ~0.97 | Manually curated entries |
-| Fuzzy match (threshold ≥ 0.70) | ~0.82 | Validated against ground truth |
-| Repology-confirmed | ~0.91 | Package must exist in Mint/Ubuntu repos |
+| CSV exact match | ≥ 0.95 | Manually curated entries — high confidence by construction |
+| Fuzzy match (threshold ≥ 0.70) | ≥ 0.80 | Acceptable trade-off for typo/version tolerance |
+| Repology-confirmed | ≥ 0.90 | Package existence cross-checked, not just named |
 
-**Recall** = correct packages found / total correct packages in ground truth
-
-Current recall at fuzzy threshold 0.70: **~0.78** — 22% of apps have no mapped equivalent (e.g., highly Windows-specific software with no Linux alternative).
+Target recall at fuzzy threshold 0.70: **≥ 0.75**.
 
 ### 4.2 Automation level — User Interaction Count
 

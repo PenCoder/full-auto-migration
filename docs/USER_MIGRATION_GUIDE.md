@@ -18,6 +18,11 @@ This guide walks you through using the **Sovereignty Migration Platform** to saf
 4. Guide you through installing Linux Mint
 5. Restore your files and help you install your new Linux apps
 
+**What this tool does NOT move:**
+- Windows programs themselves — it installs the Linux versions instead
+- Passwords or browser history
+- Windows system settings
+
 ---
 
 ## Step 1: Choose Your Migration Mode
