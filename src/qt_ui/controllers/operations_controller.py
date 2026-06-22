@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from src.constants import RESTORE_REPORT
+from src.orchestration.mode_policy import resolve_app_recommendation_strategy
 from src.services.restore_service import RestoreService
 from src.services.validation_service import validate_restore_report
 
@@ -250,7 +251,7 @@ class OperationsController:
             inventory = run_inventory(deep_scan=False)
 
         software_inventory = inventory.get("software", {}) if isinstance(inventory, dict) else {}
-        strategy = "online" if ui_state.mode == "expert" else "local"
+        strategy = resolve_app_recommendation_strategy(ui_state.mode)
         selection_profile = ui_state.recommendation_strategy
 
         log_activity("recommendations", f"Generating {strategy} app recommendations ({selection_profile})...")

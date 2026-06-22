@@ -32,6 +32,11 @@ import typer
 
 from src.constants import BASE_DIR, DATA_DIR, RESTORE_DIR
 from src.loggers import get_logger
+from src.orchestration.mode_policy import (
+    resolve_app_recommendation_strategy,
+    should_run_analysis,
+    should_run_file_recommendations,
+)
 from src.config import load_default_config, load_config, MigrationConfigRoot
 from src.inventory.hardware import (
     collect_hardware_inventory,
@@ -254,13 +259,13 @@ def scan_command(
                 f"Invalid mode '{mode}'. Use one of: {sorted(valid_modes)}"
             )
 
-        # Apply mode-default strategy when not explicitly overridden — mirrors Qt behaviour.
+        # Apply mode-default strategy when not explicitly overridden — shared with the Qt wizard.
         if recommendations is None:
-            recommendations = {"guided": "local", "balanced": "local", "expert": "online"}[mode]
+            recommendations = resolve_app_recommendation_strategy(mode)
 
         # Analysis runs by default in balanced/expert; skip in guided unless forced.
         if include_analysis is None:
-            include_analysis = mode in {"balanced", "expert"}
+            include_analysis = should_run_analysis(mode)
 
         if recommendations not in valid_recommendations:
             raise typer.BadParameter(
@@ -333,8 +338,8 @@ def scan_command(
                 "markdown_path": rec_result.get("markdown_path", ""),
             }
 
-        # File recommendations run in balanced and expert modes (mirrors Qt AutomationCoordinator).
-        if mode in {"balanced", "expert"} and recommendations != "none":
+        # File recommendations run in balanced and expert modes — shared with the Qt wizard.
+        if should_run_file_recommendations(mode) and recommendations != "none":
             file_inventory = _build_file_inventory(cfg)
             choice_mode = "all_files"
             file_rec_result = FileRecommendationService().generate_recommendations(

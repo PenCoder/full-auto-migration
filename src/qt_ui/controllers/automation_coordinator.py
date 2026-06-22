@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
+from src.orchestration.mode_policy import should_run_analysis, should_run_file_recommendations
 from src.qt_ui.state import QtUiState
 
 
@@ -99,7 +100,7 @@ class AutomationCoordinator:
         timing["inventory_s"] = t
 
         # Step 2 – Analysis (balanced and expert only).
-        if mode in {"balanced", "expert"}:
+        if should_run_analysis(mode):
             _phase("Analysing system…")
             analysis, t = _timed(run_analysis)
             ui_state.analysis_completed = True
@@ -115,7 +116,7 @@ class AutomationCoordinator:
         timing["app_recommendations_s"] = t
 
         # Step 4 – File recommendations (balanced and expert only).
-        if mode in {"balanced", "expert"}:
+        if should_run_file_recommendations(mode):
             _phase("Selecting files…")
             file_recs, t = _timed(run_file_recommendations)
             result["file_recommendations"] = file_recs
