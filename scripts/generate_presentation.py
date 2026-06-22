@@ -4,6 +4,12 @@ One-shot content generator, not part of the app itself. Re-run after editing
 this file to regenerate the deck. Screenshots in docs/presentation/assets/
 are real renders of the actual app/report (see git history for how they
 were captured) — keep them in sync if the UI changes meaningfully.
+
+Built on the official school template (Template-L3.pptx, Uni Würzburg /
+Lehrstuhl für Kommunikationsnetze) — every slide uses that template's own
+slide layouts so the logo, footer, and slide numbers in the master are
+inherited automatically. Colors are the template's own theme accents, not
+an invented palette.
 """
 from __future__ import annotations
 
@@ -19,47 +25,119 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_LABEL_POSITION
 
 ASSETS = Path(__file__).resolve().parent.parent / "docs" / "presentation" / "assets"
 OUT_PATH = Path(__file__).resolve().parent.parent / "docs" / "presentation" / "Migration_Wizard_Praktikum_Presentation.pptx"
+TEMPLATE_PATH = Path(r"E:\School Stuff\Seminars\Mobile Computing\Presentation\Template-L3.pptx")
 
-NAVY = RGBColor(0x1B, 0x1E, 0x28)
-BLUE = RGBColor(0x3F, 0x6F, 0xE0)
-DARK_BLUE = RGBColor(0x1B, 0x3A, 0x86)
-LIGHT_BLUE_BG = RGBColor(0xDC, 0xE6, 0xFF)
-GREEN = RGBColor(0x1B, 0x5E, 0x20)
-GREEN_BG = RGBColor(0xE8, 0xF5, 0xE9)
-AMBER = RGBColor(0xE6, 0x51, 0x00)
-AMBER_BG = RGBColor(0xFF, 0xF3, 0xE0)
-RED = RGBColor(0xB7, 0x1C, 0x1C)
-GREY = RGBColor(0x54, 0x6E, 0x7A)
+# Official theme accents (ppt/theme/theme1.xml in the school template) — not invented.
+NAVY = RGBColor(0x1A, 0x1A, 0x1A)
+BLUE = RGBColor(0x06, 0x3D, 0x79)        # accent1
+DARK_BLUE = RGBColor(0x06, 0x3D, 0x79)   # accent1
+LIGHT_BLUE_BG = RGBColor(0xDC, 0xE6, 0xF0)
+GREEN = RGBColor(0x00, 0x84, 0x39)       # accent3
+GREEN_BG = RGBColor(0xE2, 0xF1, 0xE8)
+AMBER = RGBColor(0xB9, 0x70, 0x00)       # accent4
+AMBER_BG = RGBColor(0xF7, 0xEC, 0xDC)
+RED = RGBColor(0xB9, 0x27, 0x00)         # accent2
+RED_BG = RGBColor(0xF7, 0xE1, 0xDC)
+GREY = RGBColor(0x3F, 0x3F, 0x3F)        # accent6
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-BG = RGBColor(0xF7, 0xFB, 0xFE)
-LINE = RGBColor(0xC3, 0xD6, 0xE0)
+BG = WHITE
+LINE = RGBColor(0xD8, 0xDA, 0xDC)        # accent5
 
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
 
+# Layout indices in Template-L3.pptx's slide master.
+LAYOUT_TITLE = 0   # 'Titelfolie' — has CENTER_TITLE (idx 0) + SUBTITLE (idx 1) placeholders
+LAYOUT_BLANK = 7   # 'Leer' — blank canvas, inherits the master's logo/footer/slide-number chrome
+
 
 def new_presentation() -> Presentation:
-    prs = Presentation()
-    prs.slide_width = SLIDE_W
-    prs.slide_height = SLIDE_H
+    from pptx.oxml.ns import qn
+
+    prs = Presentation(str(TEMPLATE_PATH))
+    # The template ships with 2 sample slides (empty placeholders) — drop both,
+    # including their underlying parts (not just the slide-list reference), so
+    # add_slide() below doesn't collide with now-orphaned slide1.xml/slide2.xml
+    # part names when re-saving.
+    xml_slides = prs.slides._sldIdLst
+    for sld in list(xml_slides):
+        rId = sld.get(qn("r:id"))
+        prs.part.drop_rel(rId)
+        xml_slides.remove(sld)
+
+    # The master's footer has a literal "Name" text box (not a real
+    # placeholder) meant for the presenter to fill in by hand — set it once
+    # here so it applies to every slide instead of showing "Name" literally.
+    for shape in prs.slide_masters[0].shapes:
+        if shape.has_text_frame and shape.text_frame.text.strip() == "Name":
+            # Set the existing run's text directly rather than text_frame.text —
+            # the latter clears all runs and re-creates one with default
+            # formatting, losing the original (smaller, unbold) 10pt styling.
+            shape.text_frame.paragraphs[0].runs[0].text = "Japhet Kofi Appau Arthur"
+
     return prs
+
+
+def title_slide(prs, title, subtitle):
+    """Uses the template's own 'Titelfolie' layout — real banner, logo, watermark."""
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_TITLE])
+    slide.placeholders[0].text = title
+    slide.placeholders[1].text = subtitle
+    return slide
+
+
+LAYOUT_SECTION = 2  # 'Abschnittsüberschrift' — section-header layout (unused; kept for reference)
+
+SECTION_ORDER = ["Motivation", "Idea", "Method", "Evidence", "Critique", "Takeaway"]
+
+
+def section_divider(prs, section_name, description):
+    """A section-break slide with a 6-step progress tracker (Motivation → Idea →
+    Method → Evidence → Critique → Takeaway) so the audience always knows where
+    they are in the talk. Built on the 'Leer' blank layout rather than the
+    template's own section-header layout, so it stays visually consistent
+    (white background, same accent blue) with every content slide.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_BLANK])
+    add_text(slide, Inches(0.9), Inches(2.7), Inches(11.5), Inches(0.45), description, size=15, italic=True, color=GREY)
+    add_text(slide, Inches(0.9), Inches(3.1), Inches(11.5), Inches(1.1), section_name.upper(), size=48, bold=True, color=BLUE)
+    line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.9), Inches(4.15), Inches(1.3), Pt(4))
+    line.fill.solid()
+    line.fill.fore_color.rgb = BLUE
+    line.line.fill.background()
+    line.shadow.inherit = False
+
+    n = len(SECTION_ORDER)
+    slot = Inches(11.5) / n
+    idx_current = SECTION_ORDER.index(section_name)
+    for i, name in enumerate(SECTION_ORDER):
+        cx = Inches(0.9) + slot * i + slot / 2
+        active = i <= idx_current
+        d = Inches(0.22)
+        dot = slide.shapes.add_shape(MSO_SHAPE.OVAL, cx - d / 2, Inches(5.0), d, d)
+        dot.fill.solid()
+        dot.fill.fore_color.rgb = BLUE if active else WHITE
+        dot.line.color.rgb = BLUE if active else LINE
+        dot.line.width = Pt(1.25)
+        dot.shadow.inherit = False
+        add_text(slide, cx - slot / 2, Inches(5.35), slot, Inches(0.35), name,
+                  size=11, bold=(name == section_name), color=BLUE if name == section_name else GREY,
+                  align=PP_ALIGN.CENTER)
+    return slide
+
+
+def blank_slide(prs, fill=None):
+    """A content slide on the template's 'Leer' layout — inherits the master's
+    logo + slide-number footer automatically; no custom background needed.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_BLANK])
+    return slide
 
 
 def _send_to_back(slide, shape):
     spTree = slide.shapes._spTree
     spTree.remove(shape._element)
     spTree.insert(2, shape._element)
-
-
-def blank_slide(prs, fill=BG):
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, SLIDE_H)
-    bg.fill.solid()
-    bg.fill.fore_color.rgb = fill
-    bg.line.fill.background()
-    bg.shadow.inherit = False
-    _send_to_back(slide, bg)
-    return slide
 
 
 def add_text(slide, left, top, width, height, text, size=18, bold=False, color=NAVY,
@@ -156,6 +234,18 @@ def add_arrow(slide, x1, y1, x2, y2, color=BLUE, weight=2.25):
     top = min(y1, y2) - height / 2
     left = min(x1, x2)
     arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, left, top, width, height)
+    arrow.fill.solid()
+    arrow.fill.fore_color.rgb = color
+    arrow.line.fill.background()
+    arrow.shadow.inherit = False
+    return arrow
+
+
+def add_down_arrow(slide, cx, y1, y2, color=BLUE, width=Pt(14)):
+    """A vertical downward arrow autoshape, centered on cx, from y1 to y2."""
+    height = abs(y2 - y1)
+    left = cx - width / 2
+    arrow = slide.shapes.add_shape(MSO_SHAPE.DOWN_ARROW, left, min(y1, y2), width, height)
     arrow.fill.solid()
     arrow.fill.fore_color.rgb = color
     arrow.line.fill.background()
@@ -276,19 +366,55 @@ def build() -> Presentation:
     prs = new_presentation()
 
     # ── 1. Title ─────────────────────────────────────────────────────────────
-    s = blank_slide(prs, fill=NAVY)
-    add_icon_circle(s, Inches(2.3), Inches(1.5), Inches(1.0), "\U0001FA9F", fg=WHITE, bg=DARK_BLUE, size=36)  # window
-    add_text(s, Inches(2.85), Inches(1.05), Inches(0.9), Inches(0.9), "→", size=36, bold=True, color=BLUE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    add_icon_circle(s, Inches(4.0), Inches(1.5), Inches(1.0), "\U0001F427", fg=WHITE, bg=GREEN, size=36)  # penguin
-    add_text(s, Inches(0.7), Inches(2.4), Inches(11.5), Inches(1.3), "Migration Wizard", size=54, bold=True, color=WHITE)
-    add_text(s, Inches(0.7), Inches(3.55), Inches(11.5), Inches(0.9),
-              "Windows 11  →  Linux Mint, automated", size=22, color=LIGHT_BLUE_BG)
-    add_text(s, Inches(0.7), Inches(6.5), Inches(8), Inches(0.5),
-              "Japhet Kofi Appau Arthur  ·  Mobile Computing Seminar · Praktikum", size=15, color=RGBColor(0xAE, 0xC2, 0xE8))
+    title_slide(
+        prs,
+        "Migration Wizard — Windows 11 → Linux Mint, automated",
+        "Japhet Kofi Appau Arthur  ·  Mobile Computing Seminar · Praktikum",
+    )
 
-    # ── 1b. Building on prior work ────────────────────────────────────────────
+    # ── SECTION: Motivation ──────────────────────────────────────────────────────
+    section_divider(prs, "Motivation", "Why a migration tool is a digital sovereignty question, not just a convenience one")
+
+    # ── The premise, stated big (one idea, oversized pull-quote) ───────────────
     s = blank_slide(prs)
-    add_header(s, "Where this builds from", "Extending a term paper into a working tool")
+    add_text(s, Inches(0.6), Inches(0.3), Inches(11), Inches(0.35), "MOTIVATION", size=12, bold=True, color=BLUE)
+    add_text(s, Inches(0.9), Inches(1.6), Inches(11.5), Inches(1.8),
+              "“Meaningful control over digital infrastructure, data flows, and computational processes.”",
+              size=32, italic=True, color=GREY, line_spacing=1.15)
+    add_text(s, Inches(0.9), Inches(3.45), Inches(11.5), Inches(0.4), "— Floridi (2020); Pohle & Thiel (2020)", size=14, color=GREY)
+    add_text(s, Inches(0.9), Inches(4.6), Inches(11.5), Inches(1.4),
+              "Windows 11 cannot be fully audited or constrained — this project asks whether a migration tool can close that gap.",
+              size=26, bold=True, color=DARK_BLUE, line_spacing=1.15)
+
+    # ── Sovereignty: measured, not claimed ──────────────────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Motivation", "Sovereignty, measured — not claimed")
+    add_text(s, Inches(0.8), Inches(1.55), Inches(11.7), Inches(0.4),
+              "“Meaningful control over digital infrastructure, data flows, and computational processes” — Floridi (2020); Pohle & Thiel (2020)",
+              size=13, italic=True, color=GREY)
+    add_bar_chart(
+        s, Inches(0.6), Inches(2.05), Inches(6.0), Inches(3.9),
+        categories=["Rate open-source\ncritical", "Cite reducing\nUS-vendor dep.", "Still run\nWindows (EU)"],
+        series_name="%", values=[63.2, 47.4, 67.75], bar_color=DARK_BLUE,
+        title="The preference-behaviour gap (Wire/StatCounter 2025)",
+    )
+    add_bar_chart(
+        s, Inches(6.8), Inches(2.05), Inches(6.0), Inches(3.9),
+        categories=["Repology\n(opt-in)", "Telemetry", "Ads/\ntracking", "Remote\nanalytics"],
+        series_name="Outbound calls", values=[2, 0, 0, 0], bar_color=GREEN,
+        title="This codebase's network calls — counted, not claimed",
+    )
+    rule = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.8), Inches(6.2), Inches(0.05), Inches(0.6))
+    rule.fill.solid(); rule.fill.fore_color.rgb = GREEN; rule.line.fill.background(); rule.shadow.inherit = False
+    add_text(s, Inches(1.05), Inches(6.3), Inches(11.4), Inches(0.55),
+              "sovereignty_score = integrity_score + openness_bonus  —  every restore reports one", size=15, bold=True, color=GREEN)
+
+    # ── SECTION: Idea ─────────────────────────────────────────────────────────────
+    section_divider(prs, "Idea", "Extend an existing semi-automated tool into one with measured automation, not just more of it")
+
+    # ── Building on prior work ──────────────────────────────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Idea", "Extending a term paper into a working tool")
     add_card(s, Inches(0.8), Inches(1.85), Inches(11.7), Inches(1.5), fill=WHITE)
     add_text(s, Inches(1.1), Inches(2.0), Inches(11.1), Inches(0.5), "TERM PAPER", size=12.5, bold=True, color=BLUE)
     add_text(s, Inches(1.1), Inches(2.35), Inches(11.1), Inches(0.55),
@@ -299,468 +425,376 @@ def build() -> Presentation:
     add_text(s, Inches(0.8), Inches(4.0), Inches(11.7), Inches(0.85),
               "How can semi-automated migration frameworks reduce technical barriers to OS-level\nsovereignty restoration while maintaining user control, data integrity, and workflow continuity?",
               size=16, color=NAVY, line_spacing=1.25)
-    add_card(s, Inches(0.8), Inches(5.05), Inches(11.7), Inches(1.6), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(1.1), Inches(5.25), Inches(11.1), Inches(0.4), "WHAT IT BUILT — AND STATED AS LIMITATIONS", size=13, bold=True, color=AMBER)
-    add_text(s, Inches(1.1), Inches(5.6), Inches(11.1), Inches(0.9),
-              "A working 5-phase pipeline (Assess → Review → Prepare → Migrate → Verify) — but compatibility\nmapping was “heuristic... not guaranteeing feature parity,” with “enhanced compatibility detection” named as future work.",
-              size=14.5, color=NAVY, line_spacing=1.25)
+    rule = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.8), Inches(5.1), Inches(0.05), Inches(1.65))
+    rule.fill.solid(); rule.fill.fore_color.rgb = AMBER; rule.line.fill.background(); rule.shadow.inherit = False
+    add_text(s, Inches(1.1), Inches(5.1), Inches(11.3), Inches(0.4), "WHAT IT BUILT — AND STATED AS LIMITATIONS", size=13, bold=True, color=AMBER)
+    add_text(s, Inches(1.1), Inches(5.45), Inches(11.3), Inches(0.4),
+              "A working 5-phase pipeline (Assess → Review → Prepare → Migrate → Verify).",
+              size=14, color=GREY)
+    add_text(s, Inches(1.1), Inches(5.9), Inches(11.3), Inches(0.8),
+              "“…heuristic matching… not guaranteeing feature parity.”",
+              size=21, italic=True, bold=True, color=NAVY, line_spacing=1.1)
 
-    # ── 2. Motivation ─────────────────────────────────────────────────────────
+    # ── The proof of concept, inspected directly ────────────────────────────────
     s = blank_slide(prs)
-    add_header(s, "Motivation", "Three things to move. Zero tools that move all three.")
-    icon_label_row(s, [
-        ("\U0001F4C1", "Files", "Documents, photos,\nmusic, ..."),
-        ("\U0001F5A5", "Apps", "Find the right\nLinux equivalent"),
-        ("⚙", "Settings", "Wallpaper, theme,\nshortcuts"),
-    ], top=Inches(2.0), bg=BLUE)
-    add_card(s, Inches(1.5), Inches(4.5), Inches(10.3), Inches(1.6), fill=WHITE)
-    add_text(s, Inches(1.5), Inches(4.75), Inches(10.3), Inches(1.1),
-              "Doing this by hand means researching dozens of app equivalents,\nmanually copying files, and rebuilding your desktop from scratch.",
-              size=18, color=NAVY, align=PP_ALIGN.CENTER, line_spacing=1.3)
-
-    # ── 2b. Digital Sovereignty ────────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Why it matters", "This is a digital sovereignty problem")
-    add_text(s, Inches(0.9), Inches(1.85), Inches(11.0), Inches(0.9),
-              "“The capacity to exercise meaningful control over digital infrastructure, data flows,\nand computational processes” — autonomy, control, transparency.",
-              size=17, color=NAVY, line_spacing=1.3)
-    add_text(s, Inches(0.9), Inches(2.55), Inches(11.0), Inches(0.35),
-              "Floridi (2020); Pohle & Thiel (2020); Roberts et al. (2021)", size=12.5, italic=True, color=GREY)
-    pairs = [
-        ("\U0001F510", "Closed → Open", "Proprietary OS/apps → an\nopen-source stack you control"),
-        ("☁", "Cloud-tied → Local-first", "Files stay on your machine,\nnot a vendor's cloud"),
-        ("\U0001F517", "Locked-in → Portable", "MIT-licensed tool; your data\nleaves in standard formats"),
+    add_header(s, "Idea", "The proof of concept this project actually started from")
+    add_text(s, Inches(0.8), Inches(1.8), Inches(11.7), Inches(0.4),
+              "github.com/PenCoder/semi-auto-migration — cloned and inspected directly, not paraphrased from the term paper",
+              size=13, italic=True, color=GREY)
+    items = [
+        ("\U0001F5A5", "Tkinter GUI", "no Qt, no CLI parity\nclaim made"),
+        ("\U0001F4CB", "25 mappings", "substring match\nonly, 1 stage"),
+        ("\U0001F9EA", "0 tests", "no automated\nregression coverage"),
+        ("\U0001F427", "Linux-only", "packaging; one\n22.5MB binary"),
     ]
-    icon_label_row(s, pairs, top=Inches(2.95), circle_d=Inches(1.0), icon_size=28, label_size=15, sub_size=13, bg=DARK_BLUE)
-    add_card(s, Inches(1.5), Inches(5.4), Inches(10.3), Inches(1.3), fill=GREEN_BG, line_color=GREEN_BG)
-    add_text(s, Inches(1.8), Inches(5.6), Inches(9.7), Inches(0.5), "MEASURED, NOT JUST CLAIMED", size=13, bold=True, color=GREEN)
-    add_text(s, Inches(1.8), Inches(5.95), Inches(9.7), Inches(0.6),
-              "sovereignty_score = integrity_score + openness_bonus  — every restore reports one",
-              size=15, color=NAVY)
+    icon_label_row(s, items, top=Inches(2.4), circle_d=Inches(1.0), icon_size=26, label_size=15, sub_size=12.5, bg=AMBER)
+    rule = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.8), Inches(4.75), Inches(0.05), Inches(1.3))
+    rule.fill.solid(); rule.fill.fore_color.rgb = AMBER; rule.line.fill.background(); rule.shadow.inherit = False
+    add_text(s, Inches(1.05), Inches(4.75), Inches(11.4), Inches(0.4), "INHERITED DEFECT, FOUND AND FIXED THIS SESSION", size=12.5, bold=True, color=AMBER)
+    add_text(s, Inches(1.05), Inches(5.1), Inches(11.4), Inches(0.8),
+              "The proof of concept's apt-get install is one atomic batch call — no per-package fallback, no timeout,\nfailures silently logged and ignored. Same defect existed here until this session's fix.",
+              size=13.5, color=NAVY, line_spacing=1.2)
 
-    # ── 2c. Preference-behavior gap ─────────────────────────────────────────────
+    # ── Three modes (funnel: decreasing automation, increasing control) ────────
     s = blank_slide(prs)
-    add_header(s, "Why it matters", "Europeans want sovereignty, but don't have it yet")
-    add_bar_chart(
-        s, Inches(0.8), Inches(1.9), Inches(7.6), Inches(4.4),
-        categories=["Rate open-source\ncritical for\nsovereignty", "Cite reducing\nUS-vendor\ndependency", "Still run\nWindows in\nEurope"],
-        series_name="Share of respondents / market",
-        values=[63.2, 47.4, 67.75],
-        bar_color=DARK_BLUE,
-        title=None,
-    )
-    add_card(s, Inches(8.7), Inches(1.95), Inches(3.8), Inches(4.3), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(9.0), Inches(2.15), Inches(3.2), Inches(0.4), "THE GAP", size=13, bold=True, color=AMBER)
-    add_text(s, Inches(9.0), Inches(2.55), Inches(3.2), Inches(2.0),
-              "Stated preference for\nsovereignty far exceeds\nactual behavior — the gap\nis migration barriers,\nnot lack of will.",
-              size=14.5, color=NAVY, line_spacing=1.3)
-    add_text(s, Inches(0.8), Inches(6.5), Inches(11.5), Inches(0.5),
-              "Wire, State of Digital Sovereignty in Europe (2025) · StatCounter, Desktop OS Market Share Europe (2025)",
-              size=12, italic=True, color=GREY)
-
-    # ── 2d. Telemetry & Big Tech ───────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "What users are escaping", "Telemetry is the concrete problem")
-    add_text(s, Inches(0.9), Inches(1.8), Inches(11.4), Inches(0.6),
-              "“Windows 11 integrates mandatory telemetry that cannot be fully disabled... users must trust\nvendor claims without ability to verify or constrain collection practices.”",
-              size=15.5, color=NAVY, line_spacing=1.25, italic=True)
-    add_card(s, Inches(0.7), Inches(2.6), Inches(5.7), Inches(3.9), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(1.0), Inches(2.8), Inches(5.1), Inches(0.4), "TYPICAL BIG TECH DEFAULT", size=13, bold=True, color=AMBER)
-    typical = ["Diagnostic data sent by default", "Advertising ID per device", "Account + cloud sign-in required",
-               "Telemetry scope set by the vendor", "Closed-source OS internals"]
-    y = Inches(3.3)
-    for t in typical:
-        add_text(s, Inches(1.0), y, Inches(5.1), Inches(0.5), "•  " + t, size=14.5, color=NAVY)
-        y += Inches(0.62)
-    add_card(s, Inches(6.7), Inches(2.6), Inches(5.9), Inches(3.9), fill=GREEN_BG, line_color=GREEN_BG)
-    add_text(s, Inches(7.0), Inches(2.8), Inches(5.3), Inches(0.35), "THIS CODEBASE'S NETWORK CALLS", size=12.5, bold=True, color=GREEN)
-    add_text(s, Inches(7.0), Inches(3.1), Inches(5.3), Inches(0.4), "counted directly in source, not claimed", size=11.5, italic=True, color=GREY)
-    add_bar_chart(
-        s, Inches(6.9), Inches(3.5), Inches(5.5), Inches(2.85),
-        categories=["Repology\n(opt-in, Expert\nmode only)", "Telemetry", "Ads /\ntracking", "Remote\nanalytics"],
-        series_name="Outbound call sites",
-        values=[2, 0, 0, 0],
-        bar_color=GREEN,
-    )
-
-    # ── 3. Approach ──────────────────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Approach", "One guided pipeline, two machines")
-    add_card(s, Inches(0.6), Inches(1.9), Inches(5.0), Inches(1.6), fill=GREEN_BG, line_color=GREEN_BG)
-    add_icon_circle(s, Inches(1.25), Inches(2.7), Inches(0.8), "1", fg=WHITE, bg=GREEN, size=22)
-    add_text(s, Inches(1.85), Inches(2.15), Inches(3.6), Inches(0.5), "Prepare (Windows)", size=17, bold=True, color=NAVY)
-    add_text(s, Inches(1.85), Inches(2.6), Inches(3.6), Inches(0.8), "Scan → map apps → pack a bundle", size=14, color=GREY)
-    add_text(s, Inches(5.9), Inches(2.55), Inches(0.7), Inches(0.7), "→", size=30, bold=True, color=BLUE, align=PP_ALIGN.CENTER)
-    add_card(s, Inches(6.7), Inches(1.9), Inches(5.0), Inches(1.6), fill=LIGHT_BLUE_BG, line_color=LIGHT_BLUE_BG)
-    add_icon_circle(s, Inches(7.35), Inches(2.7), Inches(0.8), "2", fg=WHITE, bg=DARK_BLUE, size=22)
-    add_text(s, Inches(7.95), Inches(2.15), Inches(3.6), Inches(0.5), "Restore (Linux Mint)", size=17, bold=True, color=NAVY)
-    add_text(s, Inches(7.95), Inches(2.6), Inches(3.6), Inches(0.8), "Unzip → restore → verify → report", size=14, color=GREY)
-    pic, w, h = add_picture_framed(s, ASSETS / "mode_page.png", Inches(2.9), Inches(3.85), Inches(7.5), Inches(3.3))
-    add_text(s, Inches(0.6), Inches(3.95), Inches(2.1), Inches(1.0),
-              "Same destination,\nyour choice of how\nmuch help along\nthe way →", size=14, italic=True, color=GREY, line_spacing=1.2)
-
-    # ── 4. Architecture ───────────────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Architecture", "Clean layers, thin Qt window")
-    layers = [
-        ("inventory/", "collect", GREEN_BG, GREEN),
-        ("analysis/", "match", LIGHT_BLUE_BG, DARK_BLUE),
-        ("services/", "orchestrate", AMBER_BG, AMBER),
-        ("qt_ui/", "present (MVC)", LIGHT_BLUE_BG, DARK_BLUE),
+    add_header(s, "Idea", "Same pipeline, three levels of control")
+    bands = [
+        ("Guided", GREEN, "Zero decisions after mode pick", 6.5),
+        ("Balanced", DARK_BLUE, "+ file type selection", 4.7),
+        ("Expert", AMBER, "+ overrides + online verification", 2.9),
     ]
-    x = Inches(0.9)
-    w = Inches(2.75)
-    for i, (name, verb, bg, fg) in enumerate(layers):
-        add_card(s, x, Inches(2.4), w, Inches(1.5), fill=bg, line_color=bg)
-        add_text(s, x, Inches(2.62), w, Inches(0.5), name, size=18, bold=True, color=fg, align=PP_ALIGN.CENTER)
-        add_text(s, x, Inches(3.15), w, Inches(0.5), verb, size=13, color=GREY, align=PP_ALIGN.CENTER, italic=True)
+    cx = Inches(4.3)
+    y = Inches(2.0)
+    band_h = Inches(1.15)
+    gap = Inches(0.12)
+    for label, color, sub, w_in in bands:
+        w = Inches(w_in)
+        shp = s.shapes.add_shape(MSO_SHAPE.TRAPEZOID, cx - w / 2, y, w, band_h)
+        shp.fill.solid(); shp.fill.fore_color.rgb = color; shp.line.fill.background(); shp.shadow.inherit = False
+        tf = shp.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        run = p.add_run()
+        run.text = label
+        run.font.size = Pt(17)
+        run.font.bold = True
+        run.font.color.rgb = WHITE
+        add_text(s, Inches(7.3), y + Inches(0.32), Inches(5.3), Inches(0.55), sub, size=13.5, color=NAVY)
+        y += band_h + gap
+    add_text(s, Inches(0.9), Inches(5.85), Inches(11.5), Inches(0.4),
+              "Decreasing automation, increasing manual control, top to bottom.", size=13, italic=True, color=GREY)
+    rule = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.9), Inches(6.35), Inches(0.05), Inches(0.4))
+    rule.fill.solid(); rule.fill.fore_color.rgb = AMBER; rule.line.fill.background(); rule.shadow.inherit = False
+    add_text(s, Inches(1.15), Inches(6.35), Inches(11.2), Inches(0.4),
+              "Only Expert mode touches the network — only to verify a package already chosen, never to find it.",
+              size=13, color=NAVY)
+
+    # ── SECTION: Method ───────────────────────────────────────────────────────────
+    section_divider(prs, "Method", "How automation was built, measured, and managed as a project")
+
+    # ── 4. Approach + Architecture ──────────────────────────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Method", "Two machines, four clean layers")
+    rule1 = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.6), Inches(1.9), Inches(0.05), Inches(1.0))
+    rule1.fill.solid(); rule1.fill.fore_color.rgb = GREEN; rule1.line.fill.background(); rule1.shadow.inherit = False
+    add_text(s, Inches(0.85), Inches(1.9), Inches(5.1), Inches(0.4), "1 — Prepare (Windows)", size=15, bold=True, color=NAVY)
+    add_text(s, Inches(0.85), Inches(2.35), Inches(5.1), Inches(0.55), "Scan → map apps → pack a bundle", size=13.5, color=GREY)
+    rule2 = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(6.6), Inches(1.9), Inches(0.05), Inches(1.0))
+    rule2.fill.solid(); rule2.fill.fore_color.rgb = DARK_BLUE; rule2.line.fill.background(); rule2.shadow.inherit = False
+    add_text(s, Inches(6.85), Inches(1.9), Inches(5.5), Inches(0.4), "2 — Restore (Linux Mint)", size=15, bold=True, color=NAVY)
+    add_text(s, Inches(6.85), Inches(2.35), Inches(5.5), Inches(0.55), "Unzip → restore → verify → report", size=13.5, color=GREY)
+    layers = [("inventory/", GREEN_BG, GREEN), ("analysis/", LIGHT_BLUE_BG, DARK_BLUE),
+              ("services/", AMBER_BG, AMBER), ("qt_ui/ + cli", LIGHT_BLUE_BG, DARK_BLUE)]
+    x = Inches(0.7)
+    w = Inches(2.85)
+    for i, (name, bg, fg) in enumerate(layers):
+        add_card(s, x, Inches(3.7), w, Inches(1.1), fill=bg, line_color=bg)
+        add_text(s, x, Inches(4.05), w, Inches(0.4), name, size=15, bold=True, color=fg, align=PP_ALIGN.CENTER)
         if i < len(layers) - 1:
-            add_arrow(s, x + w, Inches(3.15), x + w + Inches(0.3), Inches(3.15), color=BLUE)
-        x += w + Inches(0.3)
-    add_text(s, Inches(0.9), Inches(4.4), Inches(11.5), Inches(0.5),
-              "Qt window only wires pages to controllers — Automation / Navigation / Mode / Operations", size=15, color=GREY, align=PP_ALIGN.CENTER)
-    add_card(s, Inches(2.0), Inches(5.1), Inches(9.3), Inches(1.4), fill=WHITE)
-    add_text(s, Inches(2.3), Inches(5.3), Inches(8.7), Inches(1.0),
-              "Pages (view)  ↔  Controllers  ↔  Services\n\"thin window, real logic lives below it\"",
-              size=15, color=NAVY, align=PP_ALIGN.CENTER, line_spacing=1.4)
+            add_arrow(s, x + w, Inches(4.25), x + w + Inches(0.25), Inches(4.25), color=BLUE)
+        x += w + Inches(0.25)
+    add_card(s, Inches(1.4), Inches(5.15), Inches(10.5), Inches(1.6), fill=WHITE)
+    add_text(s, Inches(1.7), Inches(5.35), Inches(9.9), Inches(0.4), "17,467 LOC (src) · 3,595 LOC (tests) · 89 files · MIT licensed", size=14, bold=True, color=DARK_BLUE)
+    add_text(s, Inches(1.7), Inches(5.78), Inches(9.9), Inches(0.85),
+              "Pages ↔ Controllers ↔ Services — Qt window only wires up controllers; CLI calls the\nsame services directly. Iterative work packages (WP1–WP7) plus a 6-day risk buffer before this presentation.",
+              size=13, color=GREY, line_spacing=1.2)
 
-    # ── 4b. Software development practices ────────────────────────────────────
+    # ── Mode policy: one shared decision, two call paths ───────────────────────
     s = blank_slide(prs)
-    add_header(s, "How it was built", "Software engineering, not just a script")
-    practices = [
-        ("\U0001F501", "Iterative work packages", "WP1–WP7, each with its\nown deliverable"),
-        ("\U0001F9EA", "Test-first regression", "184 tests gate every\nbehavioural change"),
-        ("\U0001F5A5", "Live VM validation", "Windows + Linux Mint VM,\nnot just CI"),
-        ("\U0001F4E6", "Version control", "Git, small reviewable\ncommits per fix"),
+    add_header(s, "Method", "One shared decision module, two call paths")
+    col_w = Inches(5.65)
+    col_gap = Inches(0.3)
+    left_x = Inches(0.6)
+    right_x = left_x + col_w + col_gap
+    add_card(s, left_x, Inches(1.6), col_w, Inches(0.5), fill=LIGHT_BLUE_BG, line_color=LIGHT_BLUE_BG)
+    add_text(s, left_x, Inches(1.72), col_w, Inches(0.3), "Qt Wizard", size=14, bold=True, color=DARK_BLUE, align=PP_ALIGN.CENTER)
+    add_card(s, right_x, Inches(1.6), col_w, Inches(0.5), fill=LIGHT_BLUE_BG, line_color=LIGHT_BLUE_BG)
+    add_text(s, right_x, Inches(1.72), col_w, Inches(0.3), "CLI — python -m src.cli scan", size=14, bold=True, color=DARK_BLUE, align=PP_ALIGN.CENTER)
+    add_card(s, left_x, Inches(2.25), col_w, Inches(0.5), fill=WHITE, line_color=LINE)
+    add_text(s, left_x, Inches(2.37), col_w, Inches(0.3), "OperationsController / AutomationCoordinator", size=12, color=NAVY, align=PP_ALIGN.CENTER)
+    add_card(s, right_x, Inches(2.25), col_w, Inches(0.5), fill=WHITE, line_color=LINE)
+    add_text(s, right_x, Inches(2.37), col_w, Inches(0.3), "scan_command()", size=12, color=NAVY, align=PP_ALIGN.CENTER)
+    add_down_arrow(s, left_x + col_w / 2, Inches(2.78), Inches(3.18))
+    add_down_arrow(s, right_x + col_w / 2, Inches(2.78), Inches(3.18))
+    add_card(s, left_x, Inches(3.22), col_w * 2 + col_gap, Inches(1.45), fill=AMBER_BG, line_color=AMBER_BG)
+    add_text(s, left_x + Inches(0.3), Inches(3.32), col_w * 2, Inches(0.35), "src/orchestration/mode_policy.py", size=14, bold=True, color=AMBER)
+    fns = [
+        "should_run_analysis(mode)",
+        "should_run_file_recommendations(mode)",
+        "resolve_app_recommendation_strategy(mode)",
     ]
-    icon_label_row(s, practices, top=Inches(2.1), circle_d=Inches(1.1), icon_size=30, label_size=15, sub_size=12.5, bg=AMBER)
-    add_card(s, Inches(1.2), Inches(4.7), Inches(10.9), Inches(1.6), fill=WHITE)
-    add_text(s, Inches(1.5), Inches(4.9), Inches(10.3), Inches(0.4), "17,426 LOC (src) · 3,595 LOC (tests) · 88 Python files · MIT licensed", size=14, bold=True, color=DARK_BLUE)
-    add_text(s, Inches(1.5), Inches(5.35), Inches(10.3), Inches(0.85),
-              "This session alone: 4 real bugs found and fixed via live VM testing,\na full undo/reset feature added, and cross-platform packaging wired up.",
-              size=14, color=GREY, line_spacing=1.25)
+    for i, fn in enumerate(fns):
+        add_text(s, left_x + Inches(0.5), Inches(3.7) + Inches(0.32) * i, col_w * 2, Inches(0.32), "•  " + fn, size=12.5, color=NAVY)
+    add_down_arrow(s, Inches(6.7), Inches(4.7), Inches(5.1))
+    add_card(s, left_x, Inches(5.15), col_w * 2 + col_gap, Inches(0.55), fill=GREEN_BG, line_color=GREEN_BG)
+    add_text(s, left_x, Inches(5.27), col_w * 2 + col_gap, Inches(0.32),
+              "Services Layer — MigrationService · RecommendationService · FileRecommendationService · RestoreService",
+              size=12, color=NAVY, align=PP_ALIGN.CENTER)
+    add_text(s, Inches(0.6), Inches(5.95), Inches(12.1), Inches(0.55),
+              "Verified by identity, not output: Qt.resolve_app_recommendation_strategy is CLI.resolve_app_recommendation_strategy — both call paths hold the same function object, so a policy change can't silently apply to only one interface.",
+              size=13, italic=True, color=GREY, line_spacing=1.2)
 
-    # ── 5. Three modes ────────────────────────────────────────────────────────
+    # ── 6. Recommendation engine + the fix it delivers ─────────────────────────
     s = blank_slide(prs)
-    add_header(s, "User experience", "Same pipeline, three levels of control")
-    modes = [
-        ("Guided", "\U0001F7E2", GREEN, GREEN_BG, "Zero decisions\nafter mode pick"),
-        ("Balanced", "\U0001F535", DARK_BLUE, LIGHT_BLUE_BG, "+ file type\nselection"),
-        ("Expert", "\U0001F7E0", AMBER, AMBER_BG, "+ overrides +\nonline verification"),
-    ]
-    x = Inches(0.9)
-    w = Inches(3.6)
-    for label, glyph, fg, bg, sub in modes:
-        add_card(s, x, Inches(2.0), w, Inches(3.4), fill=WHITE)
-        add_icon_circle(s, x + w / 2, Inches(2.65), Inches(0.9), glyph, fg=WHITE, bg=fg, size=24)
-        add_text(s, x, Inches(3.25), w, Inches(0.5), label, size=20, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
-        add_text(s, x + Inches(0.3), Inches(3.8), w - Inches(0.6), Inches(1.4), sub, size=15, color=GREY,
-                  align=PP_ALIGN.CENTER, line_spacing=1.3)
-        x += w + Inches(0.2)
-    add_card(s, Inches(0.9), Inches(5.65), Inches(11.5), Inches(0.95), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(1.15), Inches(5.83), Inches(11.0), Inches(0.6),
-              "Only Expert mode ever touches the network — and only to verify a package\nthat's already been chosen, never to find it.",
-              size=14, color=NAVY, line_spacing=1.2)
-
-    # ── 6. Recommendation engine ───────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Core logic", "Windows app → Linux package, in 4 steps")
+    add_header(s, "Method", "Windows app → Linux package — and a named gap, closed")
     steps = [
-        ("\U0001F4CB", "CSV mapping", "238 curated entries"),
-        ("\U0001F50D", "Fuzzy match", "handles version numbers"),
-        ("\U0001F6E1", "Confidence floor", "never downgrades a\ncurated match"),
-        ("\U0001F310", "Repology check", "Expert mode only"),
+        ("\U0001F4CB", "CSV mapping (238)", ""),
+        ("\U0001F50D", "Fuzzy match", ""),
+        ("\U0001F6E1", "Confidence floor", ""),
+        ("\U0001F310", "Repology check", ""),
     ]
-    icon_label_row(s, steps, top=Inches(2.1), circle_d=Inches(1.1), icon_size=32, label_size=16, sub_size=13, bg=DARK_BLUE)
+    icon_label_row(s, steps, top=Inches(1.8), circle_d=Inches(0.9), icon_size=26, label_size=14.5, sub_size=12, bg=DARK_BLUE)
     for i in range(len(steps) - 1):
         slot = Inches(11.5) / len(steps)
         cx = Inches(0.9) + slot * i + slot
-        add_arrow(s, cx - Inches(0.35), Inches(2.65), cx + Inches(0.05), Inches(2.65), color=BLUE, weight=2.5)
-    pic, w, h = add_picture_framed(s, ASSETS / "review_page.png", Inches(3.9), Inches(4.55), Inches(5.6), Inches(2.3),
-                                     caption="Real app screen — Review & Confirm")
-
-    # ── 6b. From stated limitation to contribution ─────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Closing a named gap", "This is the term paper's own future work, built")
-    add_card(s, Inches(0.7), Inches(1.85), Inches(11.7), Inches(1.9), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(1.0), Inches(2.05), Inches(11.1), Inches(0.4), "THE ORIGINAL PAPER SAID", size=13, bold=True, color=AMBER)
-    add_text(s, Inches(1.0), Inches(2.45), Inches(11.1), Inches(0.55),
-              "“Compatibility mapping relies on heuristic matching... not guaranteeing feature parity.”", size=16, italic=True, color=NAVY)
-    add_text(s, Inches(1.0), Inches(3.05), Inches(11.1), Inches(0.55),
-              "Future work named: “moving beyond hard-coded mappings... feature-based matching.”", size=16, italic=True, color=NAVY)
-    add_arrow(s, Inches(6.0), Inches(3.95), Inches(6.0), Inches(4.25), color=GREEN, weight=3)
-    add_card(s, Inches(0.7), Inches(4.35), Inches(11.7), Inches(2.2), fill=GREEN_BG, line_color=GREEN_BG)
-    add_text(s, Inches(1.0), Inches(4.55), Inches(11.1), Inches(0.4), "THIS PRAKTIKUM DELIVERS", size=13, bold=True, color=GREEN)
+        add_arrow(s, cx - Inches(0.3), Inches(2.32), cx + Inches(0.05), Inches(2.32), color=BLUE, weight=2)
+    rule = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.7), Inches(3.6), Inches(0.05), Inches(0.7))
+    rule.fill.solid(); rule.fill.fore_color.rgb = AMBER; rule.line.fill.background(); rule.shadow.inherit = False
+    add_text(s, Inches(0.95), Inches(3.65), Inches(11.4), Inches(0.65),
+              "Term paper: “Compatibility mapping relies on heuristic matching... not guaranteeing feature parity.”",
+              size=14, italic=True, color=NAVY)
+    add_text(s, Inches(0.7), Inches(4.55), Inches(6.0), Inches(0.4), "WHAT THIS PROJECT FIXED", size=13, bold=True, color=BLUE)
     deliv = ["Fuzzy matching (SequenceMatcher) replaces exact-string-only lookup",
              "Confidence floors stop the algorithm silently downgrading curated matches",
              "Live Repology verification — package existence checked, not assumed"]
-    y = Inches(4.95)
-    for d in deliv:
-        add_text(s, Inches(1.0), y, Inches(11.1), Inches(0.45), "✅  " + d, size=15, color=NAVY)
-        y += Inches(0.48)
+    y = Inches(5.0)
+    for i, d in enumerate(deliv):
+        add_text(s, Inches(0.7), y, Inches(0.5), Inches(0.5), f"{i+1}", size=18, bold=True, color=GREEN)
+        add_text(s, Inches(1.2), y + Inches(0.03), Inches(11.0), Inches(0.45), d, size=14, color=NAVY)
+        y += Inches(0.55)
 
-    # ── 7. Windows-side workflow ───────────────────────────────────────────────
+    # ── Objectives (PM) ──────────────────────────────────────────────────────────
     s = blank_slide(prs)
-    add_header(s, "Workflow — Windows side", "7 guided steps from scan to bundle")
-    win_steps = ["Welcome", "Mode", "Scan +\nApp Match", "Settings", "Files", "Review", "Bundle"]
+    add_header(s, "Method", "Measurable objectives, defined at project start")
+    rows = [
+        ["Objective", "Target", "Result"],
+        ["O1 — Manual steps", "≤ 3 in guided mode", "3"],
+        ["O2 — App coverage", "≥ 80% of top-50", "238 entries"],
+        ["O3 — File integrity", "≥ 95% pass SHA-256", "100%"],
+        ["O4 — Sovereignty Score", "≥ 85%", "Scored every run"],
+        ["O5 — Qt/CLI parity", "Identical policy, both interfaces", "One shared module"],
+        ["O6 — Cycle time", "< 20 min for ≤ 5GB", "Timed every run — see Critique"],
+    ]
+    table = fill_table(s, Inches(0.6), Inches(2.0), Inches(12.1), Inches(4.0), rows)
+    table.columns[0].width = Inches(3.4)
+    table.columns[1].width = Inches(4.4)
+    table.columns[2].width = Inches(4.3)
+    set_table_style(table, body_size=14, header_size=14)
+
+    # ── Work breakdown & risk (PM) ───────────────────────────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Method", "Work breakdown & risk")
+    add_text(s, Inches(0.7), Inches(1.75), Inches(6.0), Inches(0.4), "7 WORK PACKAGES + 6-DAY RISK BUFFER", size=14, bold=True, color=BLUE)
+    add_text(s, Inches(6.4), Inches(1.77), Inches(5.7), Inches(0.36),
+              "Open risk: no physical-hardware E2E test — VM pair only", size=12, italic=True, color=AMBER, align=PP_ALIGN.RIGHT)
+    add_picture_framed(s, ASSETS / "gantt_chart.png", Inches(0.6), Inches(2.35), Inches(12.1), Inches(3.6), border=False)
+
+    # ── SECTION: Evidence ─────────────────────────────────────────────────────────
+    section_divider(prs, "Evidence", "What actually ran, what actually broke, and what the numbers say")
+
+    # ── Quantified improvement over the proof of concept ────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Evidence", "Quantified improvement over the proof of concept")
+    rows = [
+        ["Aspect", "Proof of concept", "This project", "Change"],
+        ["App mappings", "25", "238", "9.5×"],
+        ["Source LOC", "4,031", "17,467", "4.3×"],
+        ["Automated tests", "0", "192", "0 → 192"],
+        ["GUI framework", "Tkinter", "Qt (PySide6)", "rewritten"],
+        ["App-matching stages", "1 (substring)", "3 (fuzzy + confidence + online)", "1 → 3"],
+        ["Platforms packaged", "1 (Linux)", "2 (Win + Linux, auto-embed)", "1 → 2"],
+    ]
+    table = fill_table(s, Inches(0.6), Inches(1.8), Inches(12.1), Inches(3.3), rows)
+    table.columns[0].width = Inches(2.6)
+    table.columns[1].width = Inches(2.8)
+    table.columns[2].width = Inches(4.4)
+    table.columns[3].width = Inches(2.3)
+    add_text(s, Inches(0.6), Inches(5.35), Inches(12.1), Inches(0.45),
+              "New capabilities with no proof-of-concept equivalent: settings/wallpaper migration, desktop shortcuts, full reset/undo, completeness scoring.",
+              size=13.5, color=NAVY)
+    add_text(s, Inches(0.6), Inches(5.85), Inches(12.1), Inches(0.5),
+              "github.com/PenCoder/semi-auto-migration — cloned and inspected directly for this comparison.",
+              size=12.5, italic=True, color=GREY)
+
+    # ── 7. Workflow — Windows + Linux ───────────────────────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Evidence", "7 guided steps, then 1 click")
+    win_steps = ["Welcome", "Mode", "Scan +\nMatch", "Data", "Review", "Backup", "Bundle\nReport"]
     x = Inches(0.5)
     w = Inches(1.62)
     for i, label in enumerate(win_steps):
-        add_icon_circle(s, x + w / 2, Inches(2.2), Inches(0.7), str(i + 1), fg=WHITE, bg=BLUE, size=18)
-        add_text(s, x, Inches(2.65), w, Inches(0.6), label, size=12, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
+        add_icon_circle(s, x + w / 2, Inches(2.05), Inches(0.6), str(i + 1), fg=WHITE, bg=BLUE, size=15)
+        add_text(s, x, Inches(2.42), w, Inches(0.55), label, size=11.5, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
         if i < len(win_steps) - 1:
-            add_arrow(s, x + w - Inches(0.05), Inches(2.2), x + w + Inches(0.12), Inches(2.2), color=BLUE)
+            add_arrow(s, x + w - Inches(0.05), Inches(2.05), x + w + Inches(0.12), Inches(2.05), color=BLUE)
         x += w + Inches(0.12)
-    pic, w2, h2 = add_picture_framed(s, ASSETS / "scan_page.png", Inches(4.1), Inches(3.4), Inches(5.4), Inches(3.7),
-                                       caption="Real app screen — Scan & App Matching")
-    add_text(s, Inches(0.5), Inches(3.6), Inches(3.2), Inches(2.5),
-              "Output:\nmigration_bundle.zip\n\nManifest + SHA-256\nApps to install\nSettings & shortcuts\n(optional) Linux binary",
-              size=14, color=GREY, line_spacing=1.3)
-
-    # ── 8. Linux-side workflow ─────────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Workflow — Linux side", "One click: restore → verify → report")
-    lin_steps = ["Extract\n& Restore", "Verify\n(SHA-256)", "Report"]
-    x = Inches(0.6)
-    w = Inches(2.0)
-    for i, label in enumerate(lin_steps):
-        add_icon_circle(s, x + w / 2, Inches(2.1), Inches(0.85), str(i + 1), fg=WHITE, bg=GREEN, size=22)
-        add_text(s, x, Inches(2.6), w, Inches(0.7), label, size=14, bold=True, color=NAVY, align=PP_ALIGN.CENTER, line_spacing=1.1)
-        if i < len(lin_steps) - 1:
-            add_arrow(s, x + w - Inches(0.1), Inches(2.1), x + w + Inches(0.25), Inches(2.1), color=GREEN)
-        x += w + Inches(0.25)
-    pic, w2, h2 = add_picture_framed(s, ASSETS / "final_report.png", Inches(6.7), Inches(1.9), Inches(5.9), Inches(5.0),
+    add_text(s, Inches(0.5), Inches(3.05), Inches(11.5), Inches(0.4), "→ migration_bundle.zip (manifest + SHA-256, apps, settings, optional Linux binary)",
+              size=13, italic=True, color=GREY)
+    add_icon_circle(s, Inches(0.95), Inches(3.95), Inches(0.7), "1", fg=WHITE, bg=GREEN, size=20)
+    add_text(s, Inches(1.45), Inches(3.7), Inches(4.5), Inches(0.4), "Restore & Report", size=15, bold=True, color=NAVY)
+    add_text(s, Inches(1.45), Inches(4.1), Inches(4.5), Inches(0.55),
+              "Restore, verify (SHA-256), and report\nall happen within that one click.", size=12, color=GREY, line_spacing=1.15)
+    add_text(s, Inches(0.5), Inches(4.85), Inches(5.6), Inches(0.8),
+              "Failed step? Restart or Review & Complete Anyway. Reset undoes files, shortcuts, the wallpaper file, and (opt-in) apps.",
+              size=13, color=GREY, line_spacing=1.2)
+    pic, w2, h2 = add_picture_framed(s, ASSETS / "final_report.png", Inches(6.6), Inches(3.5), Inches(6.0), Inches(2.85),
                                        caption="Real report — actual VM restore, 3,344 files")
-    add_text(s, Inches(0.6), Inches(3.4), Inches(5.6), Inches(1.0),
-              "Failed step? “Restart” or\n“Review & Complete Anyway”\n— nothing fails silently.",
-              size=15, color=GREY, line_spacing=1.3)
-    add_text(s, Inches(0.6), Inches(4.6), Inches(5.6), Inches(1.6),
-              "Reset can fully undo a restore:\nfiles, shortcuts, settings,\nand (opt-in) installed apps.",
-              size=15, color=GREY, line_spacing=1.3)
 
-    # ── 9. Privacy ─────────────────────────────────────────────────────────────
+    # ── 8. Quality: tests + the bugs only live testing found ───────────────────
     s = blank_slide(prs)
-    add_header(s, "Design principle", "Privacy by default, every layer")
-    items = [
-        ("\U0001F4C1", "Files", "never leave\nthe machine"),
-        ("\U0001F310", "Repology", "name/version\nonly"),
-        ("\U0001F916", "AI rank", "opt-in,\nExpert only"),
-        ("\U0001F4CA", "Metrics", "machine ID\nanonymised"),
-        ("\U0001F4E6", "Bundle", "stays local,\nuser controls it"),
-    ]
-    icon_label_row(s, items, top=Inches(2.3), circle_d=Inches(1.0), icon_size=28, label_size=15, sub_size=12.5, bg=GREEN)
-
-    # ── 10. Validation & reporting ────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Evidence it worked", "The Sovereignty Score, hash-verified")
-    pic, w, h = add_picture_framed(s, ASSETS / "final_report.png", Inches(0.7), Inches(1.85), Inches(5.2), Inches(5.1),
-                                     caption="Real report from the actual restore run")
-    add_text(s, Inches(6.3), Inches(1.95), Inches(6.2), Inches(0.4), "SOVEREIGNTY SCORE", size=14, bold=True, color=BLUE)
-    add_text(s, Inches(6.3), Inches(2.3), Inches(6.2), Inches(0.55), "integrity_score + openness_bonus", size=16, color=NAVY)
-    add_text(s, Inches(6.3), Inches(2.75), Inches(6.2), Inches(0.5), "every file hash-verified against the manifest", size=13, italic=True, color=GREY)
-    add_text(s, Inches(6.3), Inches(3.6), Inches(6.2), Inches(0.4), "THREE FORMATS", size=14, bold=True, color=BLUE)
-    add_text(s, Inches(6.3), Inches(3.95), Inches(6.2), Inches(0.5), "JSON · Markdown · standalone HTML", size=16, color=NAVY)
-    add_text(s, Inches(6.3), Inches(4.8), Inches(6.2), Inches(0.4), "NOT JUST PASS/FAIL", size=14, bold=True, color=BLUE)
-    add_text(s, Inches(6.3), Inches(5.15), Inches(6.2), Inches(1.1),
-              "Warnings, settings applied vs.\nmanual, apps installed vs. failed",
-              size=16, color=NAVY, line_spacing=1.2)
-
-    # ── 11. Testing ──────────────────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Quality", "184 tests, counted directly from the repo")
+    add_header(s, "Evidence", "192 tests — and 4 bugs only a live VM run exposed")
     add_bar_chart(
-        s, Inches(0.8), Inches(1.85), Inches(7.4), Inches(4.3),
-        categories=["Unit", "Integration", "Performance", "E2E", "UI"],
-        series_name="Test functions",
-        values=[72, 68, 18, 15, 11],
-        bar_color=DARK_BLUE,
+        s, Inches(0.6), Inches(1.85), Inches(6.0), Inches(3.5),
+        categories=["Unit", "Integ.", "Perf.", "E2E", "UI"],
+        series_name="Test functions", values=[80, 68, 18, 15, 11], bar_color=DARK_BLUE,
     )
-    add_card(s, Inches(8.5), Inches(1.95), Inches(4.0), Inches(4.2), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(8.8), Inches(2.15), Inches(3.4), Inches(0.4), "WHY IT STILL WASN'T ENOUGH", size=12.5, bold=True, color=AMBER)
-    add_text(s, Inches(8.8), Inches(2.6), Inches(3.4), Inches(3.3),
-              "CI passing ≠ the real app\nworks.\n\nSeveral bugs this session\nwere found only by running\nit live on a Windows +\nLinux Mint VM pair.",
-              size=14.5, color=NAVY, line_spacing=1.3)
-
-    # ── 12. Bugs found via live testing ───────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Found via live testing", "Real bugs a live VM run exposed")
     bugs = [
-        ("One bad package name\nfailed ALL installs", "Batch → falls back to\none-at-a-time"),
-        ("Shortcuts matched\nrequested, not installed", "Now matched against\nactual installs only"),
-        ("Silent multi-minute\nlog gaps", "Periodic progress\nlogging added"),
-        ("Unanswered prompt\ncould hang forever", "120s timeout per\nattempt"),
+        ("Bad package name failed ALL installs", "per-package fallback"),
+        ("Shortcuts matched requested, not installed", "matched to actual installs"),
+        ("Silent multi-minute log gaps", "periodic progress logging"),
+        ("Unanswered prompt could hang forever", "120s timeout per attempt"),
     ]
-    x = Inches(0.6)
-    w = Inches(2.95)
+    y = Inches(1.95)
     for problem, fix in bugs:
-        add_card(s, x, Inches(2.0), w, Inches(1.7), fill=AMBER_BG, line_color=AMBER_BG)
-        add_text(s, x + Inches(0.2), Inches(2.15), w - Inches(0.4), Inches(1.3), "⚠  " + problem, size=13, color=NAVY, line_spacing=1.15)
-        add_arrow(s, x + w / 2, Inches(3.7), x + w / 2, Inches(3.95), color=GREEN, weight=2.5)
-        add_card(s, x, Inches(4.0), w, Inches(1.3), fill=GREEN_BG, line_color=GREEN_BG)
-        add_text(s, x + Inches(0.2), Inches(4.15), w - Inches(0.4), Inches(1.05), "✅  " + fix, size=13, color=NAVY, line_spacing=1.15)
-        x += w + Inches(0.15)
+        add_icon_circle(s, Inches(7.1), y + Inches(0.18), Inches(0.4), "!", fg=WHITE, bg=AMBER, size=15)
+        add_text(s, Inches(7.45), y, Inches(5.15), Inches(0.4), problem, size=13, color=NAVY)
+        add_icon_circle(s, Inches(7.1), y + Inches(0.62), Inches(0.4), "✓", fg=WHITE, bg=GREEN, size=14)
+        add_text(s, Inches(7.45), y + Inches(0.45), Inches(5.15), Inches(0.4), fix, size=12.5, color=GREEN, bold=True)
+        y += Inches(0.92)
+    add_text(s, Inches(0.6), Inches(5.55), Inches(6.0), Inches(0.6), "CI passing ≠ the real app works.", size=14, italic=True, color=GREY)
 
-    # ── 13. Reset feature ──────────────────────────────────────────────────────
+    # ── 9. This session shipped ─────────────────────────────────────────────────
     s = blank_slide(prs)
-    add_header(s, "New capability", "Reset now undoes everything")
-    items = [
-        ("\U0001F4C1", "Files"),
-        ("\U0001F517", "Shortcuts"),
-        ("\U0001F5BC", "Wallpaper"),
-        ("\U0001F4E6", "Apps (opt-in)"),
-    ]
-    x = Inches(1.3)
+    add_header(s, "Evidence", "Undo, and double-click distribution")
+    items = [("\U0001F4C1", "Files"), ("\U0001F517", "Shortcuts"), ("\U0001F5BC", "Wallpaper"), ("\U0001F4E6", "Apps (opt-in)")]
+    x = Inches(1.0)
     for glyph, label in items:
-        add_icon_circle(s, x, Inches(2.7), Inches(1.1), glyph, fg=WHITE, bg=GREEN, size=30)
-        add_text(s, x - Inches(1.0), Inches(3.35), Inches(2.0), Inches(0.5), label, size=15, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
-        x += Inches(2.7)
-    add_card(s, Inches(1.0), Inches(4.3), Inches(11.3), Inches(2.2), fill=WHITE)
-    add_bullet = lambda t, y: add_text(s, Inches(1.35), y, Inches(10.6), Inches(0.5), "•  " + t, size=15, color=NAVY)
-    add_bullet("Apps removal is opt-in — off by default, since shared dependencies could be affected", Inches(4.5))
-    add_bullet("Works even from a brand-new app session — reads entirely from the saved report", Inches(5.0))
-    add_bullet("Live progress in the Activity Log — not just the log file", Inches(5.5))
+        add_icon_circle(s, x, Inches(2.3), Inches(0.95), glyph, fg=WHITE, bg=GREEN, size=24)
+        add_text(s, x - Inches(0.9), Inches(2.85), Inches(1.8), Inches(0.4), label, size=13, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
+        x += Inches(2.55)
+    add_text(s, Inches(0.6), Inches(3.5), Inches(11.5), Inches(0.45), "Reset now undoes all of the above — opt-in for apps, live progress in the Activity Log.", size=13.5, color=GREY)
+    add_card(s, Inches(0.9), Inches(4.2), Inches(5.4), Inches(2.2), fill=WHITE)
+    add_icon_circle(s, Inches(3.6), Inches(4.85), Inches(0.8), "\U0001FA9F", fg=WHITE, bg=DARK_BLUE, size=22)
+    add_text(s, Inches(1.1), Inches(5.35), Inches(5.0), Inches(0.9), "migrate.exe\nPyInstaller; can bake the Linux\nbinary in for a single-file standalone.",
+              size=12.5, color=GREY, align=PP_ALIGN.CENTER, line_spacing=1.2)
+    add_card(s, Inches(6.9), Inches(4.2), Inches(5.4), Inches(2.2), fill=WHITE)
+    add_icon_circle(s, Inches(9.6), Inches(4.85), Inches(0.8), "\U0001F427", fg=WHITE, bg=GREEN, size=22)
+    add_text(s, Inches(7.1), Inches(5.35), Inches(5.0), Inches(0.9), "restore (ELF binary)\nBuilt on the target distro; embedded\nautomatically into every bundle.",
+              size=12.5, color=GREY, align=PP_ALIGN.CENTER, line_spacing=1.2)
 
-    # ── 14. Packaging ─────────────────────────────────────────────────────────
+    # ── Evaluation ───────────────────────────────────────────────────────────────
     s = blank_slide(prs)
-    add_header(s, "Distribution", "Double-click standalone, both platforms")
-    add_card(s, Inches(0.9), Inches(2.0), Inches(5.4), Inches(3.6), fill=WHITE)
-    add_icon_circle(s, Inches(3.6), Inches(2.85), Inches(1.0), "\U0001FA9F", fg=WHITE, bg=DARK_BLUE, size=30)
-    add_text(s, Inches(1.1), Inches(3.55), Inches(5.0), Inches(0.5), "MigrationWizard.exe", size=17, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(1.3), Inches(4.05), Inches(4.6), Inches(1.4),
-              "PyInstaller build of the full Qt app.\nCan bake the Linux binary in directly\nfor a true single-file standalone.",
-              size=13.5, color=GREY, align=PP_ALIGN.CENTER, line_spacing=1.3)
-    add_card(s, Inches(6.9), Inches(2.0), Inches(5.4), Inches(3.6), fill=WHITE)
-    add_icon_circle(s, Inches(9.6), Inches(2.85), Inches(1.0), "\U0001F427", fg=WHITE, bg=GREEN, size=30)
-    add_text(s, Inches(7.1), Inches(3.55), Inches(5.0), Inches(0.5), "MigrationWizard (ELF)", size=17, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(7.3), Inches(4.05), Inches(4.6), Inches(1.4),
-              "Built on the target distro itself.\nEmbedded automatically into every\nbundle the Windows app creates.",
-              size=13.5, color=GREY, align=PP_ALIGN.CENTER, line_spacing=1.3)
-    add_text(s, Inches(0.9), Inches(5.9), Inches(11.4), Inches(0.6),
-              "Bundle stays self-contained: unzip → run → restore. No Python install needed on either side.",
-              size=14, italic=True, color=GREY, align=PP_ALIGN.CENTER)
-
-    # ── 14b. Project management — work packages & timeline ─────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Project management", "Seven work packages, April → June")
-    wps = [
-        ("WP1", "Architecture", "Apr 1–17", GREEN),
-        ("WP2", "Recommendations", "Apr 15 – May 14", GREEN),
-        ("WP3", "Workflow & UI", "Apr 15 – May 27", GREEN),
-        ("WP4", "Backup Pipeline", "May 1–27", GREEN),
-        ("WP5", "Linux Restore", "May 10–28", GREEN),
-        ("WP6", "Packaging", "May 25–29", GREEN),
-        ("WP7", "Quality, Docs & Presentation", "Apr 1 – Jun 8", AMBER),
-    ]
-    y = Inches(1.85)
-    row_h = Inches(0.62)
-    for code, name, dates, color in wps:
-        add_card(s, Inches(0.7), y, Inches(1.0), row_h - Pt(6), fill=color, line_color=color)
-        add_text(s, Inches(0.7), y + Pt(4), Inches(1.0), row_h - Pt(6), code, size=13, bold=True, color=WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-        add_text(s, Inches(1.85), y + Pt(2), Inches(4.6), row_h, name, size=14.5, bold=True, color=NAVY, anchor=MSO_ANCHOR.MIDDLE)
-        add_text(s, Inches(6.6), y + Pt(2), Inches(2.8), row_h, dates, size=13, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
-        status = "Done" if color == GREEN else "Active"
-        add_pill(s, Inches(9.6), y + Pt(6), Inches(1.4), row_h - Pt(14), status, WHITE, color, size=12)
-        y += row_h + Pt(4)
-    add_text(s, Inches(0.7), y + Pt(8), Inches(11.5), Inches(0.5),
-              "Risk buffer (May 29 – Jun 4) reserved for fixes and real-environment testing before this presentation.",
-              size=13.5, italic=True, color=GREY)
-
-    # ── 14c. Project management — risk register & success criteria ─────────────
-    s = blank_slide(prs)
-    add_header(s, "Project management", "Risk register & success criteria")
-    risks = [
-        ("PySide6 packaging fails", "High impact", "Mitigated", GREEN),
-        ("Files restored to wrong location", "High impact", "Fixed", GREEN),
-        ("App recs miss niche software", "Medium impact", "Mitigated", GREEN),
-        ("No E2E test on real hardware", "Medium impact", "Open", AMBER),
-    ]
-    add_text(s, Inches(0.7), Inches(1.8), Inches(5.6), Inches(0.4), "KEY RISKS", size=13, bold=True, color=BLUE)
-    y = Inches(2.2)
-    for risk, impact, status, color in risks:
-        add_card(s, Inches(0.7), y, Inches(5.6), Inches(0.85), fill=WHITE)
-        add_text(s, Inches(0.9), y + Inches(0.08), Inches(3.6), Inches(0.4), risk, size=13.5, bold=True, color=NAVY)
-        add_text(s, Inches(0.9), y + Inches(0.45), Inches(2.0), Inches(0.35), impact, size=11.5, color=GREY)
-        add_pill(s, Inches(4.7), y + Inches(0.22), Inches(1.4), Inches(0.42), status, WHITE, color, size=11)
-        y += Inches(0.98)
-    add_text(s, Inches(6.7), Inches(1.8), Inches(5.9), Inches(0.4), "SUCCESS CRITERIA", size=13, bold=True, color=BLUE)
-    crit = [
-        ("Full scan → backup → restore pipeline", "Done"),
-        ("80% of common apps mapped", "238 mapped"),
-        ("150+ automated tests", "184 passing"),
-        ("Single double-click package", "exe + ELF"),
-    ]
-    y = Inches(2.2)
-    for label, result in crit:
-        add_card(s, Inches(6.7), y, Inches(5.9), Inches(0.85), fill=GREEN_BG, line_color=GREEN_BG)
-        add_text(s, Inches(6.9), y + Inches(0.08), Inches(4.3), Inches(0.4), label, size=13.5, color=NAVY)
-        add_text(s, Inches(6.9), y + Inches(0.45), Inches(4.3), Inches(0.35), "✅ " + result, size=12.5, bold=True, color=GREEN)
-        y += Inches(0.98)
-
-    # ── 15. Evaluation ─────────────────────────────────────────────────────────
-    s = blank_slide(prs)
-    add_header(s, "Evaluation", "What the project delivers")
-    metrics = [("238", "app mappings"), ("184", "automated tests"), ("3", "guidance modes"), ("2", "platforms packaged")]
+    add_header(s, "Evidence", "What the project delivers")
+    metrics = [("238", "app mappings"), ("192", "automated tests"), ("3", "guidance modes"), ("2", "platforms packaged")]
     x = Inches(0.8)
     for num, label in metrics:
-        add_card(s, x, Inches(1.85), Inches(2.75), Inches(1.7), fill=WHITE)
-        add_text(s, x, Inches(2.05), Inches(2.75), Inches(0.8), num, size=36, bold=True, color=BLUE, align=PP_ALIGN.CENTER)
-        add_text(s, x + Inches(0.15), Inches(2.8), Inches(2.45), Inches(0.6), label, size=13, color=NAVY, align=PP_ALIGN.CENTER)
+        add_card(s, x, Inches(1.8), Inches(2.75), Inches(1.5), fill=WHITE)
+        add_text(s, x, Inches(1.95), Inches(2.75), Inches(0.75), num, size=32, bold=True, color=BLUE, align=PP_ALIGN.CENTER)
+        add_text(s, x + Inches(0.15), Inches(2.6), Inches(2.45), Inches(0.5), label, size=12.5, color=NAVY, align=PP_ALIGN.CENTER)
         x += Inches(2.88)
     add_bar_chart(
-        s, Inches(0.8), Inches(3.75), Inches(5.5), Inches(3.3),
-        categories=["Before this session", "Now"], series_name="App mappings",
+        s, Inches(0.8), Inches(3.55), Inches(5.5), Inches(3.5),
+        categories=["Before", "Now"], series_name="App mappings",
         values=[149, 238], bar_color=GREEN, title="App mapping table growth",
     )
-    pic, w, h = add_picture_framed(s, ASSETS / "final_report.png", Inches(6.7), Inches(3.85), Inches(5.9), Inches(3.0),
+    pic, w, h = add_picture_framed(s, ASSETS / "final_report.png", Inches(6.7), Inches(3.5), Inches(5.9), Inches(2.8),
                                      caption="100% sovereignty score — real restore, 3,344 files")
 
-    # ── 16. Conclusion & future work ──────────────────────────────────────────
+    # ── SECTION: Critique ──────────────────────────────────────────────────────────
+    section_divider(prs, "Critique", "Where the project's own claims didn't hold up when checked against the system")
+
+    # ── Honest limitations ────────────────────────────────────────────────────────
     s = blank_slide(prs)
-    add_header(s, "Wrap-up", "Conclusion & future work")
-    add_card(s, Inches(0.7), Inches(1.9), Inches(5.7), Inches(4.7), fill=GREEN_BG, line_color=GREEN_BG)
-    add_text(s, Inches(1.0), Inches(2.1), Inches(5.0), Inches(0.4), "✅  DELIVERED", size=15, bold=True, color=GREEN)
+    add_header(s, "Critique", "Four review gaps, plus two found checking our own claims")
+    rows = [
+        ["#", "Gap raised", "Fix", "Status"],
+        ["1", "Vague objectives (\"more dynamic strategies\")", "O1–O6 measurable targets, each with a result", "Done"],
+        ["2", "Qt/CLI consistency too coarse", "src/orchestration/mode_policy.py — one shared function per decision", "Done"],
+        ["3", "Tight timeline, no buffer", "6-day risk buffer added to the Gantt", "Stale dates"],
+        ["4", "Evaluation lacks metrics", "Automation count, Sovereignty Score, timing real; precision/recall = target only", "Partial"],
+    ]
+    table = fill_table(s, Inches(0.6), Inches(1.7), Inches(12.1), Inches(2.75), rows)
+    table.columns[0].width = Inches(0.5)
+    table.columns[1].width = Inches(3.3)
+    table.columns[2].width = Inches(6.5)
+    table.columns[3].width = Inches(1.8)
+    rule = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.6), Inches(4.65), Inches(0.05), Inches(1.7))
+    rule.fill.solid(); rule.fill.fore_color.rgb = AMBER; rule.line.fill.background(); rule.shadow.inherit = False
+    add_text(s, Inches(0.85), Inches(4.65), Inches(11.8), Inches(0.4), "FOUND WHEN RE-CHECKING THE PROJECT'S OWN CLAIMS", size=12.5, bold=True, color=AMBER)
+    add_text(s, Inches(0.85), Inches(5.05), Inches(11.8), Inches(0.6),
+              "O6 (cycle time) does not hold up: target was <20 min for ≤5GB; the real logged run took ~30–35 minutes for extract+restore+verify alone.",
+              size=13.5, color=NAVY, line_spacing=1.2)
+    add_text(s, Inches(0.85), Inches(5.6), Inches(11.8), Inches(0.6),
+              "Recommendation-quality precision/recall: 0% measured. Methodology is defined; no ground-truth evaluation script has been built or run.",
+              size=13.5, color=NAVY, line_spacing=1.2)
+
+    # ── SECTION: Takeaway ────────────────────────────────────────────────────────
+    section_divider(prs, "Takeaway", "What was delivered, what's still open, and what to do about it")
+
+    # ── 12. Conclusion & future work ────────────────────────────────────────────
+    s = blank_slide(prs)
+    add_header(s, "Takeaway", "Conclusion & future work")
+    rule1 = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.7), Inches(1.95), Inches(0.05), Inches(4.4))
+    rule1.fill.solid(); rule1.fill.fore_color.rgb = GREEN; rule1.line.fill.background(); rule1.shadow.inherit = False
+    add_text(s, Inches(1.0), Inches(1.9), Inches(5.0), Inches(0.4), "DELIVERED", size=16, bold=True, color=GREEN)
     deliv = ["Dynamic recommendation engine", "Unified mode policy (Qt + CLI)", "Per-stage execution timing",
-             "184 test regression coverage", "Real-VM-tested reliability fixes", "Full undo/reset + packaging"]
-    y = Inches(2.65)
+             "192 test regression coverage", "Real-VM-tested reliability fixes", "Full undo/reset + packaging"]
+    y = Inches(2.55)
     for d in deliv:
-        add_text(s, Inches(1.1), y, Inches(5.1), Inches(0.45), "•  " + d, size=14.5, color=NAVY)
+        add_icon_circle(s, Inches(1.2), y + Inches(0.19), Inches(0.38), "✓", fg=WHITE, bg=GREEN, size=13)
+        add_text(s, Inches(1.55), y + Inches(0.04), Inches(4.9), Inches(0.45), d, size=14, color=NAVY)
         y += Inches(0.62)
-    add_card(s, Inches(6.7), Inches(1.9), Inches(5.7), Inches(4.7), fill=AMBER_BG, line_color=AMBER_BG)
-    add_text(s, Inches(7.0), Inches(2.1), Inches(5.0), Inches(0.4), "→  NEXT", size=15, bold=True, color=AMBER)
-    nxt = ["Real E2E test, physical machines", "Live USB write automation", "Resume/checkpoint for large restores", "Broader distro support"]
-    y = Inches(2.65)
+    rule2 = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(6.7), Inches(1.95), Inches(0.05), Inches(4.4))
+    rule2.fill.solid(); rule2.fill.fore_color.rgb = AMBER; rule2.line.fill.background(); rule2.shadow.inherit = False
+    add_text(s, Inches(7.0), Inches(1.9), Inches(5.0), Inches(0.4), "NEXT", size=16, bold=True, color=AMBER)
+    nxt = ["Real precision/recall evaluation script", "Real E2E test, physical machines", "Live USB write automation", "Resume/checkpoint for large restores"]
+    y = Inches(2.55)
     for n in nxt:
-        add_text(s, Inches(7.1), y, Inches(5.1), Inches(0.6), "•  " + n, size=14.5, color=NAVY)
+        add_icon_circle(s, Inches(7.2), y + Inches(0.19), Inches(0.38), "→", fg=WHITE, bg=AMBER, size=13)
+        add_text(s, Inches(7.55), y + Inches(0.0), Inches(4.9), Inches(0.6), n, size=14, color=NAVY)
         y += Inches(0.7)
 
-    # ── 16b. References ─────────────────────────────────────────────────────────
+    # ── 13. References ──────────────────────────────────────────────────────────
     s = blank_slide(prs)
-    add_header(s, "References", "Sovereignty framing cited from the term paper")
+    add_header(s, "Takeaway", "References — sovereignty framing cited from the term paper")
     refs = [
         "Floridi, L. (2020). The fight for digital sovereignty. Philosophy & Technology, 33(3), 369–378.",
         "Pohle, J., & Thiel, T. (2020). Digital sovereignty. Internet Policy Review, 9(4).",
         "Roberts, H., et al. (2021). Safeguarding European values with digital sovereignty. Internet Policy Review, 10(3).",
-        "Bechara, J., & Lechner, U. (2024). Digital sovereignty and open-source software. I4CS 2024, Springer.",
         "Wehnes, H. (2024). Preventing digital colony and lock-in. INFORMATIK 2024, Gesellschaft für Informatik.",
-        "European Commission (2020, 2022). Shaping Europe's digital future / A digital decade for Europe.",
-        "Wire (2025). The state of digital sovereignty in Europe.",
-        "StatCounter Global Stats (2025). Desktop OS Market Share, Europe.",
+        "Wire (2025); StatCounter Global Stats (2025). Digital sovereignty survey & OS market share, Europe.",
     ]
-    y = Inches(1.95)
+    y = Inches(2.1)
     for r in refs:
-        add_text(s, Inches(0.9), y, Inches(11.5), Inches(0.45), "•  " + r, size=14, color=NAVY)
-        y += Inches(0.58)
-    add_text(s, Inches(0.9), y + Inches(0.1), Inches(11.5), Inches(0.5),
-              "Full bibliography in: Arthur, J. — Digital Sovereignty Through Semi-Automated OS Migration (term paper).",
+        add_text(s, Inches(0.9), y, Inches(11.5), Inches(0.45), "•  " + r, size=14.5, color=NAVY)
+        y += Inches(0.65)
+    add_text(s, Inches(0.9), y + Inches(0.2), Inches(11.5), Inches(0.5),
+              "Full bibliography: Arthur, J. — Digital Sovereignty Through Semi-Automated OS Migration (term paper).",
               size=13, italic=True, color=GREY)
 
-    # ── 17. Thank you ──────────────────────────────────────────────────────────
-    s = blank_slide(prs, fill=NAVY)
-    add_icon_circle(s, Inches(2.3), Inches(1.5), Inches(1.0), "\U0001FA9F", fg=WHITE, bg=DARK_BLUE, size=36)
-    add_text(s, Inches(2.85), Inches(1.05), Inches(0.9), Inches(0.9), "→", size=36, bold=True, color=BLUE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    add_icon_circle(s, Inches(4.0), Inches(1.5), Inches(1.0), "\U0001F427", fg=WHITE, bg=GREEN, size=36)
-    add_text(s, Inches(0.8), Inches(2.9), Inches(11.5), Inches(1.2), "Thank you", size=48, bold=True, color=WHITE)
-    add_text(s, Inches(0.8), Inches(3.9), Inches(11.5), Inches(0.6), "Questions & live demo", size=22, color=LIGHT_BLUE_BG)
+    # ── 14. Thank you ────────────────────────────────────────────────────────────
+    title_slide(prs, "Thank you", "Questions & live demo")
 
     return prs
 
