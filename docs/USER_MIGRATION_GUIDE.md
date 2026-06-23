@@ -23,6 +23,8 @@ This guide walks you through using the **Sovereignty Migration Platform** to saf
 - Passwords or browser history
 - Windows system settings
 
+![The welcome screen, with a Start button to begin the migration.](assets/manual/welcome.png)
+
 ---
 
 ## Step 1: Choose Your Migration Mode
@@ -37,6 +39,8 @@ When you open the application, you will be asked to choose a **mode**. Each mode
 
 **Recommendation:** Start with **Balanced** if you are unsure.
 
+![Choosing a migration mode — Guided, Balanced, or Expert.](assets/manual/mode.png)
+
 ---
 
 ## Step 2: Scan Your Windows System
@@ -50,6 +54,8 @@ Click **Run Scan** on the Scan page. The tool will:
 This takes 1–3 minutes. You will see a summary when it finishes.
 
 > **Privacy note:** Nothing leaves your machine during the scan. All data stays local.
+
+![The scan in progress, showing hardware and software inventory results.](assets/manual/scan.png)
 
 ---
 
@@ -85,6 +91,8 @@ On the **Data Selection** page, choose which files to migrate:
 
 The tool automatically marks frequently-used and important files (source code, documents, config files) as high priority.
 
+![Choosing which personal files to bring across.](assets/manual/files.png)
+
 ---
 
 ## Step 5: Create Your Backup Bundle
@@ -98,6 +106,8 @@ Click **Create Backup Bundle**. The tool will:
 When finished, **copy the entire backup folder to your USB drive** or an external hard disk.
 
 > Keep your backup safe. You will need it after Linux Mint is installed.
+
+![Packing the migration bundle, with an optional USB drive destination.](assets/manual/bundle.png)
 
 ---
 
@@ -122,6 +132,8 @@ Click **Restore Files**. The tool will:
 3. Verify each file against its checksum to confirm nothing was corrupted
 4. Generate a restore report
 
+![The Restore page on Linux, ready to browse to the migration bundle.](assets/manual/restore.png)
+
 ---
 
 ## Step 8: Review the Validation Report
@@ -134,6 +146,10 @@ After the restore, a **Validation Report** is generated showing:
 - A **Sovereignty Score** (0–100%) summarising the overall migration quality
 
 A score above 90% means an excellent migration. If any files failed, the report lists them individually so you can re-copy them manually.
+
+![The Verification page, checking restored files and showing the Migration Score.](assets/manual/verify.png)
+
+![The final migration report page, with the Migration Score and report links.](assets/manual/report.png)
 
 ---
 

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 from src.constants import BASE_DIR
 from src.qt_ui.widgets.simple_markdown import render_user_manual
 
-USER_MANUAL_PATH = BASE_DIR / "docs" / "USER_MANUAL.md"
+USER_MANUAL_PATH = BASE_DIR / "docs" / "USER_MIGRATION_GUIDE.md"
 
 # Keyed by page class name (not the class itself, to avoid import cycles
 # between this widget module and every page module). Icons match the ones
