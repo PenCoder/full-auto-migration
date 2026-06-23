@@ -82,12 +82,17 @@ def _read_registry_object(path: str, properties: list[str]) -> dict[str, Any]:
     return {}
 
 
-def collect_settings_inventory(export_assets: bool = True) -> Dict[str, Any]:
+def collect_settings_inventory(export_assets: bool = True, assets_dir: Path | None = None) -> Dict[str, Any]:
     """Collect Windows settings and appearance inventory.
 
     The returned structure is intentionally compact and portable:
     it captures only the settings that can be meaningfully inspected,
     summarized, or exported during a migration workflow.
+
+    assets_dir overrides where exported wallpaper/theme files are written
+    (defaults to docs/reports/settings_assets); tests should always pass a
+    tmp_path here instead of letting this fall through to the real project
+    path.
     """
     desktop = _read_registry_object(
         r"HKCU:\Control Panel\Desktop",
@@ -109,7 +114,8 @@ def collect_settings_inventory(export_assets: bool = True) -> Dict[str, Any]:
     wallpaper_path = _normalize_path(str(desktop.get("WallPaper", "")))
     theme_path = _normalize_path(str(theme.get("CurrentTheme", "")))
 
-    assets_dir = BASE_DIR / "docs" / "reports" / "settings_assets"
+    if assets_dir is None:
+        assets_dir = BASE_DIR / "docs" / "reports" / "settings_assets"
     exported_assets = {
         "wallpaper": _export_asset(wallpaper_path, assets_dir, "wallpaper") if export_assets else "",
         "theme": _export_asset(theme_path, assets_dir, "current_theme") if export_assets else "",

@@ -24,7 +24,7 @@ def test_collect_settings_inventory_summarizes_and_exports(monkeypatch, tmp_path
 
     monkeypatch.setattr(settings_inventory, "_read_registry_object", fake_read_registry)
 
-    result = settings_inventory.collect_settings_inventory(export_assets=True)
+    result = settings_inventory.collect_settings_inventory(export_assets=True, assets_dir=tmp_path / "exported_assets")
 
     assert result["desktop"]["wallpaper_path"].endswith("wall.jpg")
     assert result["appearance"]["current_theme"].endswith("theme.theme")
