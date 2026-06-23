@@ -48,7 +48,7 @@ paraphrase of it.
 | Desktop shortcuts | Not present | Implemented, with full undo | new capability |
 | Reset / undo a restore | Not present | Implemented (files, shortcuts, settings, opt-in apps) | new capability |
 | Completeness scoring | None — restore just logs pass/fail | Sovereignty Score + JSON/Markdown/HTML report | new capability (self-devised metric — see §6) |
-| Packaging | Linux only, one binary | Both platforms; Linux binary auto-embeds into every Windows-built bundle | Linux-only → cross-platform |
+| Packaging | Both platforms, built and managed as two separate manual binaries | Both platforms; Linux binary auto-embeds into every Windows-built bundle | manual → automatic |
 | `apt-get install` reliability | One atomic batch call, no fallback, no timeout, failures silently logged and ignored | Per-package fallback + 120s timeout | defect inherited from baseline, found and fixed |
 
 **One nuance kept precise rather than overstated:** the original explicitly documents its CLI
@@ -153,8 +153,8 @@ beyond the four the supervisor raised:
 ## 7. Current status
 
 - **238** curated app mappings (**9.5×** the proof of concept's 25), **192** automated tests
-  (the proof of concept had none), **2** platforms packaged for one-click distribution (the
-  proof of concept packaged Linux only)
+  (the proof of concept had none), **2** platforms packaged with automatic embedding (the
+  proof of concept also packaged both platforms, but as two separate manual binaries)
 - **5 of 6** measurable objectives (O1–O5) met; O6 is open and corrected rather than claimed
 - **100%** Sovereignty Score on the most recent real restore run — on a self-devised metric,
   not an externally validated one
