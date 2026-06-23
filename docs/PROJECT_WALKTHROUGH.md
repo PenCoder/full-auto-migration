@@ -90,6 +90,7 @@ issue that live testing did surface (see §6).
 | Files restored to wrong location | High | Fixed |
 | App recommendations miss niche software | Medium | Mitigated — fuzzy matching + manual override in Expert mode |
 | No end-to-end test on physical hardware | Medium | Open — tests currently run against a VM pair, not physical machines |
+| Only verified on Windows 11, not Windows 10 | Medium | Closed — full scan-to-restore flow verified on Windows 10 (VirtualBox VM), no issues found |
 
 ---
 
