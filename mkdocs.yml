@@ -1,0 +1,53 @@
+site_name: Migration Wizard
+site_description: Windows 11 to Linux Mint migration tool — built on a digital sovereignty premise
+repo_url: https://github.com/PenCoder/full-auto-migration
+repo_name: PenCoder/full-auto-migration
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+exclude_docs: |
+  presentation/
+  reports/
+  Windows11_to_LinuxMint_Expose.pdf
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - tables
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Downloads: downloads.md
+  - Get started:
+      - User migration guide: USER_MIGRATION_GUIDE.md
+  - Project & sovereignty:
+      - Project walkthrough: PROJECT_WALKTHROUGH.md
+      - Full automation exposé: FULL_AUTOMATION_EXPOSE.md
+      - Praktikum report: PRAKTIKUM_REPORT.md
+  - Developers:
+      - Testing strategy: TESTING.md
+      - Test quick reference: TEST_QUICK_REFERENCE.md
