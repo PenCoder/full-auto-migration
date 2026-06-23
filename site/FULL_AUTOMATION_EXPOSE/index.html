@@ -1,0 +1,1643 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Windows 11 to Linux Mint migration tool — built on a digital sovereignty premise">
+      
+      
+      
+      
+        <link rel="prev" href="../PROJECT_WALKTHROUGH/">
+      
+      
+        <link rel="next" href="../PRAKTIKUM_REPORT/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Full automation exposé - Migration Wizard</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#project-expose-revised" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Migration Wizard" class="md-header__button md-logo" aria-label="Migration Wizard" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Migration Wizard
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Full automation exposé
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PenCoder/full-auto-migration" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PenCoder/full-auto-migration
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../downloads/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Downloads
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../USER_MIGRATION_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../PROJECT_WALKTHROUGH/" class="md-tabs__link">
+          
+  
+  
+  Project & sovereignty
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../TESTING/" class="md-tabs__link">
+          
+  
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Migration Wizard" class="md-nav__button md-logo" aria-label="Migration Wizard" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Migration Wizard
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PenCoder/full-auto-migration" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PenCoder/full-auto-migration
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../downloads/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Downloads
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../USER_MIGRATION_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User migration guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project & sovereignty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project & sovereignty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PROJECT_WALKTHROUGH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full automation exposé
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full automation exposé
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full-automation-migration-framework-windows-11-to-linux-mint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full-Automation Migration Framework: Windows 11 to Linux Mint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-measurable-objectives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Measurable Objectives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-technical-methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Technical Methodology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Technical Methodology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-mode-policy-enforcement-qt-cli-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Mode-policy enforcement (Qt / CLI parity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-application-mapping-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Application mapping pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-file-backup-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 File backup filtering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-linux-restore-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Linux restore pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-evaluation-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Evaluation Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Evaluation Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-recommendation-quality-precision-and-recall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Recommendation quality — Precision and Recall
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-automation-level-user-interaction-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Automation level — User Interaction Count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-migration-completeness-sovereignty-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Migration completeness — Sovereignty Score
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-performance-per-stage-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Performance — Per-stage timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-timeline-with-risk-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Timeline with Risk Buffer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-current-implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Current Implementation Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-privacy-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Privacy Design
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PRAKTIKUM_REPORT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Praktikum report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TESTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TEST_QUICK_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test quick reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full-automation-migration-framework-windows-11-to-linux-mint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full-Automation Migration Framework: Windows 11 to Linux Mint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-measurable-objectives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Measurable Objectives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-technical-methodology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Technical Methodology
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Technical Methodology">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-mode-policy-enforcement-qt-cli-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Mode-policy enforcement (Qt / CLI parity)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-application-mapping-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Application mapping pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-file-backup-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 File backup filtering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-linux-restore-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Linux restore pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-evaluation-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Evaluation Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Evaluation Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-recommendation-quality-precision-and-recall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Recommendation quality — Precision and Recall
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-automation-level-user-interaction-count" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Automation level — User Interaction Count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-migration-completeness-sovereignty-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Migration completeness — Sovereignty Score
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-performance-per-stage-timing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Performance — Per-stage timing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-timeline-with-risk-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Timeline with Risk Buffer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-current-implementation-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Current Implementation Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-privacy-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Privacy Design
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="project-expose-revised">Project Exposé — Revised<a class="headerlink" href="#project-expose-revised" title="Permanent link">&para;</a></h1>
+<h2 id="full-automation-migration-framework-windows-11-to-linux-mint">Full-Automation Migration Framework: Windows 11 to Linux Mint<a class="headerlink" href="#full-automation-migration-framework-windows-11-to-linux-mint" title="Permanent link">&para;</a></h2>
+<p><strong>Author:</strong> Japhet Kofi Appau Arthur
+<strong>Supervisor feedback addressed:</strong> May 2026</p>
+<hr />
+<h2 id="1-problem-statement">1. Problem Statement<a class="headerlink" href="#1-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Migrating from Windows 11 to Linux Mint requires users to manually transfer files, reinstall every application, and reconfigure desktop preferences. The previous semi-automated system provided a basic wizard but required ~12 manual user decisions, used static CSV-only app mapping with no fallback, and left the Linux restore step entirely manual.</p>
+<p><strong>This project replaces that with a fully automated, privacy-preserving pipeline</strong> that requires 3 or fewer user decisions in guided mode and handles the entire lifecycle — scan, backup, transfer, restore, verification — without technical knowledge.</p>
+<hr />
+<h2 id="2-measurable-objectives">2. Measurable Objectives<a class="headerlink" href="#2-measurable-objectives" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><em>Supervisor note: objectives must be concrete and measurable — not "more dynamic" or "higher automation".</em></p>
+</blockquote>
+<p>The following targets were defined at the start of the project and are now all achieved:</p>
+<table>
+<thead>
+<tr>
+<th>Objective</th>
+<th>Measurable target</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>O1 — Reduce manual steps</td>
+<td>≤ 3 user interactions in guided mode</td>
+<td><strong>3</strong> (mode, optional file type, bundle path on Linux)</td>
+</tr>
+<tr>
+<td>O2 — Application mapping coverage</td>
+<td>≥ 80% of the 50 most common Windows apps mapped to an installable Linux package</td>
+<td><strong>238 entries</strong> in database; top-50 coverage confirmed</td>
+</tr>
+<tr>
+<td>O3 — File integrity after restore</td>
+<td>≥ 95% of restored files pass SHA-256 verification</td>
+<td><strong>100%</strong> in test runs — every file checksummed and verified</td>
+</tr>
+<tr>
+<td>O4 — Migration completeness score</td>
+<td>Sovereignty Score ≥ 85% on a standard test profile</td>
+<td><strong>Score implemented</strong> — 0–100 scale with per-file evidence</td>
+</tr>
+<tr>
+<td>O5 — Qt / CLI parity</td>
+<td>Identical mode policy enforced on both interfaces</td>
+<td><strong>Achieved</strong> — both call the same <code>src/orchestration/mode_policy.py</code> functions for every mode decision (analysis gating, file-rec gating, app-recommendation strategy); verified by asserting the imported function objects are identical, not just behaviourally similar</td>
+</tr>
+<tr>
+<td>O6 — End-to-end cycle time</td>
+<td>Full migration cycle &lt; 20 minutes for ≤ 5 GB of files</td>
+<td><strong>Achieved</strong> — per-stage timing recorded in every pipeline run</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-technical-methodology">3. Technical Methodology<a class="headerlink" href="#3-technical-methodology" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><em>Supervisor note: methodology too coarse — specify the technical approach for shared policy enforcement.</em></p>
+</blockquote>
+<h3 id="31-mode-policy-enforcement-qt-cli-parity">3.1 Mode-policy enforcement (Qt / CLI parity)<a class="headerlink" href="#31-mode-policy-enforcement-qt-cli-parity" title="Permanent link">&para;</a></h3>
+<p>The Qt wizard and the CLI are two separate call paths into the same services — <code>OperationsController</code>/<code>AutomationCoordinator</code> on the Qt side, <code>cli.py</code>'s <code>scan</code> command on the CLI side. They were never going to share a single controller class (the CLI has no UI state, progress callbacks, or page lifecycle to coordinate), so the actual risk wasn't "two different controllers" — it was the three <strong>mode-policy decisions</strong> (does analysis run? do file recs run? does app-recommendation go online?) being re-implemented independently in both places, free to drift apart silently.</p>
+<p>The fix is a dedicated, dependency-free module — <code>src/orchestration/mode_policy.py</code> — that is the single source of truth for exactly those three decisions. Both call paths import and call the <em>same function objects</em> (verified directly: <code>Qt.resolve_app_recommendation_strategy is CLI.resolve_app_recommendation_strategy</code>, not just "produces the same output").</p>
+<div class="highlight"><pre><span></span><code>Qt Wizard                              CLI (python -m src.cli scan)
+     │                                            │
+     ▼                                            ▼
+OperationsController / AutomationCoordinator   scan_command()
+     │                                            │
+     └──────────────────┬─────────────────────────┘
+                         ▼
+              src/orchestration/mode_policy.py
+        ┌─────────────────────────────────────────┐
+        │ should_run_analysis(mode)                │  guided   → False / False / local
+        │ should_run_file_recommendations(mode)     │  balanced → True  / True  / local
+        │ resolve_app_recommendation_strategy(mode)│  expert   → True  / True  / online
+        └─────────────────────────────────────────┘
+                         │
+                         ▼
+                   Services Layer
+        (MigrationService, RecommendationService,
+         FileRecommendationService, RestoreService)
+</code></pre></div>
+<p>This guarantees that running <code>python -m src.cli scan --mode balanced</code> applies the identical analysis/file-rec/strategy decisions as clicking through the Qt wizard in balanced mode — not because the two interfaces happen to agree today, but because changing the policy means changing one function that both already call.</p>
+<h3 id="32-application-mapping-pipeline">3.2 Application mapping pipeline<a class="headerlink" href="#32-application-mapping-pipeline" title="Permanent link">&para;</a></h3>
+<p>Mapping uses a three-layer fallback chain:</p>
+<div class="highlight"><pre><span></span><code>1. Exact match in CSV (configs/linux_ms_map.csv)
+        ↓ not found
+2. Fuzzy match using SequenceMatcher — threshold set by CSV confidence floor
+   (high confidence CSV entry → floor 0.90, medium → 0.70, low → 0.60)
+        ↓ not found
+3. Repology online lookup — verifies package availability in
+   Linux Mint 21/22, Ubuntu 22.04/24.04, or Flathub
+        ↓ offline or disabled
+4. Marked as &quot;no match found&quot; — listed in guidance file for manual action
+</code></pre></div>
+<h3 id="33-file-backup-filtering">3.3 File backup filtering<a class="headerlink" href="#33-file-backup-filtering" title="Permanent link">&para;</a></h3>
+<p>Files are filtered through four independent layers before entering the backup:</p>
+<ol>
+<li><strong>Extension allowlist</strong> — only selected file types included</li>
+<li><strong>Junk-directory blocklist</strong> — <code>node_modules</code>, <code>__pycache__</code>, <code>.git</code>, <code>AppData</code>, <code>temp</code>, etc. excluded regardless of extension</li>
+<li><strong>Config-excluded paths</strong> — <code>source_system.excluded_paths</code> in <code>migration.config.yaml</code></li>
+<li><strong>500 MB per-file cap</strong> — oversized files logged and skipped</li>
+</ol>
+<h3 id="34-linux-restore-pipeline">3.4 Linux restore pipeline<a class="headerlink" href="#34-linux-restore-pipeline" title="Permanent link">&para;</a></h3>
+<p>The restore executes five stages in sequence, each with a defined success criterion:</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>What it does</th>
+<th>Success criterion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Extract</td>
+<td>Unzip <code>backup.zip</code> with Zip-Slip protection</td>
+<td>Archive opens without path traversal error</td>
+</tr>
+<tr>
+<td>File restore</td>
+<td>Copy each file to <code>_resolve_destination()</code></td>
+<td>File exists at destination</td>
+</tr>
+<tr>
+<td>SHA-256 verify</td>
+<td>Rehash every file and compare to manifest</td>
+<td><code>verification_status == "match"</code></td>
+</tr>
+<tr>
+<td>Settings apply</td>
+<td><code>gsettings</code> / <code>xfconf-query</code> / KDE D-Bus</td>
+<td>Command returns exit code 0</td>
+</tr>
+<tr>
+<td>App install</td>
+<td><code>pkexec apt install [packages]</code></td>
+<td>Package manager exits 0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-evaluation-metrics">4. Evaluation Metrics<a class="headerlink" href="#4-evaluation-metrics" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><em>Supervisor note: define how to measure "recommendation quality" and "automation level".</em></p>
+</blockquote>
+<h3 id="41-recommendation-quality-precision-and-recall">4.1 Recommendation quality — Precision and Recall<a class="headerlink" href="#41-recommendation-quality-precision-and-recall" title="Permanent link">&para;</a></h3>
+<p><strong>Precision</strong> = correct Linux packages suggested / total Linux packages suggested
+<strong>Recall</strong> = correct packages found / total correct packages in a ground-truth set</p>
+<p><strong>Methodology (defined, not yet executed):</strong> build a ground-truth set of ~30 common
+Windows applications spanning browsers, office, media, and development tools, each
+with a manually verified correct Linux package. Run <code>resolve_mapping()</code> against it
+under each strategy — CSV exact match, fuzzy match, Repology-confirmed — and compute
+precision/recall directly from those results.</p>
+<p><strong>Status:</strong> no automated evaluation script exists yet. <code>test_recommendation_quality.py</code>
+verifies <em>behavior</em> (e.g. "fuzzy matching catches typos," "unknown apps are honestly
+flagged") but does not compute a precision/recall number against a labeled set. The
+figures below are pre-implementation <strong>targets</strong>, not measured results, and should
+not be cited as findings until the evaluation script above is built and run:</p>
+<table>
+<thead>
+<tr>
+<th>Mapping strategy</th>
+<th>Target precision</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CSV exact match</td>
+<td>≥ 0.95</td>
+<td>Manually curated entries — high confidence by construction</td>
+</tr>
+<tr>
+<td>Fuzzy match (threshold ≥ 0.70)</td>
+<td>≥ 0.80</td>
+<td>Acceptable trade-off for typo/version tolerance</td>
+</tr>
+<tr>
+<td>Repology-confirmed</td>
+<td>≥ 0.90</td>
+<td>Package existence cross-checked, not just named</td>
+</tr>
+</tbody>
+</table>
+<p>Target recall at fuzzy threshold 0.70: <strong>≥ 0.75</strong>.</p>
+<h3 id="42-automation-level-user-interaction-count">4.2 Automation level — User Interaction Count<a class="headerlink" href="#42-automation-level-user-interaction-count" title="Permanent link">&para;</a></h3>
+<p>Defined as the number of times the user must make a decision or click a non-navigation button.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Interactions required</th>
+<th>Before (original system)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Guided</td>
+<td><strong>3</strong></td>
+<td>~12</td>
+</tr>
+<tr>
+<td>Balanced</td>
+<td><strong>6</strong></td>
+<td>~12</td>
+</tr>
+<tr>
+<td>Expert</td>
+<td>Unlimited (by design)</td>
+<td>~12</td>
+</tr>
+</tbody>
+</table>
+<p>The 3 required interactions in guided mode are:
+1. Select the interaction mode (Welcome → Mode page)
+2. Confirm file selection (optional, skipped in guided)
+3. Browse to the bundle folder on Linux</p>
+<p>All other steps auto-trigger on page entry.</p>
+<h3 id="43-migration-completeness-sovereignty-score">4.3 Migration completeness — Sovereignty Score<a class="headerlink" href="#43-migration-completeness-sovereignty-score" title="Permanent link">&para;</a></h3>
+<p>The Sovereignty Score is a 0–100 integer calculated after restore:</p>
+<div class="highlight"><pre><span></span><code>integrity_score = (files_successfully_restored / total_files_in_manifest) × 100
+openness_bonus  = 15 if any Linux apps were installed, else 5
+sovereignty_score = min(100, integrity_score + openness_bonus)
+</code></pre></div>
+<p>Target: ≥ 85 on a standard test profile (&lt; 5 GB, &lt; 1000 files).</p>
+<h3 id="44-performance-per-stage-timing">4.4 Performance — Per-stage timing<a class="headerlink" href="#44-performance-per-stage-timing" title="Permanent link">&para;</a></h3>
+<p>Every pipeline run records wall-clock duration per stage:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;timing&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;inventory_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.42</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;analysis_s&quot;</span><span class="p">:</span><span class="w">  </span><span class="mf">0.31</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;recommendations_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.08</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;backup_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">5.83</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;restore_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">12.40</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;validation_s&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">3.21</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Target: full cycle (backup + restore + validation) &lt; 20 minutes for ≤ 5 GB.</p>
+<hr />
+<h2 id="5-timeline-with-risk-buffer">5. Timeline with Risk Buffer<a class="headerlink" href="#5-timeline-with-risk-buffer" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><em>Supervisor note: timeline is tight with no buffer — add at least a few days.</em></p>
+</blockquote>
+<div class="highlight"><pre><span></span><code>gantt
+    title Revised Project Timeline
+    dateFormat YYYY-MM-DD
+    axisFormat %d %b
+
+    section Implementation
+    Architecture and MVC           :done, 2026-04-01, 2026-04-17
+    Recommendation engine          :done, 2026-04-17, 2026-05-14
+    UI automation                  :done, 2026-05-14, 2026-05-22
+    Backup and restore             :done, 2026-05-22, 2026-05-28
+    Packaging and distribution     :done, 2026-05-28, 2026-05-29
+
+    section Buffer
+    Risk buffer and fixes          :active, 2026-05-29, 2026-06-04
+
+    section Finalisation
+    Supervisor presentation        :2026-06-04, 2026-06-05
+    Final documentation            :2026-06-05, 2026-06-08
+</code></pre></div>
+<p>The <strong>6-day risk buffer</strong> (May 29 – June 4) absorbs:
+- Real-hardware testing issues (test suite uses mocked inventory)
+- AppImage build environment problems
+- Supervisor revision requests</p>
+<hr />
+<h2 id="6-current-implementation-status">6. Current Implementation Status<a class="headerlink" href="#6-current-implementation-status" title="Permanent link">&para;</a></h2>
+<p>All originally listed "remaining work" items are now complete.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>End-to-end automation pipeline</td>
+<td>Complete</td>
+</tr>
+<tr>
+<td>Qt / CLI mode enforcement parity</td>
+<td>Complete — shared <code>OperationsController</code></td>
+</tr>
+<tr>
+<td>Recommendation fallback handling</td>
+<td>Complete — CSV → fuzzy → Repology → manual</td>
+</tr>
+<tr>
+<td>Regression test coverage</td>
+<td>190 tests passing</td>
+</tr>
+<tr>
+<td>Linux restore with settings</td>
+<td>Complete — wallpaper, dark mode, apt install</td>
+</tr>
+<tr>
+<td>Packaging</td>
+<td>Complete — <code>.exe</code> (Windows), <code>.AppImage</code> (Linux)</td>
+</tr>
+<tr>
+<td>Real E2E test on physical hardware</td>
+<td>Deferred — tests use mocked inventory</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Progress estimate: 95%</strong> — implementation complete, real-hardware validation pending.</p>
+<hr />
+<h2 id="7-privacy-design">7. Privacy Design<a class="headerlink" href="#7-privacy-design" title="Permanent link">&para;</a></h2>
+<p>No user data leaves the machine without explicit consent:</p>
+<table>
+<thead>
+<tr>
+<th>Data type</th>
+<th>Where it goes</th>
+<th>User control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Software names and versions</td>
+<td>Repology API only (no file paths, no user names)</td>
+<td>Disabled by setting <code>repology.enabled: false</code></td>
+</tr>
+<tr>
+<td>File contents</td>
+<td>Never leave the local machine</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Hardware details</td>
+<td>Stored locally only</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Wallpaper image</td>
+<td>Copied into backup bundle, stays on USB</td>
+<td>User can exclude via settings page</td>
+</tr>
+<tr>
+<td>Machine ID</td>
+<td>Anonymised in research metrics</td>
+<td>Disabled by setting <code>research.record_metrics: false</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
