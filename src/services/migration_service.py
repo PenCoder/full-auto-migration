@@ -324,8 +324,8 @@ class MigrationService:
                 "Migration bundle — Linux restore\n"
                 "=================================\n\n"
                 "1. Unzip this archive if you haven't already.\n"
-                "2. Run ./MigrationWizard (in a terminal: `./MigrationWizard`;\n"
-                "   `chmod +x MigrationWizard` first if it's not executable).\n"
+                "2. Run ./restore (in a terminal: `./restore`;\n"
+                "   `chmod +x restore` first if it's not executable).\n"
                 "3. On the Restore page, click Browse and select this same folder.\n",
                 encoding="utf-8",
             )

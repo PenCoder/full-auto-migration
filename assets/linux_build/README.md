@@ -1,7 +1,7 @@
 # Pre-built Linux binary
 
 This folder is where the Windows-side backup step looks for a pre-built
-Linux executable of this same tool. If `MigrationWizard` exists here, it
+Linux executable of this same tool. If `restore` exists here, it
 gets copied into every migration bundle, so the bundle.zip carried over to
 Linux is fully self-contained: unzip, run the binary, restore.
 
@@ -18,9 +18,9 @@ pip install -r requirements.txt pyinstaller
 pyinstaller MigrationWizard_linux.spec
 ```
 
-This produces `dist/MigrationWizard`. Copy that single file back into this
-folder (`assets/linux_build/MigrationWizard`) on the Windows side, and make
-sure it's executable (`chmod +x MigrationWizard` before zipping, or the
+This produces `dist/restore`. Copy that single file back into this
+folder (`assets/linux_build/restore`) on the Windows side, and make
+sure it's executable (`chmod +x restore` before zipping, or the
 bundling step sets the bit — see `migration_service.py`).
 
 ## Notes

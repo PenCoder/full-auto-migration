@@ -1,7 +1,14 @@
 """Shared filesystem paths used across the migration application."""
 
+import subprocess
 import sys
 from pathlib import Path
+
+# Every subprocess call (PowerShell inventory, apt/pkexec, restore helpers)
+# needs this on Windows so the windowed .exe (console=False in
+# MigrationWizard.spec) doesn't flash a console window per call. The flag
+# doesn't exist on Linux, where it's simply not needed.
+SUBPROCESS_NO_WINDOW_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -26,8 +33,8 @@ else:
 # rebuild needed. Both are checked at lookup time so neither order is
 # required — see resolve_linux_build_binary().
 _LINUX_BUILD_CANDIDATES = (
-    BASE_DIR / "assets" / "linux_build" / "MigrationWizard",
-    EXEC_DIR / "assets" / "linux_build" / "MigrationWizard",
+    BASE_DIR / "assets" / "linux_build" / "restore",
+    EXEC_DIR / "assets" / "linux_build" / "restore",
 )
 
 

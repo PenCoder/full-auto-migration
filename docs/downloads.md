@@ -6,16 +6,16 @@ Pre-built binaries are attached to [GitHub Releases](https://github.com/PenCoder
 
 [Download migrate.exe](https://github.com/PenCoder/full-auto-migration/releases/latest/download/migrate.exe){ .md-button .md-button--primary }
 
-Double-click `migrate.exe` and follow the 7-step wizard. If you already have a `restore` binary (see below) sitting next to it in `assets/linux_build/`, it gets baked into the `.exe` automatically as a single standalone file.
+Double-click `migrate.exe` and follow the 7-step wizard. This build embeds a pre-built Linux `restore` binary internally, so every migration bundle it creates is fully self-contained — no separate Linux download needed.
 
 ## Linux Mint
 
-[Download restore](https://github.com/PenCoder/full-auto-migration/releases/latest/download/restore){ .md-button }
+The `restore` binary is copied into your migration bundle automatically by `migrate.exe` — you don't need to download it separately. Just copy the bundle to your Linux Mint machine and double-click the binary inside it. If nothing happens on double-click: right-click the file → Properties → Permissions → tick "Allow executing file as program".
 
-Copy the binary from the migration bundle (or download it directly) to your Linux Mint machine and double-click it. If nothing happens on double-click: right-click the file → Properties → Permissions → tick "Allow executing file as program".
+A standalone copy is also [available for direct download](https://github.com/PenCoder/full-auto-migration/releases/latest/download/restore){ .md-button } if you want to run the Linux side without going through the Windows bundle flow.
 
 !!! note "Linux binary availability"
-    The `restore` binary must be built directly on a Linux Mint machine — PyInstaller doesn't cross-compile. It may not always be attached to every release; check the [release notes](https://github.com/PenCoder/full-auto-migration/releases) for which assets are included. If it's missing, you can build it yourself — see "Run from source" below.
+    The `restore` binary must be built directly on a Linux Mint machine — PyInstaller doesn't cross-compile. It may not always be attached to every release as a standalone asset; check the [release notes](https://github.com/PenCoder/full-auto-migration/releases). If it's missing, you can build it yourself — see "Run from source" below.
 
 ## Run from source instead
 

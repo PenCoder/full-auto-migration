@@ -9,7 +9,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
-assets/linux_build/MigrationWizard
+assets/linux_build/restore
 .Python
 build/
 develop-eggs/

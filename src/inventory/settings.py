@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from src.config import MigrationConfigRoot
-from src.constants import BASE_DIR, DATA_DIR
+from src.constants import BASE_DIR, DATA_DIR, SUBPROCESS_NO_WINDOW_FLAGS
 from src.loggers import get_logger
 
 
@@ -29,7 +29,10 @@ def _run_powershell_json(command: str) -> Any:
     ]
 
     try:
-        result = subprocess.run(full_command, capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            full_command, capture_output=True, text=True, check=False,
+            creationflags=SUBPROCESS_NO_WINDOW_FLAGS,
+        )
     except FileNotFoundError as exc:
         raise RuntimeError("PowerShell executable not found in PATH.") from exc
 
