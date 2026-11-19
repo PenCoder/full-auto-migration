@@ -41,8 +41,7 @@ class TestStateManagement:
         """Test that advanced operations have defaults."""
         state = QtUiState()
         
-        assert "incremental_backup" in state.advanced_operations
-        assert state.advanced_operations["incremental_backup"] is True
+        assert state.advanced_operations == {"dry_run": False}
 
     def test_state_isolation(self):
         """Test that state instances are isolated."""

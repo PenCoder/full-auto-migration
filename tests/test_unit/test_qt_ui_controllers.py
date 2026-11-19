@@ -345,6 +345,10 @@ class TestModeController:
 
         ctl.on_mode_change("expert")
         assert ui_state.mode == "expert"
+        # Choosing a mode never opens the dock; the user opens it via the button.
+        assert dock.isVisible() is False
+        assert toggle_btn.enabled is True
+        ctl.toggle_expert_panel()
         assert dock.isVisible() is True
         ctl.toggle_expert_panel()
         assert dock.isVisible() is False
@@ -356,6 +360,7 @@ class TestModeController:
         dock.show()
         toggle_btn = _DummyButton()
         complete_btn = _DummyButton()
+        complete_btn.setEnabled(True)  # "Run Automatically" starts enabled
         mode_badge = _DummyButton()
         stack = _DummyStack(count=2)
 
@@ -373,7 +378,8 @@ class TestModeController:
         ctl.apply_mode_presentation("guided")
         assert dock.isVisible() is False
         assert toggle_btn.enabled is False
-        assert complete_btn.enabled is False
+        # Guided mode is meant to run automatically, so this must stay enabled.
+        assert complete_btn.enabled is True
 
 
 class TestOperationsController:

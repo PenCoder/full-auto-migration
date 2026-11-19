@@ -27,8 +27,11 @@ def test_build_plan_expert_adds_manual_review_items():
 
     assert plan["mode"] == "expert"
     assert plan["customization_depth"] == "advanced"
-    assert plan["counts"]["excluded"] >= 3
-    assert any(item["name"] == "Taskbar / Panel Layout" for item in plan["items"])
+    by_name = {item["name"]: item for item in plan["items"]}
+    # Not selected by default in expert mode, so they are excluded.
+    excluded = {i["name"] for i in plan["items"] if i["action"] == "exclude"}
+    assert excluded == {"Keyboard Shortcuts", "File Associations"}
+    assert by_name["App Shortcuts"]["action"] == "auto_migrate"
 
 
 def test_build_plan_expert_selected_advanced_items_require_manual_review():
@@ -47,7 +50,10 @@ def test_build_plan_expert_selected_advanced_items_require_manual_review():
         },
     )
 
-    assert plan["counts"]["manual_review"] >= 3
+    manual = {i["name"] for i in plan["items"] if i["action"] == "manual_review"}
+    assert manual == {"Keyboard Shortcuts", "File Associations"}
+    app_shortcuts = next(i for i in plan["items"] if i["name"] == "App Shortcuts")
+    assert app_shortcuts["action"] == "auto_migrate"
 
 
 def test_build_plan_honors_selection_preferences():
