@@ -73,7 +73,6 @@ logs/
 
 .claude/*
 !.claude/commands/
-!.claude/settings.json
 CLAUDE.local.md
 *cache/
 misc/site/
